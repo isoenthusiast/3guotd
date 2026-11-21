@@ -23,7 +23,7 @@ const stats = (value: unknown): boolean => record(value)
 
 function decodeRound(value: unknown, mission: Round['mission']): Round | null {
   if (!record(value)) return null
-  if (!['setup', 'running', 'won', 'lost'].includes(String(value.phase))
+  if (typeof value.phase !== 'string' || !['setup', 'running', 'won', 'lost'].includes(value.phase)
     || !integer(value.waveNumber) || value.waveNumber < 1
     || !integer(value.totalWaves) || value.waveNumber > value.totalWaves
     || !(mission ? value.totalWaves === mission.waves.length : waveOptions.some(count => count === value.totalWaves))

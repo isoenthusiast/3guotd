@@ -130,7 +130,7 @@ function App() {
   const [hasSave, setHasSave] = useState(() => loadGame() !== null)
   const [sound, setSound] = useState(loadSound)
   const [notice, setNotice] = useState('')
-  const [confirmRestart, setConfirmRestart] = useState(false)
+  const [confirmation, setConfirmation] = useState<'restart' | 'restore' | 'new' | null>(null)
   const [draftMission, setDraftMission] = useState<Mission>(campaign[0])
   const [draftWaves, setDraftWaves] = useState(20)
   const previousAudio = useRef<Round | null>(null)
@@ -188,11 +188,12 @@ function App() {
   function showMenu() {
     previousAudio.current = null
     setNotice('')
-    setConfirmRestart(false)
+    setConfirmation(null)
     setScreen('menu')
   }
 
   function enterBattle(next: Round, restore = false) {
+    setConfirmation(null)
     setRound(next)
     setHasRun(true)
     setPaused(restore && next.phase === 'running')
@@ -200,6 +201,20 @@ function App() {
     previousAudio.current = null
     if (sound) enableAudio()
     setScreen('battle')
+  }
+
+  const unfinishedRun = hasRun && (round.phase === 'setup' || running)
+
+  function restoreGame() {
+    const saved = loadGame()
+    if (!saved) {
+      setConfirmation(null)
+      setHasSave(false)
+      setNotice('The saved game could not be restored.')
+      return
+    }
+    setSpeed(saved.speed)
+    enterBattle(saved.round, true)
   }
 
   function openMission(next: Mission) {
@@ -274,26 +289,27 @@ function App() {
       <div class="menu-actions">
         {hasRun && <button type="button" class="primary" onClick={() => {
           if (sound) enableAudio()
+          setConfirmation(null)
           setScreen('battle')
         }}>Continue</button>}
-        <button type="button" onClick={() => setScreen('campaign')}>Campaign</button>
-        <button type="button" onClick={() => setScreen('long')}>Long battle</button>
+        <button type="button" onClick={() => {
+          setConfirmation(null)
+          setScreen('campaign')
+        }}>Campaign</button>
+        <button type="button" onClick={() => {
+          setConfirmation(null)
+          setScreen('long')
+        }}>Long battle</button>
         <button type="button" disabled={!hasRun} onClick={() => {
           const saved = saveGame(round, speed)
           if (saved) setHasSave(true)
           setNotice(saved ? 'Game saved on this browser.' : 'This browser could not save the game.')
         }}>Save game</button>
         <button type="button" disabled={!hasSave} onClick={() => {
-          const saved = loadGame()
-          if (!saved) {
-            setHasSave(false)
-            setNotice('The saved game could not be restored.')
-            return
-          }
-          setSpeed(saved.speed)
-          enterBattle(saved.round, true)
+          if (unfinishedRun) setConfirmation('restore')
+          else restoreGame()
         }}>Restore saved game</button>
-        {hasRun && !confirmRestart && <button type="button" onClick={() => setConfirmRestart(true)}>
+        {hasRun && confirmation !== 'restart' && <button type="button" onClick={() => setConfirmation('restart')}>
           {mission ? 'Restart level' : 'Restart battle'}
         </button>}
         <button type="button" aria-pressed={sound} onClick={() => {
@@ -303,10 +319,15 @@ function App() {
           saveSound(enabled)
         }}>Sound {sound ? 'on' : 'off'}</button>
       </div>
-      {confirmRestart && <div class="menu-confirm">
+      {confirmation === 'restart' && <div class="menu-confirm">
         <p>Restart from wave one? Your saved game stays available.</p>
         <button type="button" class="primary" onClick={() => enterBattle(createRound(round.totalWaves, mission))}>Restart from wave one</button>
-        <button type="button" onClick={() => setConfirmRestart(false)}>Cancel</button>
+        <button type="button" onClick={() => setConfirmation(null)}>Cancel</button>
+      </div>}
+      {confirmation === 'restore' && <div class="menu-confirm">
+        <p>Replace your current run with the saved game?</p>
+        <button type="button" class="primary" onClick={restoreGame}>Replace with saved game</button>
+        <button type="button" onClick={() => setConfirmation(null)}>Cancel</button>
       </div>}
       {notice && <p role="status">{notice}</p>}
     </main>
@@ -362,8 +383,15 @@ function App() {
           </select>
         </div>
       </section>}
-      <button class="primary enter-battle" type="button"
-        onClick={() => enterBattle(createRound(draftWaves, selectedMission))}>Enter battle</button>
+      {confirmation === 'new' ? <div class="menu-confirm">
+        <p>Start this battle and replace your current run?</p>
+        <button class="primary" type="button"
+          onClick={() => enterBattle(createRound(draftWaves, selectedMission))}>Replace and enter battle</button>
+        <button type="button" onClick={() => setConfirmation(null)}>Cancel</button>
+      </div> : <button class="primary enter-battle" type="button" onClick={() => {
+        if (unfinishedRun) setConfirmation('new')
+        else enterBattle(createRound(draftWaves, selectedMission))
+      }}>Enter battle</button>}
     </main>
   }
 

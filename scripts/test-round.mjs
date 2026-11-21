@@ -288,6 +288,10 @@ try {
     assert.equal(saveGame(run, 3), true)
     assert.deepEqual(loadGame(), { round: run, speed: 3 })
   }
+  const malformed = JSON.parse(local.get('3guotd.saved-game.v1'))
+  malformed.round.phase = ['running']
+  local.set('3guotd.saved-game.v1', JSON.stringify(malformed))
+  assert.equal(loadGame(), null, 'Save phases must be exact strings')
   local.set('3guotd.saved-game.v1', '{"version":1,"missionId":null,"round":{},"speed":1}')
   assert.equal(loadGame(), null, 'Incomplete snapshots must be refused')
   local.set('3guotd.saved-game.v1', '{"version":2}')
