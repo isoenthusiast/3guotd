@@ -173,11 +173,14 @@ main.with-refund { --board-space: 21.25rem; }
   background-repeat: no-repeat;
 }
 @media (max-height: 500px) {
-  .with-actions .command-bar { padding-block: .2rem; }
-  .with-actions .actions { margin-top: .2rem; }
+  :is(.with-actions, .with-refund) .command-bar { padding-block: .2rem; }
+  :is(.with-actions, .with-refund) .actions { margin-top: .2rem; }
 }
 @media (max-height: 500px) {
-  .with-actions .board-view .battlefield { min-width: 0; width: min(100%, max(180px, calc((100dvh - var(--board-space)) * 2 / 3))); }
+  :is(.with-actions, .with-refund) .board-view .battlefield {
+    width: min(100%, max(180px, calc((100dvh - var(--board-space)) * 2 / 3)));
+  }
+  .with-refund .board-view .battlefield { width: min(100%, 170px); }
 }
 @media (max-height: 500px) {
   .setup-screen .briefing-art { height: clamp(5rem, 23dvh, 7rem); }

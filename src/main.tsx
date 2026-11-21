@@ -429,8 +429,10 @@ function App() {
             <>
               <button type="button" class="primary"
                 onClick={() => setRound(startRound)}>Start wave</button>
-              {initialSetup && round.towers.length > 0 && <button type="button"
+              {initialSetup && round.towers.length > 0 && !(canRefund && tower) && <button type="button"
                 onClick={() => { setRound(createRound(round.totalWaves, mission)); selectTile(null) }}>Clear towers</button>}
+              {canRefund && tower && <button type="button"
+                onClick={() => setRound(current => removeTower(current, tower.site))}>Remove &amp; refund</button>}
             </>
           ) : (
             <button type="button" onClick={() => {
@@ -461,8 +463,6 @@ function App() {
                       </span>
                     </button>
                   ))}
-                  {canRefund && <button type="button"
-                    onClick={() => setRound(current => removeTower(current, tower.site))}>Remove &amp; refund</button>}
                 </>
               ) : towerKinds.map(kind => (
                 <button key={kind} type="button" class="purchase-card" disabled={shortfall > 0}
