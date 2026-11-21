@@ -2,7 +2,7 @@ import { render } from 'preact'
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { columns, rows, sitePosition } from './game/board'
 import {
-  attackerName, baseUpgradePrice, buildTower, canBuildAt, canSpend, closedSites, createRound, enemiesRemaining, objectiveProgress, removeTower,
+  attackerName, enemyMaxHealth, baseUpgradePrice, buildTower, canBuildAt, canSpend, closedSites, createRound, enemiesRemaining, objectiveProgress, removeTower,
   secondUpgradeSurcharge, roundRoutes, prepareNextLevel,
   retryRound, speedOptions, startRound, tickRound, towerDetails, towerPrice, upgradePrice,
   upgradeTower, waveCueTime, roundFormation, waveOptions,
@@ -186,10 +186,14 @@ function App() {
   let status = setup ? (round.towers.length ? '' : 'Tap a stake beside the road')
     : round.phase === 'won' ? (mission ? 'Level cleared!' : 'Gate defended!') : 'The gate fell.'
   if (running) {
+    const first = formation.sequence[0]
+    const waveCue = round.continuedStory
+      ? `First: ${attackerName(first)} · ${enemyMaxHealth(round, first)} HP`
+      : formation.name
     status = paused ? 'Paused' : round.rebuildTime > 0
       ? `Rebuild · ${Math.ceil(round.rebuildTime)}s before attackers arrive`
       : round.waveAge < waveCueTime
-      ? `Wave ${round.waveNumber} starts · ${formation.name}`
+      ? `Wave ${round.waveNumber} starts · ${waveCue}`
       : `${enemiesRemaining(round)} of ${formation.sequence.length} attackers`
   }
   if (preparingLevel) {
