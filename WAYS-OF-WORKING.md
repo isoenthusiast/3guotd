@@ -20,9 +20,16 @@ Start with the existing one-page web game. Make the first round easy to learn an
 
 SimaYi uses the [tower-defense UX playbook](Audit/TOWER-DEFENSE-UX.md) to review player experience and record evidence for acceptance.
 
-KongMing and SimaYi each have a dedicated Herdr pane titled with their name.
+Keep the main Herdr tab in four equal quadrants for every agent launch.
 
-Whenever adding an agent, create a dedicated Herdr pane in this workspace. Read `herdr --skill`, confirm the calling pane and workspace with `herdr pane current --current`, and split the calling pane in its current tab and project directory with focus preserved. Verify the returned pane ID and start the agent in that pane. If the pane cannot be created, report the blocker before adding the agent.
+| | Left | Right |
+|---|---|---|
+| Top | KongMing | SimaYi |
+| Bottom | FengChu | Current worker |
+
+Give every additional agent its own named pane. Show one worker at a time in the bottom-right quadrant. Before spawning a new worker, move the previous occupant into a named background tab in this workspace. Split SimaYi’s pane downward at 50% to recreate the worker slot, then launch the new agent there. To bring an existing worker forward, park the current occupant and move the desired worker pane below SimaYi. Preserve live sessions and user focus.
+
+Read `herdr --skill` and resolve live pane IDs before changing the layout. Verify the four pane labels and positions with `herdr pane layout` after each change.
 
 ## Audit follow-up
 
