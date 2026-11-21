@@ -1,0 +1,64 @@
+:root {
+  color-scheme: dark;
+  font-family: system-ui, sans-serif;
+  color: #f5e8cc;
+  background: #18251f;
+}
+
+body { margin: 0; }
+
+main {
+  width: min(100% - 2rem, 48rem);
+  margin: 3rem auto;
+}
+
+h1 {
+  font-size: clamp(1.6rem, 6vw, 2.6rem);
+  margin: 0 0 1rem;
+}
+
+figure { margin: 1.5rem 0 0; }
+
+canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: .5rem;
+}
+
+figcaption, header p {
+  color: #d5c4a6;
+  font-size: .875rem;
+  margin-top: .75rem;
+}
+
+.battlefield { position: relative; }
+
+.tower-site {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  width: clamp(27px, 8vw, 44px);
+  aspect-ratio: 1;
+  padding: 0;
+  border-radius: .4rem;
+  border: 1px solid #d6c397;
+  background: #25352c;
+  color: #f5e8cc;
+  font-size: 1rem;
+}
+
+.tower-site[aria-pressed="true"] {
+  color: #18251f;
+  background: #edbd74;
+}
+
+.tower-site[aria-pressed="false"]:disabled { opacity: .45; }
+.controls { display: flex; gap: .75rem; margin-top: 1rem; }
+
+.controls button {
+  min-height: 44px;
+  padding: .5rem 1rem;
+  font: inherit;
+}
