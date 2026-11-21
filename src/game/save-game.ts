@@ -60,13 +60,19 @@ function decodeRound(value: unknown, mission: Round['mission']): Round | null {
 export function loadGame(): SavedGame | null {
   try {
     const data: unknown = JSON.parse(localStorage.getItem(saveKey) ?? 'null')
-    if (!record(data) || data.version !== 1) return null
+    if (!record(data) || (data.version !== 1 && data.version !== 2)) return null
     const missions = record(data.round) && data.round.rulesVersion === 2 ? campaign : legacyCampaign
     const mission = data.missionId === null ? null : missions.find(level => level.id === data.missionId)
     const speed = speedOptions.find(option => option === data.speed)
     if (mission === undefined || !speed) return null
     const round = decodeRound(data.round, mission)
-    return round ? { round, speed } : null
+    if (!round) return null
+    if (data.version === 1) {
+      const savedTowers = [...round.towers, ...(round.opening?.towers ?? [])]
+      if (savedTowers.some(tower => tower.site >= 8 * 12)) return null
+      for (const tower of savedTowers) tower.site = Math.floor(tower.site / 8) * columns + tower.site % 8
+    }
+    return { round, speed }
   } catch {
     return null
   }
@@ -75,7 +81,7 @@ export function loadGame(): SavedGame | null {
 export function saveGame(round: Round, speed: PlaySpeed): boolean {
   try {
     const { mission, ...state } = round
-    localStorage.setItem(saveKey, JSON.stringify({ version: 1, missionId: mission?.id ?? null, round: state, speed }))
+    localStorage.setItem(saveKey, JSON.stringify({ version: 2, missionId: mission?.id ?? null, round: state, speed }))
     return true
   } catch {
     return false

@@ -1,4 +1,4 @@
-import { defaultRoutes, isBuildable, route, sitePosition } from './board'
+import { defaultRoutes, frontierApproach, isBuildable, route, sitePosition } from './board'
 import { campaign } from './campaign'
 
 import type { Point, Route } from './board'
@@ -194,7 +194,7 @@ export function objectiveProgress(round: Round): number {
 export const evacuatedGroups = objectiveProgress
 
 export function roundRoutes(round: Round): readonly Route[] {
-  return round.mission?.routes ?? defaultRoutes
+  return round.mission?.routes ?? (round.rulesVersion === undefined ? [frontierApproach] : defaultRoutes)
 }
 
 export function closedSites(round: Round): readonly number[] {

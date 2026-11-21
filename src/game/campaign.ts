@@ -1,4 +1,4 @@
-import { columns, connectRoute, defaultRoutes } from './board'
+import { columns, connectRoute, frontierApproach, withGateRoad } from './board'
 import type { AttackerKind, Formation, Mission } from './round'
 
 const formation = (name: string, sequence: readonly AttackerKind[], interval?: number): Formation => ({
@@ -32,7 +32,7 @@ type Battle = Omit<Mission, 'id' | 'battleId' | 'level' | 'waves' | 'closedSites
   withdrawnSites?: readonly number[]
 }
 
-export const battles: readonly Battle[] = [
+const approachesByBattle: readonly Battle[] = [
   {
     id: 'village-watch', title: 'Village Watch', setting: 'Late Han · 184 CE',
     briefing: 'Liu Bei asks you to guard the village road. Guan Yu points to the bend. Zhang Fei watches for runners.',
@@ -50,7 +50,7 @@ export const battles: readonly Battle[] = [
     victory: 'The last group is across. Liu Bei’s forces are still retreating. Keep moving toward the river.',
     defeat: 'The crossing has fallen. Retry the wave to change your defenses.',
     chronicle: 'Cao Cao defeated Liu Bei at Changban. In the novel, Zhang Fei holds the bridge as Zhao Yun crosses. The families, map, and evacuation waves are game fiction.',
-    routes: defaultRoutes, gate: 'Evacuation gate', objective: 'Protect the crossing', milestone: 'groups across',
+    routes: [frontierApproach], gate: 'Evacuation gate', objective: 'Protect the crossing', milestone: 'groups across',
     milestoneCount: 3, terrain: 'field',
   },
   {
@@ -89,7 +89,7 @@ export const battles: readonly Battle[] = [
     chronicle: 'Lu Xun defeated Liu Bei at Yiling. The particular retreat party and the closing tower sites are game fiction.',
     routes: [connectRoute([2, 0], [2, 3], [5, 3], [5, 6], [3, 6], [3, 9], [2, 9], [2, 11])],
     gate: 'Retreat gate', objective: 'Protect the retreat as outer sites close', milestone: 'stages covered',
-    milestoneCount: 3, terrain: 'wood', withdrawnSites: [columns, columns + 1, columns * 2 + 1],
+    milestoneCount: 3, terrain: 'wood', withdrawnSites: [2 * columns + 3, 4 * columns + 4, 5 * columns + 4],
   },
   {
     id: 'wuzhang', title: 'The Wuzhang Supply Road', setting: 'Wuzhang · 234 CE',
@@ -103,6 +103,10 @@ export const battles: readonly Battle[] = [
     milestoneCount: 3, terrain: 'pass',
   },
 ]
+
+export const battles = approachesByBattle.map(battle => ({
+  ...battle, routes: battle.routes.map(withGateRoad),
+}))
 
 // Later levels move an approach before setup, never underneath a live defense.
 const approaches = [
@@ -129,7 +133,7 @@ const threatNames = ['Raider rush', 'Road pursuit', 'Dock assault', 'Ferry rush'
 export const campaign: readonly Mission[] = battles.flatMap(({ id, withdrawnSites, ...battle }, chapter) =>
   levels.map((waves, index) => ({
     ...battle, battleId: id, id: `${id}:${index + 1}`, level: index + 1,
-    routes: index >= 2 ? approaches[chapter] : battle.routes,
+    routes: index >= 2 ? approaches[chapter].map(withGateRoad) : battle.routes,
     objective: `${battle.objective}${index >= 2 ? ' · New approach: inspect the road before placing towers' : ''}${withdrawnSites ? ' · The inner bend closes after wave 1; towers are fully refunded' : ''}`,
     waves: waves.map((opening, waveIndex) => {
       if (waveIndex === 0 || (chapter === 0 && index === 0)) return opening
@@ -137,13 +141,18 @@ export const campaign: readonly Mission[] = battles.flatMap(({ id, withdrawnSite
         threats[chapter][enemy % threats[chapter].length])
       if (index === 4 && waveIndex === waves.length - 1) sequence.push('commander')
       const reinforcement = (waveIndex > 1 ? Math.floor(index / 3) + Math.max(0, waveIndex - 2) * (chapter === 0 || chapter >= 4 ? 4 : 2) : 0)
-      const healthBonus = (chapter === 2 ? Math.floor(reinforcement / 2) : chapter === 3 && index >= 3 && waveIndex === waves.length - 1 ? reinforcement + 4 : reinforcement)
+      // Pressure on the longer run-in: a tighter Village raider column and a reinforced dock finale.
+      const raiderColumn = id === 'village-watch' && index === 2 && waveIndex > 1
+      const extraGuard = raiderColumn ? 1 : id === 'red-cliffs' && index === 4 && waveIndex > 1 ? 4 : 0
+      const healthBonus = extraGuard + (chapter === 2 ? Math.floor(reinforcement / 2) : chapter === 3 && index >= 3 && waveIndex === waves.length - 1 ? reinforcement + 4 : reinforcement)
+      const interval = waveIndex === waves.length - 1 ? (chapter === 4 ? 1.0 : chapter === 5 ? 0.8 : 0.9)
+        : Math.max(0.65, 1.4 - index * 0.04 - waveIndex * 0.04)
       return {
         name: `${threatNames[chapter]} · +${healthBonus} health`,
-        sequence, interval: waveIndex === waves.length - 1 ? (chapter === 4 ? 1.0 : chapter === 5 ? 0.8 : 0.9) : Math.max(0.65, 1.4 - index * 0.04 - waveIndex * 0.04), healthBonus,
+        sequence, interval: raiderColumn ? interval * 0.9 : interval, healthBonus,
       }
     }),
-    closedSites: withdrawnSites && waves.map((_, wave) => [19, 36, 44].slice(0, wave)),
+    closedSites: withdrawnSites && waves.map((_, wave) => withdrawnSites.slice(0, wave)),
   })),
 )
 

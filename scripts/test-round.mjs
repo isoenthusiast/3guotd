@@ -197,8 +197,18 @@ try {
   assert.equal(isMissionUnlocked(campaign[5], ['village-watch:5']), true)
   assert.equal(nextMission(campaign[4]).id, changban.id)
   assert.equal(nextMission(campaign.at(-1)), undefined)
-  for (const battle of battles) {
-    for (const path of battle.routes) {
+  // Segment counts measured on the former 8 × 12 board, before the level-three route change and after it.
+  const previousLengths = {
+    'village-watch': [[15], [17]], changban: [[17], [15]],
+    'red-cliffs': [[13, 14], [14, 15]], jing: [[12, 14], [13, 14]],
+    yiling: [[17], [18]], wuzhang: [[19], [19]],
+  }
+  assert.equal(route.length - 1, 21, 'Long battle previously had 17 segments')
+  for (const battle of campaign) {
+    const before = previousLengths[battle.battleId][Number(battle.level >= 3)]
+    for (const [lane, path] of battle.routes.entries()) {
+      assert.equal(path.length - 1, before[lane] + 4)
+      assert((path.length - 1) / columns > before[lane] / 8, 'Screen-space route length grows at equal board width')
       assert.equal(path[0][1], 0)
       assert.equal(path.at(-1)[1], rows - 1)
       for (const [index, [x, y]] of path.entries()) {
@@ -217,13 +227,13 @@ try {
   assert.deepEqual(arrivals.enemies.map(enemy => enemy.routeIndex), [0, 1])
 
   const retreat = createRound(20, campaign.find(mission => mission.id === 'yiling:1'))
-  let closure = startRound(buildTower(retreat, 19, 'archer'))
+  let closure = startRound(buildTower(retreat, site(3, 2), 'archer'))
   closure = tickRound({ ...closure, spawned: roundFormation(closure).sequence.length }, 1)
   assert.equal(closure.waveNumber, 2)
   assert.equal(closure.towers.length, 0)
   assert.equal(closure.silver, startingSilver)
-  assert.equal(canBuildAt(closure, 19), false)
-  assert.equal(buildTower(retryRound(closure), 19, 'archer').towers.length, 0)
+  assert.equal(canBuildAt(closure, site(3, 2)), false)
+  assert.equal(buildTower(retryRound(closure), site(3, 2), 'archer').towers.length, 0)
   assert.equal(closure.rebuildTime, 5)
   closure = buildTower(closure, 0, 'drum')
   assert.equal(closure.towers.length, 1, 'Can rebuild with the refund before attackers arrive')
@@ -240,9 +250,13 @@ try {
   const rankedSites = (level, coverageOnly = false) => {
     const score = cell => {
       const [x, y] = sitePosition(cell)
-      return roundRoutes(level).reduce((sum, path) => sum + path.reduce((coverage, [rx, ry], index) =>
+      return roundRoutes(level).reduce((sum, route) => {
+        // Mixed defenses cover the approach early enough to reinvest kill rewards.
+        const path = coverageOnly ? route : route.slice(0, -4)
+        return sum + path.reduce((coverage, [rx, ry], index) =>
         coverage + (Math.hypot(rx - x, ry - y) <= 1.8
-          ? 1 + (coverageOnly ? 0 : (path.length - index) / path.length * 0.3) : 0), 0), 0)
+          ? 1 + (coverageOnly ? 0 : (path.length - index) / path.length * 0.3) : 0), 0)
+      }, 0)
     }
     return Array.from({ length: columns * rows }, (_, cell) => cell)
       .filter(cell => canBuildAt(level, cell)).sort((a, b) => score(b) - score(a))
@@ -264,7 +278,8 @@ try {
       const strongerDrum = policy.strong && level.towers.find(tower => tower.kind === 'drum' && !tower.power)
       const archer = level.towers.find(tower => tower.kind === 'archer' && !tower.power)
       const shouldUpgrade = policy.upgrade && level.towers.length >= (policy.minimum ?? 3)
-      if (shouldUpgrade && drum) level = upgradeTower(level, drum.site, 'reach')
+      if (shouldUpgrade && policy.drumIndex === 3 && archer) level = upgradeTower(level, archer.site, 'power')
+      else if (shouldUpgrade && drum) level = upgradeTower(level, drum.site, 'reach')
       else if (shouldUpgrade && strongerDrum) level = upgradeTower(level, strongerDrum.site, 'power')
       else if (shouldUpgrade && archer) level = upgradeTower(level, archer.site, 'power')
       else if (level.silver >= towerPrice && level.towers.length < columns * rows) {
@@ -281,10 +296,10 @@ try {
   // Fixed witnesses: [opening Drum rank, spacing between Drums, towers before upgrades, stronger slow].
   // A failed witness is a regression, rather than a search for a different winning policy.
   const plans = {
-    'village-watch:2': [0, 4, 9], 'village-watch:3': [1, 5, 3],
+    'village-watch:2': [0, 4, 9], 'village-watch:3': [3, 8, 3, true],
     'village-watch:4': [2, 4, 3, true], 'village-watch:5': [1, 5, 3, true],
     'changban:2': [0, 3, 7], 'changban:4': [0, 4, 5], 'changban:5': [0, 4, 3],
-    'jing:4': [0, 4, 3], 'jing:5': [0, 4, 3],
+    'red-cliffs:5': [2, 3, 5, true], 'jing:4': [0, 5, 3], 'jing:5': [0, 5, 3],
     'yiling:2': [0, 3, 5], 'yiling:3': [0, 4, 7],
     'yiling:4': [0, 4, 7, true], 'yiling:5': [1, 4, 7],
     'wuzhang:4': [0, 3, 7, true], 'wuzhang:5': [0, 3, 9],
@@ -380,6 +395,16 @@ try {
     assert.equal(saveGame(run, 3), true)
     assert.deepEqual(loadGame(), { round: run, speed: 3 })
   }
+  saveGame(startRound(buildTower(initial, site(1, 4), 'archer')), 2)
+  const oldSlot = JSON.parse(local.get('3guotd.saved-game.v1'))
+  oldSlot.version = 1
+  oldSlot.round.towers[0].site = oldSlot.round.opening.towers[0].site = 4 * 8 + 1
+  local.set('3guotd.saved-game.v1', JSON.stringify(oldSlot))
+  const migrated = loadGame().round
+  assert.equal(migrated.towers[0].site, site(1, 4))
+  assert.equal(retryRound(migrated).towers[0].site, site(1, 4))
+  saveGame(migrated, 2)
+  assert.deepEqual(loadGame().round, migrated, 'A migrated tower moves only once')
   const { campaign: legacyCampaign } = require(join(output, 'legacy-campaign.js'))
   // Unversioned snapshots retain the original schedule and geometry throughout resume/retry.
   for (const mission of [...legacyCampaign, null]) {

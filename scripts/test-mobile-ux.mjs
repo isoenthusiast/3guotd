@@ -29,11 +29,33 @@ async function checkPhone(width, height) {
     const original = await board.boundingBox()
     const checkFrame = async () => {
       const current = await board.boundingBox()
+      assert(await fits(board))
+      const overflow = await page.evaluate(() => {
+        const root = document.scrollingElement
+        return [root.scrollWidth - innerWidth, root.scrollHeight - innerHeight, scrollX, scrollY]
+      })
+      assert.deepEqual(overflow, [0, 0, 0, 0], 'Battle and controls fit without scrolling')
       for (const prop of ['x', 'y', 'width', 'height']) {
         assert(Math.abs(current[prop] - original[prop]) < 1, `Board ${prop} moved during purchase at ${width} × ${height}`)
       }
     }
-    await button('Empty tile, row 12, column 8').tap()
+    for (const label of ['Empty tile, row 1, column 3', 'Empty tile, row 13, column 6']) {
+      const nearLandmark = button(label)
+      await nearLandmark.tap()
+      assert.equal(await nearLandmark.getAttribute('aria-pressed'), 'true')
+      await checkFrame()
+    }
+    const tile = button('Empty tile, row 13, column 9')
+    const box = await tile.boundingBox()
+    assert(box.width >= 24 && box.height >= 24, 'Touch tiles must measure at least 24 CSS pixels')
+    for (const column of [8, 9]) {
+      const cell = button(`Empty tile, row 13, column ${column}`)
+      const target = await cell.boundingBox()
+      await page.touchscreen.tap(target.x + target.width / 2, target.y + target.height / 2)
+      assert.equal(await cell.getAttribute('aria-pressed'), 'true')
+    }
+    console.log(`Board at ${width} × ${height}: ${original.width.toFixed(1)} × ${original.height.toFixed(1)}, tile ${box.width.toFixed(1)} px.`)
+    await button('Empty tile, row 1, column 9').tap()
     await checkFrame()
     assert.match(await card('Archer').innerText(), /Road out of range/)
     for (const kind of ['Archer', 'Drum', 'Archer']) {
@@ -49,7 +71,25 @@ async function checkPhone(width, height) {
     await checkFrame()
     await button('Start wave').tap()
     await button('Pause').tap()
+    await checkFrame()
     assert(await fits(button('Resume')))
+    await button('Main menu').tap()
+    await button('Save game').tap()
+    await page.evaluate(() => {
+      const key = '3guotd.saved-game.v1'
+      const saved = JSON.parse(localStorage.getItem(key))
+      saved.round.waveNumber = 2
+      saved.round.previousWave = { ...saved.round.waveStats, waveNumber: 1 }
+      localStorage.setItem(key, JSON.stringify(saved))
+    })
+    await page.reload()
+    await button('Restore saved game').tap()
+    await button('Report').tap()
+    await page.getByText('Wave 1 summary').tap()
+    assert(await fits(button('Close report')))
+    await button('Close report').tap()
+    await page.locator('button.useful-site').first().tap()
+    await checkFrame()
     assert.deepEqual(errors, [])
     console.log(`Passed offline placement, purchase, refund, and stable board at ${width} × ${height}.`)
   } finally {
@@ -59,6 +99,7 @@ async function checkPhone(width, height) {
 
 try {
   await checkPhone(320, 480)
+  await checkPhone(320, 568)
   await checkPhone(390, 740)
 } finally {
   await browser.close()

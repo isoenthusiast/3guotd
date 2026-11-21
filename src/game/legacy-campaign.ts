@@ -1,5 +1,5 @@
 // Frozen ec46433 mission rules for unversioned v1 saves. New games use campaign.ts.
-import { columns, connectRoute, defaultRoutes } from './board'
+import { columns, connectRoute, frontierApproach } from './board'
 import type { AttackerKind, Formation, Mission } from './round'
 
 const formation = (name: string, sequence: readonly AttackerKind[], interval?: number): Formation => ({
@@ -51,7 +51,7 @@ export const battles: readonly Battle[] = [
     victory: 'The last group is across. Liu Bei’s forces are still retreating. Keep moving toward the river.',
     defeat: 'The crossing has fallen. Retry the wave to change your defenses.',
     chronicle: 'Cao Cao defeated Liu Bei at Changban. In the novel, Zhang Fei holds the bridge as Zhao Yun crosses. The families, map, and evacuation waves are game fiction.',
-    routes: defaultRoutes, gate: 'Evacuation gate', objective: 'Protect the crossing', milestone: 'groups across',
+    routes: [frontierApproach], gate: 'Evacuation gate', objective: 'Protect the crossing', milestone: 'groups across',
     milestoneCount: 3, terrain: 'field',
   },
   {

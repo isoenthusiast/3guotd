@@ -149,6 +149,7 @@ function loadClears(): string[] {
 }
 
 function App() {
+  const reportDialog = useRef<HTMLDialogElement>(null)
   const [offline, setOffline] = useState('')
   const [screen, setScreen] = useState<'menu' | 'campaign' | 'long' | 'battle'>('menu')
   const [hasRun, setHasRun] = useState(false)
@@ -460,6 +461,10 @@ function App() {
       <div class="map-controls">
         <button type="button" class="pause-control" aria-label="Main menu" onClick={showMenu}>Menu</button>
         {speedPicker}
+        {(report || showChronicle) && <button type="button" class="pause-control" onClick={() => {
+          if (running || preparingLevel) setPaused(true)
+          reportDialog.current?.showModal()
+        }}>Report</button>}
         {(running || preparingLevel) && <button type="button" class="pause-control" onClick={() => setPaused(value => !value)}>
           {paused ? 'Resume' : 'Pause'}
         </button>}
@@ -527,17 +532,20 @@ function App() {
           </section>
         )}
       </div>
-      {mission && finished && <p class="mission-outcome">{round.phase === 'lost' ? mission.defeat
-        : mission.level === 5 ? mission.victory : `Level ${mission.level} cleared. Level ${mission.level + 1} unlocked.`}</p>}
-      {showChronicle && <details class="wave-report" open={round.phase === 'won'}>
-        <summary>{mission?.title} Chronicle</summary>
-        <p>{mission?.chronicle}</p>
-      </details>}
-      {report && <details class="wave-report">
-        <summary>Wave {report.waveNumber} summary</summary>
-        <p>{report.stopped} stopped · {report.escaped} reached the gate · {report.earned} silver earned</p>
-        {report.runnersEscaped > 0 && <p>Runners that reached the gate: {report.runnersEscaped}</p>}
-      </details>}
+      {(report || showChronicle) && <dialog ref={reportDialog} class="battle-report" aria-label="Battle report">
+        {mission && finished && <p class="mission-outcome">{round.phase === 'lost' ? mission.defeat
+          : mission.level === 5 ? mission.victory : `Level ${mission.level} cleared. Level ${mission.level + 1} unlocked.`}</p>}
+        {showChronicle && <details class="wave-report" open={round.phase === 'won'}>
+          <summary>{mission?.title} Chronicle</summary>
+          <p>{mission?.chronicle}</p>
+        </details>}
+        {report && <details class="wave-report">
+          <summary>Wave {report.waveNumber} summary</summary>
+          <p>{report.stopped} stopped · {report.escaped} reached the gate · {report.earned} silver earned</p>
+          {report.runnersEscaped > 0 && <p>Runners that reached the gate: {report.runnersEscaped}</p>}
+        </details>}
+        <form method="dialog"><button type="submit">Close report</button></form>
+      </dialog>}
     </main>
   )
 }

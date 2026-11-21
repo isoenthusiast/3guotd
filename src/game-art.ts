@@ -154,11 +154,13 @@ export function drawBattlefield(
     point: center(path[0]),
   }))
   landmarks.push({ label: round.mission?.gate ?? 'Shu Outpost Gate', point: [gateX, objective ? gateY - 48 : gateY] })
-  ctx.font = 'bold 21px system-ui'
+  ctx.font = 'bold 25px system-ui'
   for (const { label, point: [x, y] } of landmarks) {
     const right = x < columns * tile / 2
-    const labelX = x + (right ? 34 : -34)
-    ctx.textAlign = right ? 'left' : 'right'
+    const labelWidth = ctx.measureText(label).width
+    const desiredX = right ? x + 34 : x - 34 - labelWidth
+    const labelX = Math.max(4, Math.min(columns * tile - labelWidth - 4, desiredX))
+    ctx.textAlign = 'left'
     ctx.lineWidth = 5
     ctx.strokeStyle = '#29332a'
     ctx.fillStyle = '#fff0cc'
