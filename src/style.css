@@ -1,78 +1,62 @@
 :root {
   color-scheme: dark;
   font-family: system-ui, sans-serif;
-  color: #f5e8cc;
-  background: #18251f;
+  color: #f5e5c9;
+  background: #202720;
+  --bronze: #ebc084;
+  --panel: #30392e;
 }
 
 body { margin: 0; }
+main { width: min(100% - 1.25rem, 52rem); margin: 1.4rem auto; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; gap: .25rem .8rem; }
+h1 { font-family: Georgia, serif; font-size: clamp(1.6rem, 6vw, 2.6rem); margin: 0; }
+.offline { color: #c4beaa; font-size: .8rem; }
+.hud { display: flex; align-items: center; flex-wrap: wrap; gap: .35rem 1rem; min-height: 2.6rem; font-size: .875rem; }
+.hud strong { display: inline-flex; align-items: center; gap: .32rem; color: #ffe7ba; }
+.coin { width: .65rem; height: .65rem; border: 1px solid #f2d49c; border-radius: 50%; background: #ad8148; }
+.board-view { overflow-x: auto; border-radius: .5rem; }
+.map-mode { display: none; }
+.battlefield { position: relative; background: #4c654d; border-radius: .5rem; overflow: hidden; }
+canvas { display: block; width: 100%; height: auto; }
 
-main {
-  width: min(100% - 2rem, 48rem);
-  margin: 3rem auto;
-}
-
-h1 {
-  font-size: clamp(1.6rem, 6vw, 2.6rem);
-  margin: 0 0 1rem;
-}
-
-figure { margin: 1.5rem 0 0; }
-
-canvas {
-  display: block;
-  width: 100%;
-  height: auto;
-  border-radius: .5rem;
-}
-
-figcaption, header p {
-  color: #d5c4a6;
-  font-size: .875rem;
-  margin-top: .75rem;
-}
-
-.battlefield { position: relative; }
-
-.tower-site {
+.cells {
   position: absolute;
-  transform: translate(-50%, -50%);
+  inset: 0;
   display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  border: 0;
-  background: transparent;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-rows: repeat(8, minmax(0, 1fr));
+}
+
+button {
+  border: 1px solid #7a725a;
+  border-radius: .35rem;
+  background: #363e33;
   color: inherit;
   font: inherit;
+  cursor: pointer;
 }
 
-.tower-marker {
-  box-sizing: border-box;
-  display: grid;
-  place-items: center;
-  width: clamp(27px, 8vw, 44px);
-  aspect-ratio: 1;
-  pointer-events: none;
-  border-radius: .4rem;
-  border: 1px solid #d6c397;
-  background: #25352c;
-  color: #f5e8cc;
-  font-size: 1rem;
-}
+button:disabled { opacity: .5; cursor: default; }
+button:focus-visible { outline: 2px solid #ffedaf; outline-offset: 2px; }
+.cell { background: transparent; border: 0; border-radius: 0; padding: 0; touch-action: manipulation; }
+.cell[aria-pressed="true"], .cell:focus-visible { outline: 2px solid #ffedaf; outline-offset: -2px; }
+@media (hover: hover) { .cell:hover { background: #fff0af24; } }
 
-.tower-site[aria-pressed="true"] .tower-marker {
-  color: #18251f;
-  background: #edbd74;
-}
+.command-bar { position: sticky; bottom: 0; z-index: 1; background: #202720; padding: .55rem 0 .4rem; }
+.actions { min-height: 7rem; box-sizing: border-box; background: var(--panel); border: 1px solid #625e4e; border-radius: .5rem; padding: .55rem; }
+.action-label { margin: 0; color: #eadaca; font-size: .85rem; }
+.action-grid { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .45rem; }
+.action-grid button { flex: 1 1 5rem; min-height: 44px; padding: .35rem .3rem; font-size: .82rem; }
+.action-grid button[aria-pressed="true"] { border-color: var(--bronze); background: #594834; }
+button small { display: block; font-size: .7rem; line-height: 1.15; margin-top: .15rem; }
+.round-controls { display: flex; gap: .5rem; margin-top: .6rem; }
+.round-controls button { min-height: 44px; padding: .35rem .75rem; }
+.primary { background: #823f38; border-color: #b78661; }
 
-.tower-site:focus-visible { outline: 2px solid #fff4c5; }
-.tower-site[aria-pressed="false"]:disabled .tower-marker { opacity: .45; }
-.controls { display: flex; gap: .75rem; margin-top: 1rem; }
 
-.controls button {
-  min-height: 44px;
-  padding: .5rem 1rem;
-  font: inherit;
+@media (max-width: 548px) {
+  .map-mode { display: inline-block; min-height: 44px; padding: .35rem .6rem; margin-bottom: .35rem; }
+  .board-view.zoomed .battlefield { min-width: 528px; }
+  .board-view:not(.zoomed) .cells { display: none; }
 }

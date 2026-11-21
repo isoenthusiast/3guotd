@@ -4,6 +4,8 @@ Read [SimaYi’s first review](2026-11-21-simayi.md) for the original findings a
 
 See [SimaYi’s quick UX review](2026-11-21-ux-simayi.md) for the playability findings and the [UX remediation report](2026-11-21-ux-remediation.md) for verification.
 
+See the [single-page silver round audit](2026-11-21-single-page-audit.md) for the build-view and command-bar findings and evidence.
+
 From the checkout root, list open work:
 
 ```sh

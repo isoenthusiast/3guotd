@@ -1,137 +1,79 @@
 import { render } from 'preact'
 import { useEffect, useRef, useState } from 'preact/hooks'
-import { columns, route, rows } from './game/board'
-import { advanceRound, createRound, enemiesRemaining, enemyCount, enemyMaxHealth, enemyPosition, impactTime, retryRound, shotFlightTime, toggleTower, towerBudget, towerRange, towerSites } from './game/round'
-import type { Round } from './game/round'
+import { columns, isBuildable, rows, sitePosition } from './game/board'
+import {
+  advanceRound, buildTower, canSpend, createRound, enemiesRemaining, enemyCount, removeTower,
+  retryRound, startRound, towerDetails, towerPrice, upgradePrice, upgradeTower,
+} from './game/round'
+import type { Round, TowerKind } from './game/round'
+import { drawBattlefield, tile } from './game-art'
 import './style.css'
 
-function Battlefield({ round, onToggle }: { round: Round; onToggle: (site: number) => void }) {
+const siteCount = columns * rows
+const towerKinds = ['archer', 'drum'] as const
+const upgradeBranches = ['reach', 'power'] as const
+
+function Battlefield({ round, selected, kind, onSelect }: {
+  round: Round
+  selected: number | null
+  kind: TowerKind
+  onSelect: (site: number | null) => void
+}) {
   const canvas = useRef<HTMLCanvasElement>(null)
-
+  const cells = useRef<(HTMLButtonElement | null)[]>([])
   useEffect(() => {
-    const context = canvas.current?.getContext('2d')
-    if (!context) return
-
-    const tile = 64
-    for (let row = 0; row < rows; row++) {
-      for (let column = 0; column < columns; column++) {
-        context.fillStyle = (row + column) % 2 ? '#314638' : '#384f3f'
-        context.fillRect(column * tile, row * tile, tile, tile)
-      }
-    }
-
-    context.fillStyle = '#c6a36e'
-    for (const [column, row] of route) {
-      context.fillRect(column * tile, row * tile, tile, tile)
-    }
-    if (round.phase === 'setup') {
-      context.fillStyle = '#f5dca933'
-      context.strokeStyle = '#f5dca9aa'
-      context.lineWidth = 2
-      for (const tower of round.towers) {
-        const [x, y] = towerSites[tower.site]
-        context.beginPath()
-        context.arc((x + 0.5) * tile, (y + 0.5) * tile, towerRange * tile, 0, Math.PI * 2)
-        context.fill()
-        context.stroke()
-      }
-    }
-
-    const enemyCenters = new Map<number, [number, number]>()
-    for (const enemy of round.enemies) {
-      const [x, y] = enemyPosition(enemy.progress)
-      const center: [number, number] = [(x + 0.5) * tile, (y + 0.5) * tile]
-      enemyCenters.set(enemy.id, center)
-      context.fillStyle = '#a73735'
-      context.strokeStyle = '#371c1d'
-      context.lineWidth = 3
-      context.beginPath()
-      context.arc(...center, tile * 0.29, 0, Math.PI * 2)
-      context.fill()
-      context.stroke()
-    }
-
-    for (const shot of round.shots) {
-      const target = enemyCenters.get(shot.targetId)
-      if (!target) continue
-      const fromX = (shot.from[0] + 0.5) * tile
-      const fromY = (shot.from[1] + 0.5) * tile
-      const progress = shot.elapsed / shotFlightTime
-      const tail = Math.max(0, progress - 0.22)
-      const dx = target[0] - fromX
-      const dy = target[1] - fromY
-      const x = fromX + dx * progress
-      const y = fromY + dy * progress
-      context.strokeStyle = '#604116'
-      context.lineWidth = 9
-      context.lineCap = 'round'
-      context.beginPath()
-      context.moveTo(fromX + dx * tail, fromY + dy * tail)
-      context.lineTo(x, y)
-      context.stroke()
-      context.strokeStyle = '#ffd27a'
-      context.lineWidth = 4
-      context.stroke()
-      context.fillStyle = '#fff4c5'
-      context.beginPath()
-      context.arc(x, y, 6, 0, Math.PI * 2)
-      context.fill()
-    }
-
-    for (const impact of round.impacts) {
-      const progress = impact.elapsed / impactTime
-      context.globalAlpha = 1 - progress
-      context.strokeStyle = '#fff4c5'
-      context.lineWidth = 5
-      context.beginPath()
-      context.arc((impact.at[0] + 0.5) * tile, (impact.at[1] + 0.5) * tile,
-        10 + 23 * progress, 0, Math.PI * 2)
-      context.stroke()
-    }
-    context.globalAlpha = 1
-
-    for (const enemy of round.enemies) {
-      const center = enemyCenters.get(enemy.id)
-      if (!center) continue
-      const [x, y] = center
-      const pipWidth = 10
-      const gap = 2
-      const width = (pipWidth + gap) * enemyMaxHealth - gap
-      const left = x - width / 2
-      context.fillStyle = '#1b2220'
-      context.fillRect(left - 3, y - 35, width + 6, 13)
-      for (let pip = 0; pip < enemyMaxHealth; pip++) {
-        context.fillStyle = pip < enemy.health ? '#e4f6a7' : '#555b4d'
-        context.fillRect(left + pip * (pipWidth + gap), y - 32, pipWidth, 7)
-      }
-    }
-  }, [round])
+    const ctx = canvas.current?.getContext('2d')
+    if (ctx) drawBattlefield(ctx, round, selected, kind)
+  }, [round, selected, kind])
 
   return (
     <div class="battlefield">
-      <canvas ref={canvas} width={columns * 64} height={rows * 64}
-        role="img" aria-label="Battlefield with an enemy route from left to right" />
-      {towerSites.map(([x, y], site) => {
-        const placed = round.towers.some(tower => tower.site === site)
-        return (
-          <button key={site} type="button" class="tower-site"
-            style={{ left: `${(x + 0.5) / columns * 100}%`, top: `${(y + 0.5) / rows * 100}%` }}
-            disabled={round.phase !== 'setup' || (!placed && round.towers.length >= towerBudget)}
-            aria-label={`Tower site ${site + 1}`} aria-pressed={placed}
-            onClick={() => onToggle(site)}>
-              <span class="tower-marker" aria-hidden="true">{placed ? '▲' : '+'}</span>
-            </button>
-        )
-      })}
+      <canvas ref={canvas} width={columns * tile} height={rows * tile} role="img"
+        aria-label="Shu frontier battlefield, with an enemy road from left to right ending at the gate" />
+      <div class="cells" role="group" aria-label="Battlefield tiles. Use arrow keys to select a nearby tile.">
+        {Array.from({ length: siteCount }, (_, site) => {
+          if (!isBuildable(site)) return <span key={site} aria-hidden="true" />
+          const [x, y] = sitePosition(site)
+          const tower = round.towers.find(candidate => candidate.site === site)
+          const label = tower ? towerDetails[tower.kind].name : 'Empty tile'
+          return (
+            <button key={site} ref={button => { cells.current[site] = button }}
+              type="button" class="cell" tabIndex={site === (selected ?? 0) ? 0 : -1}
+              aria-label={`${label}, row ${y + 1}, column ${x + 1}`}
+              aria-pressed={selected === site} onClick={() => onSelect(site)}
+              onKeyDown={event => {
+                const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -columns, ArrowDown: columns }[event.key]
+                if (step === undefined) return
+                event.preventDefault()
+                let next = site + step
+                while (next >= 0 && next < siteCount) {
+                  const sameLine = Math.abs(step) === 1 ? sitePosition(next)[1] === y : sitePosition(next)[0] === x
+                  if (!sameLine) return
+                  if (cells.current[next]) {
+                    onSelect(next)
+                    cells.current[next]?.focus()
+                    return
+                  }
+                  next += step
+                }
+              }} />
+          )
+        })}
+      </div>
     </div>
   )
 }
 
 function App() {
-  const [status, setStatus] = useState('')
+  const [offline, setOffline] = useState('')
   const [round, setRound] = useState(createRound)
+  const [selected, setSelected] = useState<number | null>(null)
+  const [kind, setKind] = useState<TowerKind>('archer')
+  const [zoomed, setZoomed] = useState(true)
   const running = round.phase === 'running'
-  const settingUp = round.phase === 'setup'
+  const setup = round.phase === 'setup'
+  const tower = round.towers.find(candidate => candidate.site === selected)
+  const selection = selected === null ? null : sitePosition(selected)
 
   useEffect(() => {
     if (!running) return
@@ -142,49 +84,82 @@ function App() {
   }, [running])
 
   useEffect(() => {
-    const platform = (window as Window & {
-      Capacitor?: { isNativePlatform(): boolean }
-    }).Capacitor
-
-    if (!import.meta.env.PROD || platform?.isNativePlatform()) return
-    if (!('serviceWorker' in navigator)) return
-
-    navigator.serviceWorker.register('./sw.js')
-      .catch(() => setStatus('Offline setup failed.'))
-    const markReady = () => {
-      if (navigator.serviceWorker.controller) setStatus('Ready offline')
+    const platform = (window as Window & { Capacitor?: { isNativePlatform(): boolean } }).Capacitor
+    if (!import.meta.env.PROD || document.documentElement.hasAttribute('data-standalone')
+      || platform?.isNativePlatform() || !('serviceWorker' in navigator)) return
+    navigator.serviceWorker.register('./sw.js').catch(() => setOffline('Offline setup failed.'))
+    const ready = () => {
+      if (navigator.serviceWorker.controller) setOffline('Ready offline')
     }
-    markReady()
-    navigator.serviceWorker.addEventListener('controllerchange', markReady)
-    return () => navigator.serviceWorker.removeEventListener('controllerchange', markReady)
+    ready()
+    navigator.serviceWorker.addEventListener('controllerchange', ready)
+    return () => navigator.serviceWorker.removeEventListener('controllerchange', ready)
   }, [])
 
   return (
     <main>
       <header>
         <h1>3Guo Tower Defense</h1>
-        {status && <p role="status">{status}</p>}
+        {offline && <span class="offline">{offline}</span>}
       </header>
-      <p role="status">Lives: {round.lives} · Towers: {round.towers.length}/{towerBudget}</p>
-      <Battlefield round={round} onToggle={site => setRound(current => toggleTower(current, site))} />
-      <div class="controls">
-        {settingUp ? (
-          <>
-            <button type="button"
-              onClick={() => setRound(current => ({ ...current, phase: 'running' }))}>Start wave</button>
-            <button type="button" disabled={round.towers.length === 0}
-              onClick={() => setRound(createRound())}>Clear towers</button>
-          </>
-        ) : (
-          <button type="button" onClick={() => setRound(retryRound)}>Retry round</button>
-        )}
+      <div class="hud">
+        <strong aria-label={`Silver: ${round.silver}`}><span class="coin" aria-hidden="true" />{round.silver} silver</strong>
+        <span>{round.lives} lives</span>
+        <span role="status">{running ? `${enemiesRemaining(round)} of ${enemyCount} attackers` : setup
+          ? 'Prepare defenses' : round.phase === 'won' ? 'Gate defended!' : 'The gate fell.'}</span>
       </div>
-      {settingUp && <p>Tap marked sites to place up to three towers. The circles show firing range. Cover the bends, then start the wave.</p>}
-      <p role="status" class="wave-status">
-        {running && `Enemies remaining: ${enemiesRemaining(round)} of ${enemyCount}`}
-        {round.phase === 'won' && 'Gate defended!'}
-        {round.phase === 'lost' && 'The gate fell.'}
-      </p>
+      <button type="button" class="map-mode" aria-pressed={!zoomed}
+        onClick={() => { setZoomed(current => !current); setSelected(null) }}>
+        {zoomed ? 'View full map' : 'Zoom to build'}
+      </button>
+      <div class={`board-view ${zoomed ? 'zoomed' : ''}`}>
+        <Battlefield round={round} selected={selected} kind={kind} onSelect={setSelected} />
+      </div>
+      <div class="command-bar">
+        <section class="actions" aria-label="Tower actions">
+          {selection ? (
+            <>
+              <p class="action-label">{tower ? towerDetails[tower.kind].name : 'Build tower'} · Row {selection[1] + 1}, column {selection[0] + 1}</p>
+              {tower ? (
+                <div class="action-grid">
+                  {upgradeBranches.map(branch => (
+                    <button key={branch} type="button"
+                      disabled={tower[branch] || !canSpend(round) || round.silver < upgradePrice(tower)}
+                      onClick={() => setRound(current => upgradeTower(current, tower.site, branch))}>
+                      {towerDetails[tower.kind][branch]}<small>{tower[branch] ? 'Purchased' : `${upgradePrice(tower)} silver`}</small>
+                    </button>
+                  ))}
+                  {setup && <button type="button" onClick={() => setRound(current => removeTower(current, tower.site))}>Remove &amp; refund</button>}
+                </div>
+              ) : (
+                <>
+                  <div class="action-grid">
+                    {towerKinds.map(option => (
+                      <button key={option} type="button" aria-pressed={kind === option} onClick={() => setKind(option)}>
+                        {towerDetails[option].name}<small>{option === 'archer' ? 'Deals damage' : 'Slows attackers'}</small>
+                      </button>
+                    ))}
+                    <button type="button" class="primary"
+                      disabled={!canSpend(round) || round.silver < towerPrice}
+                      onClick={() => setRound(current => buildTower(current, selected!, kind))}>
+                      Build {towerDetails[kind].name}<small>{towerPrice} silver</small>
+                    </button>
+                  </div>
+                </>
+              )}
+            </>
+          ) : <p class="action-label">Tap an empty tile to preview a tower, or tap a tower to upgrade it.</p>}
+        </section>
+        <div class="round-controls">
+          {setup ? (
+            <>
+              <button type="button" class="primary" onClick={() => setRound(startRound)}>Start wave</button>
+              {round.towers.length > 0 && <button type="button"
+                onClick={() => { setRound(createRound()); setSelected(null) }}>Clear towers</button>}
+            </>
+          ) : <button type="button" onClick={() => { setRound(retryRound); setSelected(null) }}>Retry round</button>}
+        </div>
+      </div>
     </main>
   )
 }

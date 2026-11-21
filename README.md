@@ -1,6 +1,10 @@
 # 3Guo Tower Defense
 
-A web-first tower defense starter built with Preact, TypeScript, Canvas 2D, and Vite. The starter includes one playable wave. Tap up to three tower sites, select Start wave, and survive with at least one life. Select **Retry round** to keep your towers and adjust the layout, or **Clear towers** in setup to start with an empty board.
+A web-first tower defense game built with Preact, TypeScript, Canvas 2D, and Vite. The current round defends a Shu frontier outpost against infantry and fast runners.
+
+On a phone, scroll the zoomed battlefield sideways to reach more sites, or select **View full map** to see the whole route. Tap an empty tile off the road in the build view to preview an Archer or Drum tower. Confirm the purchase in the action bar. Start with 90 silver, enough for three 30-silver towers. Kills pay 7 or 12 silver depending on enemy level. Spend silver during the wave to build more towers or buy upgrades. An Archer deals damage and a Drum slows attackers. Each tower can buy both upgrade branches in either order for 18 silver and then 27 silver.
+
+**Retry round** restores the towers, upgrades, and silver from the start of the wave. **Clear towers** in setup restores the starting purse.
 
 ## Local development
 
@@ -15,7 +19,11 @@ npm run build
 npm run preview
 ```
 
-`dev` serves source with live reload. `check` runs TypeScript validation. `test` simulates all legal tower layouts and checks that placement matters. `build` writes the production site and service worker to `dist/`. `preview` serves that build for local testing.
+`dev` serves source with live reload. `check` runs TypeScript validation. `test` checks combat, economy, retry, and a winning mixed-defense scenario. `build` writes the production site and service worker to `dist/`. `preview` serves that build for local testing.
+
+## Single HTML file
+
+`npm run build` also writes `dist/standalone.html`, which contains the game code, styles, and programmatically drawn art. To try the single-file version, open it directly or use the [private standalone link](https://edward-z370-hd3.tail94dc7a.ts.net:8472/standalone.html). The normal web build still has its existing service worker.
 
 ## Offline web
 
@@ -35,4 +43,4 @@ Commit the reviewed changes, then run `bash scripts/publish.sh` on Ed-Z370. The 
 
 For changes to the offline update path, open the old release and leave a tab open when publishing the new build. Check that the new worker waits and that the old tab can still reload offline. Close all game tabs and reopen to let the waiting worker activate. Confirm the new release then reloads offline.
 
-For changes to the board layout or round controls, verify touch at a 320 px viewport. Check that each tower has a distinct 44 × 44 px hit area. Complete a round, confirm the HUD count includes pending spawns, and check that **Retry round** keeps the layout while **Clear towers** removes it. For private-link changes, also record a check from an intended tailnet device.
+For changes to the board layout or round controls, verify touch at a 320 px viewport. Check 44 px touch targets near and far along the scrollable board. Confirm neighboring tiles select independently, selecting a tile cannot spend silver before confirmation, and the action bar stays in place. Verify upgrades and mid-wave purchases, then confirm **Retry round** restores the pre-wave layout and purse. For private-link changes, also record a check from an intended tailnet device.
