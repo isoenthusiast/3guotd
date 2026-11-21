@@ -14,7 +14,7 @@ try {
   ], { stdio: 'inherit' })
 
   const {
-    createRound, startRound, advanceRound, buildTower, upgradeTower, removeTower, retryRound,
+    createRound, startRound, advanceRound, tickRound, buildTower, upgradeTower, removeTower, retryRound,
     towerPrice, startingSilver, baseUpgradePrice, secondUpgradeSurcharge, towerRange,
     shotFlightTime, enemiesRemaining, enemyCount, enemyDetails,
   } = require(join(output, 'round.js'))
@@ -23,11 +23,11 @@ try {
   const initial = createRound()
   assert.equal(startingSilver, 3 * towerPrice)
   for (const [x, y] of route) assert.equal(isBuildable(site(x, y)), false)
-  assert.equal(buildTower(initial, site(0, 2), 'archer'), initial)
+  assert.equal(buildTower(initial, site(2, 0), 'archer'), initial)
 
-  const built = buildTower(initial, site(0, 1), 'archer')
+  const built = buildTower(initial, site(1, 0), 'archer')
   assert.equal(built.silver, startingSilver - towerPrice)
-  assert.equal(buildTower(built, site(0, 1), 'drum'), built)
+  assert.equal(buildTower(built, site(1, 0), 'drum'), built)
   for (const kind of ['archer', 'drum']) {
     for (const [first, second] of [['reach', 'power'], ['power', 'reach']]) {
       const tower = buildTower(initial, 0, kind)
@@ -43,6 +43,8 @@ try {
   }
 
   const seeded = startRound(built)
+  assert.deepEqual(tickRound(seeded, 3), tickRound(tickRound(tickRound(seeded, 1), 1), 1))
+  assert.deepEqual(tickRound(seeded, 2), tickRound(tickRound(seeded, 1), 1))
   let combat = seeded
   assert.equal(enemiesRemaining(combat), enemyCount)
   for (let step = 0; step < 120 && combat.shots.length === 0; step++) {
@@ -57,13 +59,13 @@ try {
   combat = advanceRound(combat, shotFlightTime / 2)
   assert.equal(targetHealth(), fullHealth - 1)
   assert.equal(combat.impacts.length, 1)
-  const upgradedMidWave = upgradeTower(combat, site(0, 1), 'power')
+  const upgradedMidWave = upgradeTower(combat, site(1, 0), 'power')
   assert.ok(upgradedMidWave.towers[0].power)
   assert.deepEqual(retryRound(upgradedMidWave), built)
 
-  const layout = placements => placements.reduce((round, [x, y, kind]) =>
-    buildTower(round, site(x, y), kind), initial)
-  let round = startRound(layout([[0, 1, 'archer'], [1, 1, 'archer'], [2, 1, 'archer']]))
+  const layout = (placements, waves = 1) => placements.reduce((round, [x, y, kind]) =>
+    buildTower(round, site(x, y), kind), createRound(waves))
+  let round = startRound(layout([[1, 0, 'archer'], [1, 1, 'archer'], [1, 2, 'archer']]))
   assert.equal(round.silver, 0)
   assert.equal(buildTower(round, 0, 'drum'), round)
   const rewards = new Set()
@@ -78,7 +80,7 @@ try {
     }
     round = next
     if (round.silver >= towerPrice && round.towers.length === 3) {
-      round = buildTower(round, site(3, 1), 'drum')
+      round = buildTower(round, site(1, 3), 'drum')
     }
     sawSlow ||= round.enemies.some(enemy => enemy.slowed)
     sawRunner ||= round.enemies.some(enemy => enemyDetails(enemy).runner)
@@ -87,14 +89,14 @@ try {
   assert.equal(round.towers.length, 4, 'Kill rewards can buy a fourth tower')
   assert.ok(rewards.has(7) && rewards.has(12), 'Payout must differ by level')
   assert.ok(sawSlow && sawRunner, 'Runners enter the wave and a Drum slows attackers')
-  assert.deepEqual(retryRound(round), layout([[0, 1, 'archer'], [1, 1, 'archer'], [2, 1, 'archer']]))
+  assert.deepEqual(retryRound(round), layout([[1, 0, 'archer'], [1, 1, 'archer'], [1, 2, 'archer']]))
 
-  const opening = [[0, 1, 'archer'], [1, 1, 'drum'], [2, 1, 'archer']]
+  const opening = [[1, 0, 'archer'], [1, 1, 'drum'], [1, 2, 'archer']]
   let mixed = startRound(layout(opening))
   for (let step = 0; step < 1200 && mixed.phase === 'running'; step++) {
     mixed = advanceRound(mixed, 0.05)
     if (mixed.silver >= towerPrice && mixed.towers.length === 3) {
-      mixed = buildTower(mixed, site(3, 1), 'archer')
+      mixed = buildTower(mixed, site(1, 3), 'archer')
     }
     if (mixed.towers.length === 4 && mixed.silver >= baseUpgradePrice) {
       const archer = mixed.towers.find(tower => tower.kind === 'archer' && !tower.power)
@@ -103,13 +105,44 @@ try {
   }
   assert.equal(mixed.phase, 'won', 'A mixed opening with reinvestment must be viable')
 
+  for (const totalWaves of [3, 5]) {
+    let battle = layout(opening, totalWaves)
+    for (let number = 1; number <= totalWaves; number++) {
+      assert.equal(battle.waveNumber, number)
+      const preWave = battle
+      battle = startRound(battle)
+      let running = battle
+      for (let step = 0; step < 1200 && running.phase === 'running'; step++) {
+        running = tickRound(running, 1)
+        if (running.phase !== 'running') break
+        if (running.silver >= towerPrice && running.towers.length === 3) {
+          running = buildTower(running, site(1, 3), 'archer')
+        }
+        if (running.towers.length === 4 && running.silver >= baseUpgradePrice) {
+          const archer = running.towers.find(tower => tower.kind === 'archer' && !tower.power)
+          if (archer) running = upgradeTower(running, archer.site, 'power')
+        }
+        const retried = retryRound(running)
+        assert.equal(retried.waveNumber, number)
+        assert.equal(retried.totalWaves, totalWaves)
+        assert.equal(retried.silver, preWave.silver)
+        assert.equal(retried.lives, preWave.lives)
+        assert.deepEqual(retried.towers, preWave.towers)
+      }
+      assert.equal(running.phase, number < totalWaves ? 'between' : 'won')
+      assert.equal(running.towers.length, 4, 'Towers carry over between waves')
+      assert.ok(running.lives > 0)
+      battle = running
+    }
+  }
+
   let undefended = startRound(initial)
   for (let step = 0; step < 1200 && undefended.phase === 'running'; step++) {
     undefended = advanceRound(undefended, 0.05)
   }
   assert.equal(undefended.phase, 'lost')
   assert.equal(undefended.silver, startingSilver, 'Escaped attackers do not pay rewards')
-  console.log('Passed: placement, economy, both upgrade orders, kill rewards, slowing, shots, and retry.')
+  console.log('Passed: placement, economy, both upgrade orders, kill rewards, slowing, shots, wave transitions, speed, and retry.')
 } finally {
   rmSync(output, { recursive: true, force: true })
 }

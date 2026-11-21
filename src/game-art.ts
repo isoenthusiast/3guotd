@@ -37,9 +37,9 @@ export function drawBattlefield(
     ctx.beginPath()
     for (const [index, point] of route.entries()) {
       const [x, y] = center(point)
-      if (index === 0) ctx.moveTo(x - tile / 2, y)
+      if (index === 0) ctx.moveTo(x, y - tile / 2)
       ctx.lineTo(x, y)
-      if (index === route.length - 1) ctx.lineTo(x + tile / 2, y)
+      if (index === route.length - 1) ctx.lineTo(x, y + tile / 2)
     }
     ctx.lineWidth = width
     ctx.strokeStyle = color

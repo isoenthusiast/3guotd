@@ -2,9 +2,11 @@
 
 A web-first tower defense game built with Preact, TypeScript, Canvas 2D, and Vite. The current round defends a Shu frontier outpost against infantry and fast runners.
 
-On a phone, scroll the zoomed battlefield sideways to reach more sites, or select **View full map** to see the whole route. Tap an empty tile off the road in the build view to preview an Archer or Drum tower. Confirm the purchase in the action bar. Start with 90 silver, enough for three 30-silver towers. Kills pay 7 or 12 silver depending on enemy level. Spend silver during the wave to build more towers or buy upgrades. An Archer deals damage and a Drum slows attackers. Each tower can buy both upgrade branches in either order for 18 silver and then 27 silver.
+On a phone, scroll the zoomed portrait battlefield to reach more sites, or select **View full map** to see the whole route. Tap an empty tile off the road in the build view to preview an Archer or Drum tower. Confirm the purchase in the action bar. Start with 90 silver, enough for three 30-silver towers. Kills pay 7 or 12 silver depending on enemy level. Spend silver during the wave to build more towers or buy upgrades. An Archer deals damage and a Drum slows attackers. Each tower can buy both upgrade branches in either order for 18 silver and then 27 silver.
 
-**Retry round** restores the towers, upgrades, and silver from the start of the wave. **Clear towers** in setup restores the starting purse.
+Choose 1, 3, or 5 waves before the battle. Switch between 1×, 2×, and 3× at any time. Silver, towers, upgrades, and surviving lives carry over. Use **Next wave** to start when ready, or **New battle** to return to setup with a fresh purse and change the wave count.
+
+**Retry wave** restores the towers, upgrades, silver, and lives from the start of that wave. **Clear towers** in the first setup restores the starting purse.
 
 ## Local development
 
@@ -43,4 +45,4 @@ Commit the reviewed changes, then run `bash scripts/publish.sh` on Ed-Z370. The 
 
 For changes to the offline update path, open the old release and leave a tab open when publishing the new build. Check that the new worker waits and that the old tab can still reload offline. Close all game tabs and reopen to let the waiting worker activate. Confirm the new release then reloads offline.
 
-For changes to the board layout or round controls, verify touch at a 320 px viewport. Check 44 px touch targets near and far along the scrollable board. Confirm neighboring tiles select independently, selecting a tile cannot spend silver before confirmation, and the action bar stays in place. Verify upgrades and mid-wave purchases, then confirm **Retry round** restores the pre-wave layout and purse. For private-link changes, also record a check from an intended tailnet device.
+For changes to the board layout or round controls, verify touch at a 320 px viewport. Check 44 px touch targets near and far along the scrollable board. Confirm neighboring tiles select independently, selecting a tile cannot spend silver before confirmation, and the action bar stays in place. Verify upgrades and mid-wave purchases, then confirm **Retry wave** restores the pre-wave layout and purse. During intermission, check that **New battle** restores setup and lets the player change the wave count. For private-link changes, also record a check from an intended tailnet device.

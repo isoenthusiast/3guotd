@@ -8,15 +8,21 @@
 }
 
 body { margin: 0; }
-main { width: min(100% - 1.25rem, 52rem); margin: 1.4rem auto; }
+main { width: min(100% - 1.25rem, 34rem); margin: .75rem auto; }
 header { display: flex; flex-wrap: wrap; align-items: baseline; gap: .25rem .8rem; }
 h1 { font-family: Georgia, serif; font-size: clamp(1.6rem, 6vw, 2.6rem); margin: 0; }
 .offline { color: #c4beaa; font-size: .8rem; }
-.hud { display: flex; align-items: center; flex-wrap: wrap; gap: .35rem 1rem; min-height: 2.6rem; font-size: .875rem; }
+.hud { display: flex; align-items: center; flex-wrap: wrap; gap: .35rem 1rem; min-height: 2.25rem; font-size: .875rem; }
 .hud strong { display: inline-flex; align-items: center; gap: .32rem; color: #ffe7ba; }
 .coin { width: .65rem; height: .65rem; border: 1px solid #f2d49c; border-radius: 50%; background: #ad8148; }
-.board-view { overflow-x: auto; border-radius: .5rem; }
-.map-mode { display: none; }
+.map-controls { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem .6rem; margin-bottom: .4rem; }
+.map-setting { display: inline-flex; align-items: center; gap: .25rem; font-size: .85rem; }
+.map-controls select { min-width: 44px; min-height: 44px; font: inherit; }
+.map-mode { min-height: 44px; padding: .3rem .55rem; font-size: .85rem; }
+.board-view { overflow: auto; height: min(51dvh, 34rem); border-radius: .5rem; background: #2a382e; }
+.board-view.zoomed .battlefield { width: var(--build-width); margin-inline: auto; }
+.board-view:not(.zoomed) .battlefield { width: min(100%, 34dvh, 22.6667rem); margin-inline: auto; }
+.board-view:not(.zoomed) .cells { display: none; }
 .battlefield { position: relative; background: #4c654d; border-radius: .5rem; overflow: hidden; }
 canvas { display: block; width: 100%; height: auto; }
 
@@ -24,8 +30,6 @@ canvas { display: block; width: 100%; height: auto; }
   position: absolute;
   inset: 0;
   display: grid;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
-  grid-template-rows: repeat(8, minmax(0, 1fr));
 }
 
 button {
@@ -53,10 +57,3 @@ button small { display: block; font-size: .7rem; line-height: 1.15; margin-top: 
 .round-controls { display: flex; gap: .5rem; margin-top: .6rem; }
 .round-controls button { min-height: 44px; padding: .35rem .75rem; }
 .primary { background: #823f38; border-color: #b78661; }
-
-
-@media (max-width: 548px) {
-  .map-mode { display: inline-block; min-height: 44px; padding: .35rem .6rem; margin-bottom: .35rem; }
-  .board-view.zoomed .battlefield { min-width: 528px; }
-  .board-view:not(.zoomed) .cells { display: none; }
-}

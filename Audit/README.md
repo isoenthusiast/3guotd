@@ -6,6 +6,8 @@ See [SimaYi’s quick UX review](2026-11-21-ux-simayi.md) for the playability fi
 
 See the [single-page silver round audit](2026-11-21-single-page-audit.md) for the build-view and command-bar findings and evidence.
 
+See the [portrait and multi-wave audit](2026-11-21-portrait-wave-audit.md) for the intermission finding and closure evidence.
+
 From the checkout root, list open work:
 
 ```sh

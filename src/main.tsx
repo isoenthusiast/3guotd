@@ -2,10 +2,11 @@ import { render } from 'preact'
 import { useEffect, useRef, useState } from 'preact/hooks'
 import { columns, isBuildable, rows, sitePosition } from './game/board'
 import {
-  advanceRound, buildTower, canSpend, createRound, enemiesRemaining, enemyCount, removeTower,
-  retryRound, startRound, towerDetails, towerPrice, upgradePrice, upgradeTower,
+  buildTower, canSpend, createRound, enemiesRemaining, enemyCount, removeTower,
+  retryRound, speedOptions, startRound, tickRound, towerDetails, towerPrice, upgradePrice,
+  upgradeTower, waveOptions,
 } from './game/round'
-import type { Round, TowerKind } from './game/round'
+import type { PlaySpeed, Round, TowerKind } from './game/round'
 import { drawBattlefield, tile } from './game-art'
 import './style.css'
 
@@ -29,8 +30,9 @@ function Battlefield({ round, selected, kind, onSelect }: {
   return (
     <div class="battlefield">
       <canvas ref={canvas} width={columns * tile} height={rows * tile} role="img"
-        aria-label="Shu frontier battlefield, with an enemy road from left to right ending at the gate" />
-      <div class="cells" role="group" aria-label="Battlefield tiles. Use arrow keys to select a nearby tile.">
+        aria-label="Shu frontier battlefield, with an enemy road from top to bottom ending at the gate" />
+      <div class="cells" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+        gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))` }} role="group" aria-label="Battlefield tiles. Use arrow keys to select a nearby tile.">
         {Array.from({ length: siteCount }, (_, site) => {
           if (!isBuildable(site)) return <span key={site} aria-hidden="true" />
           const [x, y] = sitePosition(site)
@@ -70,18 +72,22 @@ function App() {
   const [selected, setSelected] = useState<number | null>(null)
   const [kind, setKind] = useState<TowerKind>('archer')
   const [zoomed, setZoomed] = useState(true)
+  const [speed, setSpeed] = useState<PlaySpeed>(1)
   const running = round.phase === 'running'
   const setup = round.phase === 'setup'
+  const between = round.phase === 'between'
+  const initialSetup = setup && round.waveNumber === 1
+  const finished = round.phase === 'won' || round.phase === 'lost'
   const tower = round.towers.find(candidate => candidate.site === selected)
   const selection = selected === null ? null : sitePosition(selected)
 
   useEffect(() => {
     if (!running) return
     const timer = window.setInterval(() => {
-      if (!document.hidden) setRound(current => advanceRound(current, 0.05))
+      if (!document.hidden) setRound(current => tickRound(current, speed))
     }, 50)
     return () => window.clearInterval(timer)
-  }, [running])
+  }, [running, speed])
 
   useEffect(() => {
     const platform = (window as Window & { Capacitor?: { isNativePlatform(): boolean } }).Capacitor
@@ -105,14 +111,37 @@ function App() {
       <div class="hud">
         <strong aria-label={`Silver: ${round.silver}`}><span class="coin" aria-hidden="true" />{round.silver} silver</strong>
         <span>{round.lives} lives</span>
+        <span>Wave {round.waveNumber} of {round.totalWaves}</span>
         <span role="status">{running ? `${enemiesRemaining(round)} of ${enemyCount} attackers` : setup
-          ? 'Prepare defenses' : round.phase === 'won' ? 'Gate defended!' : 'The gate fell.'}</span>
+          ? 'Prepare defenses' : between ? 'Ready for the next wave' : round.phase === 'won'
+            ? 'Gate defended!' : 'The gate fell.'}</span>
       </div>
-      <button type="button" class="map-mode" aria-pressed={!zoomed}
-        onClick={() => { setZoomed(current => !current); setSelected(null) }}>
-        {zoomed ? 'View full map' : 'Zoom to build'}
-      </button>
-      <div class={`board-view ${zoomed ? 'zoomed' : ''}`}>
+      <div class="map-controls">
+        <div class="map-setting">
+          <label for="waves">Waves</label>
+          <select id="waves" value={round.totalWaves} disabled={!initialSetup}
+            onChange={event => {
+              const count = waveOptions.find(option => option === Number(event.currentTarget.value))
+              if (count) setRound(current => ({ ...current, totalWaves: count }))
+            }}>
+            {waveOptions.map(option => <option key={option} value={option}>{option}</option>)}
+          </select>
+        </div>
+        <div class="map-setting">
+          <label for="speed">Speed</label>
+          <select id="speed" value={speed} onChange={event => {
+            const value = speedOptions.find(option => option === Number(event.currentTarget.value))
+            if (value) setSpeed(value)
+          }}>
+            {speedOptions.map(option => <option key={option} value={option}>{option}×</option>)}
+          </select>
+        </div>
+        <button type="button" class="map-mode" aria-pressed={!zoomed}
+          onClick={() => { setZoomed(current => !current); setSelected(null) }}>
+          {zoomed ? 'View full map' : 'Zoom to build'}
+        </button>
+      </div>
+      <div class={`board-view ${zoomed ? 'zoomed' : ''}`} style={{ '--build-width': `${columns * 44}px` }}>
         <Battlefield round={round} selected={selected} kind={kind} onSelect={setSelected} />
       </div>
       <div class="command-bar">
@@ -129,7 +158,7 @@ function App() {
                       {towerDetails[tower.kind][branch]}<small>{tower[branch] ? 'Purchased' : `${upgradePrice(tower)} silver`}</small>
                     </button>
                   ))}
-                  {setup && <button type="button" onClick={() => setRound(current => removeTower(current, tower.site))}>Remove &amp; refund</button>}
+                  {(setup || between) && <button type="button" onClick={() => setRound(current => removeTower(current, tower.site))}>Remove &amp; refund</button>}
                 </div>
               ) : (
                 <>
@@ -148,16 +177,21 @@ function App() {
                 </>
               )}
             </>
-          ) : <p class="action-label">Tap an empty tile to preview a tower, or tap a tower to upgrade it.</p>}
+          ) : <p class="action-label">Tap an empty tile to build or a tower to upgrade. You can spend silver during a wave.</p>}
         </section>
         <div class="round-controls">
-          {setup ? (
+          {setup || between ? (
             <>
-              <button type="button" class="primary" onClick={() => setRound(startRound)}>Start wave</button>
-              {round.towers.length > 0 && <button type="button"
-                onClick={() => { setRound(createRound()); setSelected(null) }}>Clear towers</button>}
+              <button type="button" class="primary"
+                onClick={() => setRound(startRound)}>{between ? 'Next wave' : 'Start wave'}</button>
+              {initialSetup && round.towers.length > 0 && <button type="button"
+                onClick={() => { setRound(createRound(round.totalWaves)); setSelected(null) }}>Clear towers</button>}
             </>
-          ) : <button type="button" onClick={() => { setRound(retryRound); setSelected(null) }}>Retry round</button>}
+          ) : (
+            <button type="button" onClick={() => { setRound(retryRound); setSelected(null) }}>Retry wave</button>
+          )}
+          {(between || finished) && <button type="button"
+            onClick={() => { setRound(createRound(round.totalWaves)); setSelected(null) }}>New battle</button>}
         </div>
       </div>
     </main>
