@@ -86,7 +86,7 @@ export function drawBattlefield(
   ctx.textAlign = 'left'
   for (const [label, x, y] of [
     ['Entry', entryX + 33, entryY + 7],
-    ['Shu Outpost Gate', gateX + 33, gateY + 7],
+    [round.mission ? 'Evacuation gate' : 'Shu Outpost Gate', gateX + 33, gateY + 7],
   ] as const) {
     ctx.lineWidth = 5
     ctx.strokeStyle = '#293c31'

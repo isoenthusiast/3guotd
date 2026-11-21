@@ -38,6 +38,17 @@ const attackers = {
   veteranRunner: { health: 4, speed: 2.4, reward: 12, runner: true, level: 2 },
 } as const
 
+export type Mission = {
+  id: string
+  title: string
+  setting: string
+  briefing: string
+  victory: string
+  defeat: string
+  chronicle: string
+  waves: readonly { name: string; sequence: readonly (keyof typeof attackers)[] }[]
+}
+
 export const enemyCount = wave.length
 const formations = [
   { name: 'Mixed patrol', sequence: wave },
@@ -75,7 +86,8 @@ type Opening = Pick<Round, 'towers' | 'silver' | 'lives'>
 
 export type Round = {
   phase: 'setup' | 'running' | 'won' | 'lost'
-  totalWaves: WaveCount
+  totalWaves: number
+  mission: Mission | null
   waveNumber: number
   towers: Tower[]
   silver: number
@@ -92,9 +104,9 @@ export type Round = {
   spawnTimer: number
 }
 
-export function createRound(totalWaves: WaveCount = 20): Round {
+export function createRound(totalWaves = 20, mission: Mission | null = null): Round {
   return {
-    phase: 'setup', totalWaves, waveNumber: 1, towers: [], silver: startingSilver, opening: null,
+    phase: 'setup', totalWaves: mission?.waves.length ?? totalWaves, mission, waveNumber: 1, towers: [], silver: startingSilver, opening: null,
     enemies: [], shots: [], impacts: [], gateHit: null, waveAge: 0,
     waveStats: emptyStats, previousWave: null, lives: initialLives, spawned: 0, spawnTimer: 0,
   }
@@ -108,11 +120,19 @@ export function startRound(round: Round): Round {
 
 export function retryRound(round: Round): Round {
   if (!round.opening) return round
-  return { ...createRound(round.totalWaves), waveNumber: round.waveNumber, previousWave: round.previousWave, ...round.opening }
+  return { ...createRound(round.totalWaves, round.mission), waveNumber: round.waveNumber, previousWave: round.previousWave, ...round.opening }
+}
+
+export function roundFormation(round: Round) {
+  return round.mission?.waves[round.waveNumber - 1] ?? waveFormation(round.waveNumber)
+}
+
+export function evacuatedGroups(round: Round): number {
+  return round.waveNumber - 1 + (round.phase === 'won' ? 1 : 0)
 }
 
 export function enemiesRemaining(round: Round): number {
-  return enemyCount - round.spawned + round.enemies.length
+  return roundFormation(round).sequence.length - round.spawned + round.enemies.length
 }
 
 export function enemyDetails(enemy: Enemy) {
@@ -231,8 +251,9 @@ export function advanceRound(round: Round, seconds: number, visualSeconds = seco
     }
     return false
   })
-  if (spawned < enemyCount && spawnTimer <= 0) {
-    const kind = waveFormation(round.waveNumber).sequence[spawned]
+  const formation = roundFormation(round)
+  if (spawned < formation.sequence.length && spawnTimer <= 0) {
+    const kind = formation.sequence[spawned]
     enemies.push({ id: spawned, kind, health: attackers[kind].health, progress: 0, slowed: false })
     spawned++
     spawnTimer += spawnInterval
@@ -251,10 +272,10 @@ export function advanceRound(round: Round, seconds: number, visualSeconds = seco
     const stats = towerDetails.archer
     return { ...tower, cooldown: tower.power ? stats.fasterShotInterval : stats.shotInterval }
   })
-  const cleared = spawned === enemyCount && enemies.length === 0
+  const cleared = spawned === formation.sequence.length && enemies.length === 0
   if (lives > 0 && cleared && round.waveNumber < round.totalWaves) {
     return startRound({
-      ...createRound(round.totalWaves), waveNumber: round.waveNumber + 1,
+      ...createRound(round.totalWaves, round.mission), waveNumber: round.waveNumber + 1,
       towers: towers.map(tower => ({ ...tower, cooldown: 0 })), silver, lives,
       previousWave: { ...waveStats, waveNumber: round.waveNumber }, gateHit, impacts,
     })

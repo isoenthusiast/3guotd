@@ -10,13 +10,13 @@ const output = mkdtempSync(join(tmpdir(), '3guotd-round-'))
 try {
   execFileSync(process.execPath, [
     require.resolve('typescript/bin/tsc'), '--ignoreConfig', '--target', 'es2022',
-    '--module', 'commonjs', '--outDir', output, 'src/game/round.ts',
+    '--module', 'commonjs', '--outDir', output, 'src/game/round.ts', 'src/game/campaign.ts',
   ], { stdio: 'inherit' })
 
   const {
     createRound, startRound, advanceRound, tickRound, buildTower, upgradeTower, removeTower, retryRound,
     towerPrice, startingSilver, baseUpgradePrice, secondUpgradeSurcharge, towerRange, towerDetails,
-    shotFlightTime, enemiesRemaining, enemyCount, enemyDetails, waveFormation,
+    shotFlightTime, enemiesRemaining, enemyCount, enemyDetails, waveFormation, evacuatedGroups, roundFormation,
   } = require(join(output, 'round.js'))
   const { isBuildable, columns, route } = require(join(output, 'board.js'))
   const site = (x, y) => y * columns + x
@@ -156,6 +156,37 @@ try {
   assert.equal(breachAtTransition.gateHit.kind, 'veteranRunner')
   assert.equal(breachAtTransition.waveAge, 0)
   assert.equal(breachAtTransition.previousWave.escaped, 1)
+
+  const { changban } = require(join(output, 'campaign.js'))
+  const chapter = createRound(20, changban)
+  assert.equal(chapter.totalWaves, 3)
+  assert.equal(evacuatedGroups(chapter), 0)
+  let story = startRound([
+    [1, 0, 'archer'], [1, 1, 'drum'], [1, 2, 'archer'],
+  ].reduce((round, [x, y, kind]) => buildTower(round, site(x, y), kind), chapter))
+  for (let step = 0; step < 2400 && story.phase === 'running'; step++) {
+    story = tickRound(story, 1)
+    if (story.phase !== 'running') break
+    if (story.silver >= towerPrice && story.towers.length === 3) {
+      story = buildTower(story, site(1, 3), 'archer')
+    }
+    const retried = retryRound(story)
+    assert.equal(evacuatedGroups(retried), story.waveNumber - 1)
+    assert.equal(retried.mission, changban)
+  }
+  assert.equal(story.phase, 'won', 'Changban must be playable with both tower roles')
+  assert.equal(evacuatedGroups(story), 3)
+  assert.equal(evacuatedGroups(retryRound(story)), 2)
+  const finalWave = startRound({ ...chapter, waveNumber: 3, lives: 1 })
+  const finalCount = roundFormation(finalWave).sequence.length
+  const lastGroup = tickRound({ ...finalWave, spawned: finalCount }, 1)
+  assert.equal(lastGroup.phase, 'won')
+  assert.equal(evacuatedGroups(lastGroup), 3)
+  const gateRunner = { id: 0, kind: 'runner', progress: route.length - 1.01, health: 3, slowed: false }
+  const lastLifeLost = tickRound({ ...finalWave, spawned: finalCount, enemies: [gateRunner] }, 1)
+  assert.equal(lastLifeLost.phase, 'lost')
+  assert.equal(evacuatedGroups(lastLifeLost), 2)
+  assert.equal(evacuatedGroups(retryRound(lastLifeLost)), 2)
 
   let undefended = startRound(initial)
   for (let step = 0; step < 1200 && undefended.phase === 'running'; step++) {

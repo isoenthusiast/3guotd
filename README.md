@@ -8,6 +8,10 @@ Choose 20, 40, 60, 80, or 100 waves before the battle. Waves advance automatical
 
 **Retry wave** restores the towers, upgrades, silver, and lives from the start of that wave, and lets you edit on the full map. Remove a tower for a full refund if you want to change the layout with an empty purse. **Clear towers** in the first setup restores the starting purse.
 
+## Changban story
+
+Choose **Changban story** to defend an evacuation crossing in 208 CE. Clear three waves with at least one life remaining to get all three groups across. Retry restores the current wave’s opening defenses and evacuation tally. Victory opens the Chronicle, and this browser remembers the clear. **Long battle** retains the existing 20–100 wave choices.
+
 ## Local development
 
 Use Node.js 20.19+ on the 20.x line or Node.js 22.12+.

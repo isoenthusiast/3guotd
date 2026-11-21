@@ -16,7 +16,7 @@ h1 { font-family: Georgia, serif; font-size: clamp(1.6rem, 6vw, 2.6rem); margin:
 .map-controls { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem .6rem; margin-bottom: .4rem; }
 .map-setting { display: inline-flex; align-items: center; gap: .25rem; font-size: .85rem; }
 .map-controls select { min-width: 44px; min-height: 44px; font: inherit; }
-.board-view .battlefield { width: min(100%, max(192px, calc((100dvh - var(--board-space)) * 2 / 3)), 22.6667rem); margin-inline: auto; }
+.board-view .battlefield { width: min(100%, max(192px, calc((100dvh - var(--board-space) - var(--mode-space, 0rem)) * 2 / 3)), 22.6667rem); margin-inline: auto; }
 .battlefield { position: relative; background: #4c654d; border-radius: .5rem; overflow: hidden; }
 canvas { display: block; width: 100%; height: auto; }
 
@@ -81,3 +81,15 @@ main.with-refund { --board-space: 21.25rem; }
 .wave-report { margin: .3rem 0; font-size: .85rem; color: #f5e5c9; }
 .wave-report summary { cursor: pointer; padding: .45rem 0; }
 .wave-report p { margin: .35rem 0; }
+
+.mode-picker { display: flex; gap: .35rem; margin: .4rem 0; }
+.mode-picker button { min-height: 44px; padding: .3rem .6rem; }
+.mode-picker button[aria-pressed="true"] { border-color: #efc687; background: #554331; }
+.mission-briefing { font-size: .85rem; line-height: 1.3; }
+.mission-briefing h2 { font-family: Georgia, serif; font-size: 1.1rem; margin: .4rem 0; }
+.mission-briefing p, .mission-outcome { margin: .35rem 0; }
+main.campaign { --board-space: 15rem; }
+main.campaign.with-actions { --board-space: 21rem; }
+main.campaign.with-refund { --board-space: 24rem; }
+main:not(.campaign):has(.mode-picker) { --mode-space: 3.2rem; }
+main.campaign:has(.mode-picker) { --mode-space: 7rem; }
