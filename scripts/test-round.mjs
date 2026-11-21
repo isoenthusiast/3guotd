@@ -16,7 +16,7 @@ try {
   const {
     createRound, startRound, advanceRound, tickRound, buildTower, upgradeTower, removeTower, retryRound,
     towerPrice, startingSilver, baseUpgradePrice, secondUpgradeSurcharge, towerRange, towerDetails,
-    shotFlightTime, enemiesRemaining, enemyCount, enemyDetails,
+    shotFlightTime, enemiesRemaining, enemyCount, enemyDetails, waveFormation,
   } = require(join(output, 'round.js'))
   const { isBuildable, columns, route } = require(join(output, 'board.js'))
   const site = (x, y) => y * columns + x
@@ -43,8 +43,19 @@ try {
   }
 
   const seeded = startRound(built)
-  assert.deepEqual(tickRound(seeded, 3), tickRound(tickRound(tickRound(seeded, 1), 1), 1))
-  assert.deepEqual(tickRound(seeded, 2), tickRound(tickRound(seeded, 1), 1))
+  for (const speed of [2, 3]) {
+    let expected = seeded
+    for (let step = 0; step < speed; step++) expected = advanceRound(expected, 0.05)
+    assert.deepEqual(tickRound(seeded, speed), { ...expected, waveAge: 0.05 })
+  }
+  const cue = { ...seeded, impacts: [{ at: [2, 1], elapsed: 0, silver: 7 }] }
+  for (const speed of [1, 3]) {
+    let visible = cue
+    for (let step = 0; step < 12; step++) visible = tickRound(visible, speed)
+    assert.ok(visible.impacts.some(hit => hit.silver === 7))
+  }
+  assert.notDeepEqual(waveFormation(1).sequence, waveFormation(2).sequence)
+  assert.notDeepEqual(waveFormation(2).sequence, waveFormation(3).sequence)
   let combat = seeded
   assert.equal(enemiesRemaining(combat), enemyCount)
   for (let step = 0; step < 120 && combat.shots.length === 0; step++) {
@@ -132,6 +143,7 @@ try {
   assert.equal(continuous.phase, 'running')
   assert.equal(continuous.waveNumber, 2)
   assert.equal(continuous.towers.length, 3)
+  assert.equal(continuous.previousWave.waveNumber, 1)
   assert.equal(retryRound(continuous).waveNumber, 2)
   assert.equal(tickRound({ ...continuous, waveNumber: 20, spawned: enemyCount }, 1).phase, 'won')
 
@@ -140,6 +152,9 @@ try {
     undefended = advanceRound(undefended, 0.05)
   }
   assert.equal(undefended.phase, 'lost')
+  assert.equal(undefended.waveStats.escaped, 3)
+  assert.ok(undefended.waveStats.runnersEscaped > 0)
+  assert.ok(undefended.gateHit)
   assert.equal(undefended.silver, startingSilver, 'Escaped attackers do not pay rewards')
   console.log('Passed: placement, economy, both upgrade orders, kill rewards, slowing, shots, wave transitions, speed, and retry.')
 } finally {

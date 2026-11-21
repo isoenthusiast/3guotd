@@ -39,12 +39,38 @@ const attackers = {
 } as const
 
 export const enemyCount = wave.length
+const formations = [
+  { name: 'Mixed patrol', sequence: wave },
+  { name: 'Runner rush', sequence: ['runner', 'runner', 'infantry', 'runner', 'veteranRunner',
+    'runner', 'infantry', 'veteran', 'runner'] },
+  { name: 'Veteran column', sequence: ['infantry', 'veteran', 'veteran', 'runner', 'veteran',
+    'infantry', 'veteranRunner', 'veteran', 'runner'] },
+] as const
+
+export function waveFormation(number: number) {
+  return formations[(number - 1) % formations.length]
+}
+
 const spawnInterval = 1.65
+const gateCueTime = 1.35
+export const waveCueTime = 1.15
+export const rewardCueTime = 0.7
 
 type Enemy = { id: number; kind: keyof typeof attackers; progress: number; health: number; slowed: boolean }
 export type Tower = { site: number; kind: TowerKind; reach: boolean; power: boolean; cooldown: number }
 type Shot = { from: Point; targetId: number; elapsed: number }
 type Impact = { at: Point; elapsed: number; silver: number }
+type GateHit = { kind: Enemy['kind']; elapsed: number }
+type WaveStats = { stopped: number; escaped: number; runnersEscaped: number; earned: number }
+type WaveReport = WaveStats & { waveNumber: number }
+const emptyStats: WaveStats = { stopped: 0, escaped: 0, runnersEscaped: 0, earned: 0 }
+
+export function attackerName(kind: Enemy['kind']): string {
+  return ({
+    infantry: 'Infantry', runner: 'Runner', veteran: 'Veteran', veteranRunner: 'Veteran runner',
+  })[kind]
+}
+
 type Opening = Pick<Round, 'towers' | 'silver' | 'lives'>
 
 export type Round = {
@@ -57,6 +83,10 @@ export type Round = {
   enemies: Enemy[]
   shots: Shot[]
   impacts: Impact[]
+  gateHit: GateHit | null
+  waveAge: number
+  waveStats: WaveStats
+  previousWave: WaveReport | null
   lives: number
   spawned: number
   spawnTimer: number
@@ -65,7 +95,8 @@ export type Round = {
 export function createRound(totalWaves: WaveCount = 20): Round {
   return {
     phase: 'setup', totalWaves, waveNumber: 1, towers: [], silver: startingSilver, opening: null,
-    enemies: [], shots: [], impacts: [], lives: initialLives, spawned: 0, spawnTimer: 0,
+    enemies: [], shots: [], impacts: [], gateHit: null, waveAge: 0,
+    waveStats: emptyStats, previousWave: null, lives: initialLives, spawned: 0, spawnTimer: 0,
   }
 }
 
@@ -77,7 +108,7 @@ export function startRound(round: Round): Round {
 
 export function retryRound(round: Round): Round {
   if (!round.opening) return round
-  return { ...createRound(round.totalWaves), waveNumber: round.waveNumber, ...round.opening }
+  return { ...createRound(round.totalWaves), waveNumber: round.waveNumber, previousWave: round.previousWave, ...round.opening }
 }
 
 export function enemiesRemaining(round: Round): number {
@@ -141,9 +172,13 @@ function inRange(tower: Tower, [x, y]: Point): boolean {
   return Math.hypot(x - towerX, y - towerY) <= towerRange(tower.kind, tower.reach)
 }
 
-export function advanceRound(round: Round, seconds: number): Round {
+export function advanceRound(round: Round, seconds: number, visualSeconds = seconds): Round {
   if (round.phase !== 'running') return round
   let { spawned, spawnTimer, lives, silver } = round
+  const waveStats = { ...round.waveStats }
+  const waveAge = round.waveAge + visualSeconds
+  let gateHit = round.gateHit && { ...round.gateHit, elapsed: round.gateHit.elapsed + visualSeconds }
+  if (gateHit && gateHit.elapsed >= gateCueTime) gateHit = null
   spawnTimer -= seconds
   const drums = round.towers.filter(tower => tower.kind === 'drum')
   const moving = round.enemies.map(enemy => {
@@ -162,8 +197,8 @@ export function advanceRound(round: Round, seconds: number): Round {
   })
   const targets = new Map(moving.map(enemy => [enemy.id, enemy]))
   const impacts = round.impacts
-    .map(impact => ({ ...impact, elapsed: impact.elapsed + seconds }))
-    .filter(impact => impact.elapsed < (impact.silver ? 0.7 : impactTime))
+    .map(impact => ({ ...impact, elapsed: impact.elapsed + visualSeconds }))
+    .filter(impact => impact.elapsed < (impact.silver ? rewardCueTime : impactTime))
   const shots: Shot[] = []
   const incoming = new Map<number, number>()
   for (const shot of round.shots) {
@@ -174,7 +209,11 @@ export function advanceRound(round: Round, seconds: number): Round {
     if (elapsed >= shotFlightTime) {
       target.health--
       const reward = target.health === 0 ? enemyDetails(target).reward : 0
-      silver += reward
+      if (reward > 0) {
+        silver += reward
+        waveStats.earned += reward
+        waveStats.stopped++
+      }
       impacts.push({ at: enemyPosition(target.progress), elapsed: 0, silver: reward })
     } else {
       shots.push({ ...shot, elapsed })
@@ -184,11 +223,16 @@ export function advanceRound(round: Round, seconds: number): Round {
   const enemies = moving.filter(enemy => {
     if (enemy.health <= 0) return false
     if (enemy.progress < route.length - 1) return true
-    lives = Math.max(0, lives - 1)
+    if (lives > 0) {
+      lives--
+      waveStats.escaped++
+      if (enemyDetails(enemy).runner) waveStats.runnersEscaped++
+      gateHit = { kind: enemy.kind, elapsed: 0 }
+    }
     return false
   })
   if (spawned < enemyCount && spawnTimer <= 0) {
-    const kind = wave[spawned]
+    const kind = waveFormation(round.waveNumber).sequence[spawned]
     enemies.push({ id: spawned, kind, health: attackers[kind].health, progress: 0, slowed: false })
     spawned++
     spawnTimer += spawnInterval
@@ -207,23 +251,24 @@ export function advanceRound(round: Round, seconds: number): Round {
     const stats = towerDetails.archer
     return { ...tower, cooldown: tower.power ? stats.fasterShotInterval : stats.shotInterval }
   })
-  const cleared = spawned === enemyCount && enemies.length === 0 && impacts.length === 0
+  const cleared = spawned === enemyCount && enemies.length === 0
   if (lives > 0 && cleared && round.waveNumber < round.totalWaves) {
     return startRound({
       ...createRound(round.totalWaves), waveNumber: round.waveNumber + 1,
       towers: towers.map(tower => ({ ...tower, cooldown: 0 })), silver, lives,
+      previousWave: { ...waveStats, waveNumber: round.waveNumber }, gateHit, impacts,
     })
   }
   const phase = lives === 0 ? 'lost' : cleared ? 'won' : 'running'
   return {
-    ...round, phase, towers, enemies, impacts, silver, lives, spawned, spawnTimer,
+    ...round, phase, towers, enemies, impacts, gateHit, waveAge, waveStats, silver, lives, spawned, spawnTimer,
     shots: shots.filter(shot => activeIds.has(shot.targetId)),
   }
 }
 
 export function tickRound(round: Round, speed: PlaySpeed): Round {
   for (let step = 0; step < speed && round.phase === 'running'; step++) {
-    round = advanceRound(round, 0.05)
+    round = advanceRound(round, 0.05, 0.05 / speed)
   }
   return round
 }

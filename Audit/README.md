@@ -10,6 +10,10 @@ See the [portrait and multi-wave audit](2026-11-21-portrait-wave-audit.md) for t
 
 See the [retry and purchase feedback audit](2026-11-21-retry-purchase-audit.md) for the retry fix and purchase-preview evidence.
 
+See [SimaYi’s ranked Three Kingdoms UX review](2026-11-21-three-kingdoms-ux-top-10.md) for the latest discovery findings.
+
+See the [AUD-008 remediation evidence](2026-11-21-three-kingdoms-ux-remediation.md) for fixes and outstanding human playtests.
+
 From the checkout root, list open work:
 
 ```sh

@@ -2,10 +2,10 @@ import { render } from 'preact'
 import { useEffect, useRef, useState } from 'preact/hooks'
 import { columns, isBuildable, rows, sitePosition } from './game/board'
 import {
-  baseUpgradePrice, buildTower, canSpend, createRound, enemiesRemaining, enemyCount, removeTower,
+  attackerName, baseUpgradePrice, buildTower, canSpend, createRound, enemiesRemaining, enemyCount, removeTower,
   secondUpgradeSurcharge,
   retryRound, speedOptions, startRound, tickRound, towerDetails, towerPrice, upgradePrice,
-  upgradeTower, waveOptions,
+  upgradeTower, waveCueTime, waveFormation, waveOptions,
 } from './game/round'
 import type { PlaySpeed, Round, TowerKind, Upgrade } from './game/round'
 import { drawBattlefield, drawTower, tile } from './game-art'
@@ -120,6 +120,16 @@ function App() {
   const shortfall = Math.max(0, price - round.silver)
   const spendingOpen = canSpend(round)
   const canRefund = setup && round.towers.length > 0
+  const showActions = selected !== null && spendingOpen && (!tower || !tower.reach || !tower.power || canRefund)
+  const report = finished ? { ...round.waveStats, waveNumber: round.waveNumber } : round.previousWave
+  let status = setup ? (round.towers.length ? 'Prepare defenses' : 'Tap grass to build')
+    : round.phase === 'won' ? 'Gate defended!' : 'The gate fell.'
+  if (running) {
+    status = paused ? 'Paused' : round.waveAge < waveCueTime
+      ? `Wave ${round.waveNumber} starts · ${waveFormation(round.waveNumber).name}`
+      : `${enemiesRemaining(round)} of ${enemyCount} attackers`
+  }
+  const breach = round.gateHit && `${attackerName(round.gateHit.kind)} reached the gate`
 
   function selectTile(site: number | null) {
     setSelected(site)
@@ -147,7 +157,7 @@ function App() {
   }, [])
 
   return (
-    <main>
+    <main class={showActions ? (canRefund && tower ? 'with-refund' : 'with-actions') : undefined}>
       <header>
         <h1>3Guo Tower Defense</h1>
         {offline && <span class="offline">{offline}</span>}
@@ -156,9 +166,7 @@ function App() {
         <strong aria-label={`Silver: ${round.silver}`}><span class="coin" aria-hidden="true" />{round.silver} silver</strong>
         <span>{round.lives} lives</span>
         <span>Wave {round.waveNumber} of {round.totalWaves}</span>
-        <span role="status">{running ? (paused ? 'Paused' : `${enemiesRemaining(round)} of ${enemyCount} attackers`) : setup
-          ? 'Prepare defenses' : round.phase === 'won'
-            ? 'Gate defended!' : 'The gate fell.'}</span>
+        <span role="status">{breach && !paused ? `${breach}${finished ? ` · ${status}` : ''}` : status}</span>
       </div>
       <div class="map-controls">
         <div class="map-setting">
@@ -206,7 +214,7 @@ function App() {
           {finished && <button type="button"
             onClick={() => { setPaused(false); setRound(createRound(round.totalWaves)); selectTile(null) }}>New battle</button>}
         </div>
-        {selected !== null && spendingOpen && (!tower || !tower.reach || !tower.power || canRefund) && (
+        {showActions && selected !== null && (
           <section class="actions" aria-label="Tower actions">
             <div class="action-grid">
               {tower ? (
@@ -233,7 +241,7 @@ function App() {
                   <span>
                     <strong>Build {towerDetails[kind].name}</strong>
                     <span class="card-price">{towerPrice} silver</span>
-                    <small>{kind === 'archer' ? 'Deals damage' : 'Slows attackers'}</small>
+                    <small>{kind === 'archer' ? 'Damage · solid range' : 'Slow · dashed range'}</small>
                   </span>
                 </button>
               ))}
@@ -243,6 +251,11 @@ function App() {
           </section>
         )}
       </div>
+      {report && <details class="wave-report">
+        <summary>Wave {report.waveNumber} summary</summary>
+        <p>{report.stopped} stopped · {report.escaped} reached the gate · {report.earned} silver earned</p>
+        {report.runnersEscaped > 0 && <p>Runners that reached the gate: {report.runnersEscaped}</p>}
+      </details>}
     </main>
   )
 }

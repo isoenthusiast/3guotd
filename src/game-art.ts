@@ -75,6 +75,42 @@ export function drawBattlefield(
   ctx.fillRect(gateX - 9, gateY + 1, 18, 23)
   roof(ctx, gateX, gateY - 22, 28, '#473b3b')
 
+  if (round.gateHit) {
+    ctx.strokeStyle = '#ffa487'
+    ctx.lineWidth = 6
+    ctx.strokeRect(gateX - 27, gateY - 26, 54, 54)
+  }
+
+  const [entryX, entryY] = center(route[0])
+  ctx.font = 'bold 20px system-ui'
+  ctx.textAlign = 'left'
+  for (const [label, x, y] of [
+    ['Entry', entryX + 33, entryY + 7],
+    ['Shu Outpost Gate', gateX + 33, gateY + 7],
+  ] as const) {
+    ctx.lineWidth = 5
+    ctx.strokeStyle = '#293c31'
+    ctx.fillStyle = '#fff0cc'
+    ctx.strokeText(label, x, y)
+    ctx.fillText(label, x, y)
+  }
+
+  if (!round.towers.some(tower => tower.site === selected) && selected !== null) {
+    const [x, y] = center(sitePosition(selected))
+    ctx.save()
+    ctx.lineWidth = 4
+    ctx.strokeStyle = '#ffd08a'
+    ctx.beginPath()
+    ctx.arc(x, y, towerRange('archer', false) * tile, 0, 2 * Math.PI)
+    ctx.stroke()
+    ctx.strokeStyle = '#b7f1e9'
+    ctx.setLineDash([9, 5])
+    ctx.beginPath()
+    ctx.arc(x, y, towerRange('drum', false) * tile, 0, 2 * Math.PI)
+    ctx.stroke()
+    ctx.restore()
+  }
+
   const active = round.towers.find(tower => tower.site === selected)
   if (active) {
     const [x, y] = center(sitePosition(active.site))
@@ -99,6 +135,16 @@ export function drawBattlefield(
 
   for (const tower of round.towers) {
     const [x, y] = center(sitePosition(tower.site))
+    if (tower.kind === 'drum' && round.enemies.some(enemy => {
+      const [enemyX, enemyY] = center(enemyPosition(enemy.progress))
+      return enemy.slowed && Math.hypot(enemyX - x, enemyY - y) <= towerRange(tower.kind, tower.reach) * tile
+    })) {
+      ctx.strokeStyle = '#b7f1e9'
+      ctx.lineWidth = 4
+      ctx.beginPath()
+      ctx.arc(x, y, 28 + (Math.sin(round.waveAge * 9) + 1) * 5, 0, 2 * Math.PI)
+      ctx.stroke()
+    }
     drawTower(ctx, x, y, tower.kind)
     ctx.fillStyle = '#fff0bb'
     if (tower.reach) ctx.fillRect(x - 10, y + 24, 8, 4)
@@ -118,6 +164,17 @@ export function drawBattlefield(
     ctx.beginPath()
     ctx.arc(x, y - 5, detail.runner ? 6 : 8, 0, 2 * Math.PI)
     ctx.fill()
+    if (detail.level === 2) {
+      ctx.fillStyle = '#302d35'
+      ctx.beginPath()
+      ctx.moveTo(x - 11, y - 4)
+      ctx.lineTo(x - 8, y - 15)
+      ctx.lineTo(x + 8, y - 15)
+      ctx.lineTo(x + 11, y - 4)
+      ctx.closePath()
+      ctx.fill()
+      ctx.fillRect(x - 14, y - 6, 28, 4)
+    }
     if (enemy.slowed) {
       ctx.strokeStyle = '#c6f2f0'
       ctx.lineWidth = 4

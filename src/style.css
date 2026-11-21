@@ -6,7 +6,7 @@
 }
 
 body { margin: 0; }
-main { width: min(100% - 1.25rem, 34rem); margin: .75rem auto; }
+main { --board-space: 10rem; width: min(100% - 1.25rem, 34rem); margin: .75rem auto; }
 header { display: flex; flex-wrap: wrap; align-items: baseline; gap: .25rem .8rem; }
 h1 { font-family: Georgia, serif; font-size: clamp(1.6rem, 6vw, 2.6rem); margin: 0; }
 .offline { color: #c4beaa; font-size: .8rem; }
@@ -16,7 +16,7 @@ h1 { font-family: Georgia, serif; font-size: clamp(1.6rem, 6vw, 2.6rem); margin:
 .map-controls { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem .6rem; margin-bottom: .4rem; }
 .map-setting { display: inline-flex; align-items: center; gap: .25rem; font-size: .85rem; }
 .map-controls select { min-width: 44px; min-height: 44px; font: inherit; }
-.board-view .battlefield { width: min(100%, calc((100dvh - 10rem) * 2 / 3), 22.6667rem); margin-inline: auto; }
+.board-view .battlefield { width: min(100%, max(192px, calc((100dvh - var(--board-space)) * 2 / 3)), 22.6667rem); margin-inline: auto; }
 .battlefield { position: relative; background: #4c654d; border-radius: .5rem; overflow: hidden; }
 canvas { display: block; width: 100%; height: auto; }
 
@@ -74,3 +74,10 @@ button small { display: block; font-size: .7rem; line-height: 1.15; margin-top: 
 .purchase-card strong, .card-price { display: block; }
 .card-price { color: #ffe0a3; font-weight: 700; }
 .purchase-card:disabled { opacity: .78; }
+
+
+main.with-actions { --board-space: 18rem; }
+main.with-refund { --board-space: 21.25rem; }
+.wave-report { margin: .3rem 0; font-size: .85rem; color: #f5e5c9; }
+.wave-report summary { cursor: pointer; padding: .45rem 0; }
+.wave-report p { margin: .35rem 0; }
