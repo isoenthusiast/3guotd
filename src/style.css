@@ -186,3 +186,8 @@ main.with-refund { --board-space: 21.25rem; }
   .setup-screen .briefing-art { height: clamp(5rem, 23dvh, 7rem); }
   .setup-screen .enter-battle { margin-top: .45rem; }
 }
+
+@media (max-height: 500px) {
+  .with-shortfall .board-view .battlefield { width: min(100%, 158px); }
+  .with-shortfall .action-note { margin-top: .2rem; }
+}

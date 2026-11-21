@@ -403,7 +403,7 @@ function App() {
   }
 
   return (
-    <main class={`battle-screen ${showActions ? (canRefund && tower ? 'with-refund' : 'with-actions') : ''}`.trim()}>
+    <main class={`battle-screen ${showActions ? (canRefund && tower ? 'with-refund' : 'with-actions') : ''}${showActions && shortfall > 0 ? ' with-shortfall' : ''}`.trim()}>
       <h1 class="visually-hidden">3Guo Tower Defense</h1>
       <div class="hud">
         <strong aria-label={`Silver: ${round.silver}`}><span class="coin" aria-hidden="true" />{round.silver} silver</strong>
@@ -478,7 +478,7 @@ function App() {
               ))}
             </div>
             {(!tower || !tower.reach || !tower.power) && shortfall > 0
-              && <p class="action-note">Need {shortfall} more silver.{!tower && canRefund && ' Remove a tower for a refund.'}</p>}
+              && <p class="action-note">Need {shortfall} more silver.</p>}
           </section>
         )}
       </div>
