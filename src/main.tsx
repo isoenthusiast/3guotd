@@ -1,7 +1,7 @@
 import { render } from 'preact'
 import { useEffect, useRef, useState } from 'preact/hooks'
 import { columns, route, rows } from './game/board'
-import { advanceRound, createRound, enemyPosition, toggleTower, towerBudget, towerRange, towerSites } from './game/round'
+import { advanceRound, createRound, enemyMaxHealth, enemyPosition, impactTime, shotFlightTime, toggleTower, towerBudget, towerRange, towerSites } from './game/round'
 import type { Round } from './game/round'
 import './style.css'
 
@@ -37,20 +37,73 @@ function Battlefield({ round, onToggle }: { round: Round; onToggle: (site: numbe
       }
     }
 
+    const enemyCenters = new Map<number, [number, number]>()
     for (const enemy of round.enemies) {
       const [x, y] = enemyPosition(enemy.progress)
-      context.fillStyle = '#9e352c'
+      const center: [number, number] = [(x + 0.5) * tile, (y + 0.5) * tile]
+      enemyCenters.set(enemy.id, center)
+      context.fillStyle = '#a73735'
+      context.strokeStyle = '#371c1d'
+      context.lineWidth = 3
       context.beginPath()
-      context.arc((x + 0.5) * tile, (y + 0.5) * tile, tile * 0.29, 0, Math.PI * 2)
+      context.arc(...center, tile * 0.29, 0, Math.PI * 2)
+      context.fill()
+      context.stroke()
+    }
+
+    for (const shot of round.shots) {
+      const target = enemyCenters.get(shot.targetId)
+      if (!target) continue
+      const fromX = (shot.from[0] + 0.5) * tile
+      const fromY = (shot.from[1] + 0.5) * tile
+      const progress = shot.elapsed / shotFlightTime
+      const tail = Math.max(0, progress - 0.22)
+      const dx = target[0] - fromX
+      const dy = target[1] - fromY
+      const x = fromX + dx * progress
+      const y = fromY + dy * progress
+      context.strokeStyle = '#604116'
+      context.lineWidth = 9
+      context.lineCap = 'round'
+      context.beginPath()
+      context.moveTo(fromX + dx * tail, fromY + dy * tail)
+      context.lineTo(x, y)
+      context.stroke()
+      context.strokeStyle = '#ffd27a'
+      context.lineWidth = 4
+      context.stroke()
+      context.fillStyle = '#fff4c5'
+      context.beginPath()
+      context.arc(x, y, 6, 0, Math.PI * 2)
       context.fill()
     }
-    context.strokeStyle = '#fff0b2'
-    context.lineWidth = 4
-    for (const { from, to } of round.shots) {
+
+    for (const impact of round.impacts) {
+      const progress = impact.elapsed / impactTime
+      context.globalAlpha = 1 - progress
+      context.strokeStyle = '#fff4c5'
+      context.lineWidth = 5
       context.beginPath()
-      context.moveTo((from[0] + 0.5) * tile, (from[1] + 0.5) * tile)
-      context.lineTo((to[0] + 0.5) * tile, (to[1] + 0.5) * tile)
+      context.arc((impact.at[0] + 0.5) * tile, (impact.at[1] + 0.5) * tile,
+        10 + 23 * progress, 0, Math.PI * 2)
       context.stroke()
+    }
+    context.globalAlpha = 1
+
+    for (const enemy of round.enemies) {
+      const center = enemyCenters.get(enemy.id)
+      if (!center) continue
+      const [x, y] = center
+      const pipWidth = 10
+      const gap = 2
+      const width = (pipWidth + gap) * enemyMaxHealth - gap
+      const left = x - width / 2
+      context.fillStyle = '#1b2220'
+      context.fillRect(left - 3, y - 35, width + 6, 13)
+      for (let pip = 0; pip < enemyMaxHealth; pip++) {
+        context.fillStyle = pip < enemy.health ? '#e4f6a7' : '#555b4d'
+        context.fillRect(left + pip * (pipWidth + gap), y - 32, pipWidth, 7)
+      }
     }
   }, [round])
 

@@ -11,23 +11,29 @@ const spawnInterval = 1.3
 const speed = 1.6
 export const towerRange = 1.8
 const shotInterval = 1.2
+export const shotFlightTime = 0.25
+export const impactTime = 0.25
+export const enemyMaxHealth = 4
 export const initialLives = 3
 
-type Enemy = { progress: number; health: number }
+type Enemy = { id: number; progress: number; health: number }
+type Shot = { from: Point; targetId: number; elapsed: number }
+type Impact = { at: Point; elapsed: number }
 type Tower = { site: number; cooldown: number }
 
 export type Round = {
   phase: 'setup' | 'running' | 'won' | 'lost'
   towers: Tower[]
   enemies: Enemy[]
-  shots: { from: Point; to: Point }[]
+  shots: Shot[]
+  impacts: Impact[]
   lives: number
   spawned: number
   spawnTimer: number
 }
 
 export function createRound(): Round {
-  return { phase: 'setup', towers: [], enemies: [], shots: [], lives: initialLives, spawned: 0, spawnTimer: 0 }
+  return { phase: 'setup', towers: [], enemies: [], shots: [], impacts: [], lives: initialLives, spawned: 0, spawnTimer: 0 }
 }
 
 export function toggleTower(round: Round, site: number): Round {
@@ -52,20 +58,40 @@ export function advanceRound(round: Round, seconds: number): Round {
   if (round.phase !== 'running') return round
   let { spawned, spawnTimer, lives } = round
   spawnTimer -= seconds
-  const enemies = round.enemies.map(enemy => ({
+  const moving = round.enemies.map(enemy => ({
     ...enemy,
-    progress: enemy.progress + seconds * speed,
-  })).filter(enemy => {
+    progress: Math.min(route.length - 1, enemy.progress + seconds * speed),
+  }))
+  const targets = new Map(moving.map(enemy => [enemy.id, enemy]))
+  const impacts = round.impacts
+    .map(impact => ({ ...impact, elapsed: impact.elapsed + seconds }))
+    .filter(impact => impact.elapsed < impactTime)
+  const shots: Shot[] = []
+  const incoming = new Map<number, number>()
+  for (const shot of round.shots) {
+    const target = targets.get(shot.targetId)
+    if (!target || target.health <= 0) continue
+
+    const elapsed = shot.elapsed + seconds
+    if (elapsed >= shotFlightTime) {
+      target.health--
+      impacts.push({ at: enemyPosition(target.progress), elapsed: 0 })
+    } else {
+      shots.push({ ...shot, elapsed })
+      incoming.set(target.id, (incoming.get(target.id) ?? 0) + 1)
+    }
+  }
+  const enemies = moving.filter(enemy => {
+    if (enemy.health <= 0) return false
     if (enemy.progress < route.length - 1) return true
     lives = Math.max(0, lives - 1)
     return false
   })
   if (spawned < enemyCount && spawnTimer <= 0) {
-    enemies.push({ health: 4, progress: 0 })
+    enemies.push({ id: spawned, health: enemyMaxHealth, progress: 0 })
     spawned++
     spawnTimer += spawnInterval
   }
-  const shots: Round['shots'] = []
   const towers = round.towers.map(tower => {
     const cooldown = Math.max(0, tower.cooldown - seconds)
     if (cooldown > 0) return { ...tower, cooldown }
@@ -73,14 +99,15 @@ export function advanceRound(round: Round, seconds: number): Round {
     const [x, y] = towerSites[tower.site]
     const target = enemies.find(enemy => {
       const [enemyX, enemyY] = enemyPosition(enemy.progress)
-      return enemy.health > 0 && Math.hypot(enemyX - x, enemyY - y) <= towerRange
+      return enemy.health > (incoming.get(enemy.id) ?? 0)
+        && Math.hypot(enemyX - x, enemyY - y) <= towerRange
     })
     if (!target) return { ...tower, cooldown }
-    target.health--
-    shots.push({ from: [x, y], to: enemyPosition(target.progress) })
+    shots.push({ from: [x, y], targetId: target.id, elapsed: 0 })
+    incoming.set(target.id, (incoming.get(target.id) ?? 0) + 1)
     return { ...tower, cooldown: shotInterval }
   })
-  const surviving = enemies.filter(enemy => enemy.health > 0)
-  const phase = lives === 0 ? 'lost' : spawned === enemyCount && !surviving.length ? 'won' : 'running'
-  return { phase, towers, enemies: surviving, shots, lives, spawned, spawnTimer }
+  const cleared = spawned === enemyCount && enemies.length === 0 && impacts.length === 0
+  const phase = lives === 0 ? 'lost' : cleared ? 'won' : 'running'
+  return { phase, towers, enemies, shots, impacts, lives, spawned, spawnTimer }
 }

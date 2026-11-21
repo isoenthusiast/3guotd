@@ -2,6 +2,8 @@
 
 Read [SimaYi’s first review](2026-11-21-simayi.md) for the original findings and test evidence. The [remediation record](2026-11-21-remediation.md) explains the fixes and their verification. Use `gameflow.db` as the current record of status, learnings, root causes, preventive methods, and actions taken. [schema.sql](schema.sql) defines the database structure.
 
+See [SimaYi’s quick UX review](2026-11-21-ux-simayi.md) for the current playability findings.
+
 From the checkout root, list open work:
 
 ```sh
