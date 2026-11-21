@@ -12,7 +12,7 @@ Choose 20, 40, 60, 80, or 100 waves before the battle. Waves advance automatical
 
 Choose **Campaign** to start at Village Watch. There are six battle maps and five levels per map. Clear a level to unlock the next one. The fifth level on each map ends with a pursuit commander and opens the battle’s Chronicle. Progress is saved by level ID in this browser, including earlier Changban clears.
 
-Maps add different pressures. Red Cliffs and Jing have two approaches. Yiling marks tower sites that close on the next wave and refunds towers on those sites. Wuzhang tracks supply deliveries. The current campaign uses the existing Archer and Drum towers. Road heroes and their upgrade economy are future systems. **Long battle** retains the 20–100 wave choices.
+Maps add different pressures. Red Cliffs and Jing have two approaches. Yiling marks tower sites that close on the next wave, refunds affected towers, and gives you five seconds to rebuild before attackers arrive. Wuzhang tracks supply deliveries. The current campaign uses the existing Archer and Drum towers. Road heroes and their upgrade economy are future systems. **Long battle** retains the 20–100 wave choices.
 
 ## Local development
 

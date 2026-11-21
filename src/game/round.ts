@@ -84,6 +84,7 @@ export function waveFormation(number: number) {
 
 const spawnInterval = 1.65
 const gateCueTime = 1.35
+export const rebuildWindow = 5
 export const waveCueTime = 1.15
 export const rewardCueTime = 0.7
 
@@ -118,6 +119,7 @@ export type Round = {
   impacts: Impact[]
   gateHit: GateHit | null
   waveAge: number
+  rebuildTime: number
   waveStats: WaveStats
   previousWave: WaveReport | null
   lives: number
@@ -128,7 +130,7 @@ export type Round = {
 export function createRound(totalWaves = 20, mission: Mission | null = null): Round {
   return {
     phase: 'setup', totalWaves: mission?.waves.length ?? totalWaves, mission, waveNumber: 1, towers: [], silver: startingSilver, opening: null,
-    enemies: [], shots: [], impacts: [], gateHit: null, waveAge: 0,
+    enemies: [], shots: [], impacts: [], gateHit: null, waveAge: 0, rebuildTime: 0,
     waveStats: emptyStats, previousWave: null, lives: initialLives, spawned: 0, spawnTimer: 0,
   }
 }
@@ -237,6 +239,10 @@ function inRange(tower: Tower, [x, y]: Point): boolean {
 
 export function advanceRound(round: Round, seconds: number, visualSeconds = seconds): Round {
   if (round.phase !== 'running') return round
+  if (round.rebuildTime > 0) {
+    return { ...round, rebuildTime: round.rebuildTime <= visualSeconds + 1e-9
+      ? 0 : round.rebuildTime - visualSeconds }
+  }
   let { spawned, spawnTimer, lives, silver } = round
   const waveStats = { ...round.waveStats }
   const waveAge = round.waveAge + visualSeconds
@@ -322,11 +328,13 @@ export function advanceRound(round: Round, seconds: number, visualSeconds = seco
   if (lives > 0 && cleared && round.waveNumber < round.totalWaves) {
     const next = { ...createRound(round.totalWaves, round.mission), waveNumber: round.waveNumber + 1 }
     const closed = closedSites(next)
+    const needsRebuild = closed.length > closedSites(round).length
     const remaining = towers.filter(tower => !closed.includes(tower.site))
     const refund = towers.reduce((amount, tower) => amount + (closed.includes(tower.site) ? towerRefund(tower) : 0), 0)
     return startRound({
       ...next, towers: remaining.map(tower => ({ ...tower, cooldown: 0 })), silver: silver + refund, lives,
-      previousWave: { ...waveStats, waveNumber: round.waveNumber }, gateHit, impacts,
+      previousWave: { ...waveStats, waveNumber: round.waveNumber },
+      gateHit: needsRebuild ? null : gateHit, impacts: needsRebuild ? [] : impacts, rebuildTime: needsRebuild ? rebuildWindow : 0,
     })
   }
   const phase = lives === 0 ? 'lost' : cleared ? 'won' : 'running'

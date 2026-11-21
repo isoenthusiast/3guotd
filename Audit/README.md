@@ -14,6 +14,8 @@ See [SimaYi’s ranked Three Kingdoms UX review](2026-11-21-three-kingdoms-ux-to
 
 See the [AUD-008 remediation evidence](2026-11-21-three-kingdoms-ux-remediation.md) for fixes and outstanding human playtests.
 
+See the [campaign levels audit](2026-11-21-campaign-levels-audit.md) for Yiling and boss-preview verification.
+
 From the checkout root, list open work:
 
 ```sh

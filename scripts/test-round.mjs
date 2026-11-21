@@ -223,6 +223,17 @@ try {
   assert.equal(closure.silver, startingSilver)
   assert.equal(canBuildAt(closure, columns), false)
   assert.equal(buildTower(retryRound(closure), columns, 'archer').towers.length, 0)
+  assert.equal(closure.rebuildTime, 5)
+  closure = buildTower(closure, 0, 'drum')
+  assert.equal(closure.towers.length, 1, 'Can rebuild with the refund before attackers arrive')
+  for (let frame = 0; frame < 100; frame++) {
+    assert.equal(closure.spawned, 0)
+    closure = tickRound(closure, 3)
+  }
+  assert.equal(closure.rebuildTime, 0)
+  assert.equal(closure.spawned, 0)
+  assert.equal(tickRound(closure, 3).spawned, 1)
+
 
   const clearedIds = []
   for (const mission of campaign) {

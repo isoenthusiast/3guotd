@@ -149,7 +149,9 @@ function App() {
   let status = setup ? (round.towers.length ? 'Prepare defenses' : 'Tap grass to build')
     : round.phase === 'won' ? (mission ? 'Level cleared!' : 'Gate defended!') : 'The gate fell.'
   if (running) {
-    status = paused ? 'Paused' : round.waveAge < waveCueTime
+    status = paused ? 'Paused' : round.rebuildTime > 0
+      ? `Rebuild · ${Math.ceil(round.rebuildTime)}s before attackers arrive`
+      : round.waveAge < waveCueTime
       ? `Wave ${round.waveNumber} starts · ${formation.name}`
       : `${enemiesRemaining(round)} of ${formation.sequence.length} attackers`
   }
@@ -255,7 +257,9 @@ function App() {
           {initialSetup && `${mission.objective} · Hold for ${round.totalWaves} waves · `}
           {objectiveProgress(round)} of {mission.milestoneCount} {mission.milestone}
         </p>
-        {setup && <p>Next threat · {formation.name}</p>}
+        {setup && <p>{mission.level === 5 && initialSetup
+          ? 'Final threat · The commander waits for his escort to clear.'
+          : `Next threat · ${formation.name}`}</p>}
         {!finished && upcomingClosures && <p>Marked sites close next wave. Towers there are refunded.</p>}
       </section>}
       <div class="hud">
