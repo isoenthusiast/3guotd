@@ -10,11 +10,12 @@ Use Node.js 20.19+ on the 20.x line or Node.js 22.12+.
 npm ci
 npm run dev
 npm run check
+npm test
 npm run build
 npm run preview
 ```
 
-`dev` serves source with live reload. `check` runs TypeScript validation. `build` writes the production site and service worker to `dist/`. `preview` serves that build for local testing.
+`dev` serves source with live reload. `check` runs TypeScript validation. `test` simulates all legal tower layouts and checks that placement matters. `build` writes the production site and service worker to `dist/`. `preview` serves that build for local testing.
 
 ## Offline web
 
@@ -28,4 +29,8 @@ Capacitor is the shortest path to an Android package sharing the web implementat
 
 ## Ed-Z370 private play link
 
-Open [3Guo Tower Defense](https://edward-z370-hd3.tail94dc7a.ts.net:8472/) on a device connected to the tailnet. Tailscale Serve proxies HTTPS port 8472 to the loopback static server on port 8804. The enabled user service is `3guotd-web.service`. Run `npm run build` to publish updated assets. Close open app tabs and reopen to let a waiting service worker activate.
+Open [3Guo Tower Defense](https://edward-z370-hd3.tail94dc7a.ts.net:8472/) on a device connected to the tailnet. Tailscale Serve proxies HTTPS port 8472 to the loopback static server on port 8804. The enabled user service is `3guotd-web.service`. The service reads the active release through `.releases/current`.
+
+Commit the reviewed changes, then run `bash scripts/publish.sh` on Ed-Z370. The script builds and tests the committed source in staging and switches the active release with one rename. It prints the published commit for the audit record. `npm run build` is available for local verification in `dist/`.
+
+For changes to the offline update path, open the old release and leave a tab open when publishing the new build. Check that the new worker waits and that the old tab can still reload offline. Close all game tabs and reopen to let the waiting worker activate. Confirm the new release then reloads offline. For private-link changes, also record a check from an intended tailnet device.

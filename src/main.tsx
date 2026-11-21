@@ -1,7 +1,7 @@
 import { render } from 'preact'
 import { useEffect, useRef, useState } from 'preact/hooks'
 import { columns, route, rows } from './game/board'
-import { advanceRound, createRound, enemyPosition, toggleTower, towerBudget, towerSites } from './game/round'
+import { advanceRound, createRound, enemyPosition, toggleTower, towerBudget, towerRange, towerSites } from './game/round'
 import type { Round } from './game/round'
 import './style.css'
 
@@ -24,6 +24,19 @@ function Battlefield({ round, onToggle }: { round: Round; onToggle: (site: numbe
     for (const [column, row] of route) {
       context.fillRect(column * tile, row * tile, tile, tile)
     }
+    if (round.phase === 'setup') {
+      context.fillStyle = '#f5dca933'
+      context.strokeStyle = '#f5dca9aa'
+      context.lineWidth = 2
+      for (const tower of round.towers) {
+        const [x, y] = towerSites[tower.site]
+        context.beginPath()
+        context.arc((x + 0.5) * tile, (y + 0.5) * tile, towerRange * tile, 0, Math.PI * 2)
+        context.fill()
+        context.stroke()
+      }
+    }
+
     for (const enemy of round.enemies) {
       const [x, y] = enemyPosition(enemy.progress)
       context.fillStyle = '#9e352c'
@@ -31,7 +44,15 @@ function Battlefield({ round, onToggle }: { round: Round; onToggle: (site: numbe
       context.arc((x + 0.5) * tile, (y + 0.5) * tile, tile * 0.29, 0, Math.PI * 2)
       context.fill()
     }
-  }, [round.enemies])
+    context.strokeStyle = '#fff0b2'
+    context.lineWidth = 4
+    for (const { from, to } of round.shots) {
+      context.beginPath()
+      context.moveTo((from[0] + 0.5) * tile, (from[1] + 0.5) * tile)
+      context.lineTo((to[0] + 0.5) * tile, (to[1] + 0.5) * tile)
+      context.stroke()
+    }
+  }, [round])
 
   return (
     <div class="battlefield">
@@ -88,7 +109,7 @@ function App() {
         <h1>3Guo Tower Defense</h1>
         {status && <p role="status">{status}</p>}
       </header>
-      <p>Tap up to three marked sites to place towers. Start the wave and keep enemies from getting through.</p>
+      <p>Tap marked sites to place up to three towers. The circles show firing range. Cover the bends, then start the wave.</p>
       <p role="status">Lives: {round.lives} · Towers: {round.towers.length}/{towerBudget}
         {round.phase === 'won' && ' · Gate defended!'}
         {round.phase === 'lost' && ' · The gate fell.'}

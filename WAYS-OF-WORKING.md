@@ -8,9 +8,9 @@ Start with the existing one-page web game. Make the first round easy to learn an
 
 1. **Plan.** Pick one player-facing change and write down how to tell it works.
 2. **Build.** Implement it in the web app and keep the diff focused.
-3. **Audit.** Review the diff, run `npm run build`, and check the affected behavior, touch controls, and offline reload.
+3. **Audit.** Review the diff, run `npm test` and `npm run build`, and check the affected behavior, touch controls, and offline reload.
 4. **Playtest.** Ask someone to try meaningful gameplay changes on a phone without coaching. Record where they hesitate or get stuck.
-5. **Release.** Publish the checked build to the private Tailscale link in [README.md](README.md) and record what changed and what was verified.
+5. **Release.** Publish a reviewed commit using the staged release process in [README.md](README.md). Record the commit, checks, and any device or player evidence.
 
 ## Agents and Herdr panes
 
@@ -24,7 +24,7 @@ Whenever adding an agent, create a dedicated Herdr pane in this workspace. Read 
 
 ## Audit follow-up
 
-Record SimaYi’s reviews and track findings, actions, and preventive methods in [Audit](Audit/README.md). Use open findings and past learnings when planning the next change.
+Record SimaYi’s reviews and track findings, actions, and preventive methods in [Audit](Audit/README.md). For each finding, confirm its cause, plan a fix, and check whether the plan also prevents recurrence. Add a separate preventive step only when needed. Replan if the fix fails the acceptance check. Record the action, test evidence, and learning before closing the finding.
 
 ## Recording decisions
 
