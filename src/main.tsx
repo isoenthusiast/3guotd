@@ -10,6 +10,8 @@ import {
 import type { Mission, PlaySpeed, Round, TowerKind, Upgrade } from './game/round'
 import { drawBattlefield, drawTower, tile } from './game-art'
 import { battles, campaign, isMissionUnlocked, nextMission } from './game/campaign'
+import { loadGame, loadSound, saveGame, saveSound } from './game/save-game'
+import { enableAudio, playCue } from './sound'
 import './style.css'
 
 const siteCount = columns * rows
@@ -123,6 +125,15 @@ function loadClears(): string[] {
 
 function App() {
   const [offline, setOffline] = useState('')
+  const [screen, setScreen] = useState<'menu' | 'campaign' | 'long' | 'battle'>('menu')
+  const [hasRun, setHasRun] = useState(false)
+  const [hasSave, setHasSave] = useState(() => loadGame() !== null)
+  const [sound, setSound] = useState(loadSound)
+  const [notice, setNotice] = useState('')
+  const [confirmRestart, setConfirmRestart] = useState(false)
+  const [draftMission, setDraftMission] = useState<Mission>(campaign[0])
+  const [draftWaves, setDraftWaves] = useState(20)
+  const previousAudio = useRef<Round | null>(null)
   const [round, setRound] = useState(createRound)
   const [clears, setClears] = useState(loadClears)
   const [selected, setSelected] = useState<number | null>(null)
@@ -174,20 +185,55 @@ function App() {
     }
   }, [round.phase, mission, clears])
 
-  function openMode(next: Mission | null) {
-    if (next && !isMissionUnlocked(next, clears) && !(round.phase === 'won' && upcoming === next)) return
-    setRound(createRound(20, next))
-    setPaused(false)
+  function showMenu() {
+    previousAudio.current = null
+    setNotice('')
+    setConfirmRestart(false)
+    setScreen('menu')
+  }
+
+  function enterBattle(next: Round, restore = false) {
+    setRound(next)
+    setHasRun(true)
+    setPaused(restore && next.phase === 'running')
     selectTile(null)
+    previousAudio.current = null
+    if (sound) enableAudio()
+    setScreen('battle')
+  }
+
+  function openMission(next: Mission) {
+    if (!isMissionUnlocked(next, clears) && !(round.phase === 'won' && upcoming === next)) return
+    setDraftMission(next)
+    setScreen('campaign')
+  }
+
+  function buy(event: (current: Round) => Round) {
+    const updated = event(round)
+    if (updated === round) return
+    if (sound) {
+      enableAudio()
+      playCue('purchase')
+    }
+    setRound(current => event(current))
   }
 
   useEffect(() => {
-    if (!running || paused) return
+    if (screen !== 'battle' || !running || paused) return
     const timer = window.setInterval(() => {
       if (!document.hidden) setRound(current => tickRound(current, speed))
     }, 50)
     return () => window.clearInterval(timer)
-  }, [running, speed, paused])
+  }, [screen, running, speed, paused])
+
+  useEffect(() => {
+    const previous = previousAudio.current
+    previousAudio.current = screen === 'battle' ? round : null
+    if (!sound || screen !== 'battle' || !previous) return
+    if (round.lives < previous.lives) playCue('breach')
+    else if (running && (previous.phase === 'setup' || previous.waveNumber !== round.waveNumber)) playCue('wave')
+    else if (round.impacts.some(hit => hit.elapsed < 0.05 && !previous.impacts.includes(hit))) playCue('hit')
+  }, [round, screen, sound, running])
 
   useEffect(() => {
     const platform = (window as Window & { Capacitor?: { isNativePlatform(): boolean } }).Capacitor
@@ -214,23 +260,71 @@ function App() {
     </div>
   )
 
-  return (
-    <main class={`${mission ? 'campaign' : ''} ${showActions ? (canRefund && tower ? 'with-refund' : 'with-actions') : ''}`}>
-      <header>
-        <h1>3Guo Tower Defense</h1>
-        {offline && <span class="offline">{offline}</span>}
-      </header>
-      {!running && <nav class="mode-picker" aria-label="Game mode">
-        <button type="button" aria-pressed={mission !== null} onClick={() => { if (!mission) openMode(campaign[0]) }}>Campaign</button>
-        <button type="button" aria-pressed={mission === null} onClick={() => { if (mission) openMode(null) }}>Long battle</button>
-      </nav>}
-      {mission && <section class="mission-briefing" aria-label="Story mission">
-        {!running && <div class="campaign-options">
+  const header = <header>
+    <h1>3Guo Tower Defense</h1>
+    {offline && <span class="offline">{offline}</span>}
+  </header>
+
+  if (screen === 'menu') {
+    return <main class="menu-screen">
+      {header}
+      <h2>Main menu</h2>
+      {hasRun && <p>{mission ? `${mission.title} · Level ${mission.level}` : 'Long battle'}
+        {` · Wave ${round.waveNumber} of ${round.totalWaves}`}</p>}
+      <div class="menu-actions">
+        {hasRun && <button type="button" class="primary" onClick={() => {
+          if (sound) enableAudio()
+          setScreen('battle')
+        }}>Continue</button>}
+        <button type="button" onClick={() => setScreen('campaign')}>Campaign</button>
+        <button type="button" onClick={() => setScreen('long')}>Long battle</button>
+        <button type="button" disabled={!hasRun} onClick={() => {
+          const saved = saveGame(round, speed)
+          if (saved) setHasSave(true)
+          setNotice(saved ? 'Game saved on this browser.' : 'This browser could not save the game.')
+        }}>Save game</button>
+        <button type="button" disabled={!hasSave} onClick={() => {
+          const saved = loadGame()
+          if (!saved) {
+            setHasSave(false)
+            setNotice('The saved game could not be restored.')
+            return
+          }
+          setSpeed(saved.speed)
+          enterBattle(saved.round, true)
+        }}>Restore saved game</button>
+        {hasRun && !confirmRestart && <button type="button" onClick={() => setConfirmRestart(true)}>
+          {mission ? 'Restart level' : 'Restart battle'}
+        </button>}
+        <button type="button" aria-pressed={sound} onClick={() => {
+          const enabled = !sound
+          if (enabled) enableAudio()
+          setSound(enabled)
+          saveSound(enabled)
+        }}>Sound {sound ? 'on' : 'off'}</button>
+      </div>
+      {confirmRestart && <div class="menu-confirm">
+        <p>Restart from wave one? Your saved game stays available.</p>
+        <button type="button" class="primary" onClick={() => enterBattle(createRound(round.totalWaves, mission))}>Restart from wave one</button>
+        <button type="button" onClick={() => setConfirmRestart(false)}>Cancel</button>
+      </div>}
+      {notice && <p role="status">{notice}</p>}
+    </main>
+  }
+
+  if (screen === 'campaign' || screen === 'long') {
+    const selectedMission = screen === 'campaign' ? draftMission : null
+    return <main class="menu-screen">
+      {header}
+      <button type="button" onClick={showMenu}>Main menu</button>
+      {selectedMission ? <section class="mission-briefing" aria-label="Mission briefing">
+        <h2>Campaign</h2>
+        <div class="campaign-options">
           <label for="battle">Battle</label>
-          <select id="battle" value={mission.battleId} onChange={event => {
+          <select id="battle" value={selectedMission.battleId} onChange={event => {
             const first = campaign.find(level => level.battleId === event.currentTarget.value
               && isMissionUnlocked(level, clears))
-            if (first) openMode(first)
+            if (first) setDraftMission(first)
           }}>
             {battles.map(battle => <option key={battle.id} value={battle.id}
               disabled={!campaign.some(level => level.battleId === battle.id && isMissionUnlocked(level, clears))}>
@@ -238,58 +332,64 @@ function App() {
             </option>)}
           </select>
           <label for="level">Level</label>
-          <select id="level" value={mission.id} onChange={event => {
+          <select id="level" value={selectedMission.id} onChange={event => {
             const level = campaign.find(candidate => candidate.id === event.currentTarget.value)
-            if (level) openMode(level)
+            if (level && isMissionUnlocked(level, clears)) setDraftMission(level)
           }}>
-            {campaign.filter(level => level.battleId === mission.battleId).map(level =>
+            {campaign.filter(level => level.battleId === selectedMission.battleId).map(level =>
               <option key={level.id} value={level.id} disabled={!isMissionUnlocked(level, clears)}>
                 {level.level}{clears.includes(level.id) ? ' · Cleared' : ''}
               </option>)}
           </select>
-        </div>}
-        {initialSetup && <>
-          <p class="mission-setup"><strong>{mission.setting}</strong> · {mission.briefing}</p>
-          {mission.leadIn && <details class="story-scene"><summary>Before the battle</summary><p>{mission.leadIn}</p></details>}
-        </>}
-        {running && <p>{mission.title} · Level {mission.level}</p>}
-        <p>
-          {initialSetup && `${mission.objective} · Hold for ${round.totalWaves} waves · `}
-          {objectiveProgress(round)} of {mission.milestoneCount} {mission.milestone}
-        </p>
-        {setup && <p>{mission.level === 5 && initialSetup
-          ? 'Final threat · The commander waits for his escort to clear.'
-          : `Next threat · ${formation.name}`}</p>}
-        {!finished && upcomingClosures && <p>Marked sites close next wave. Towers there are refunded.</p>}
+        </div>
+        <h3>{selectedMission.title} · Level {selectedMission.level}</h3>
+        <p><strong>{selectedMission.setting}</strong> · {selectedMission.briefing}</p>
+        {selectedMission.leadIn && <details class="story-scene"><summary>Before the battle</summary><p>{selectedMission.leadIn}</p></details>}
+        <p>{selectedMission.objective} · Hold for {selectedMission.waves.length} waves</p>
+        <p>{selectedMission.level === 5 ? 'Final threat · The commander waits for his escort to clear.'
+          : `Next threat · ${selectedMission.waves[0].name}`}</p>
+        {(clears.includes(`${selectedMission.battleId}:5`)
+          || (selectedMission.battleId === 'changban' && clears.includes('changban'))) &&
+          <details class="story-scene"><summary>{selectedMission.title} Chronicle</summary><p>{selectedMission.chronicle}</p></details>}
+      </section> : <section class="mission-briefing" aria-label="Long battle setup">
+        <h2>Long battle</h2>
+        <div class="map-setting"><label for="waves">Waves</label>
+          <select id="waves" value={draftWaves} onChange={event => {
+            const count = waveOptions.find(option => option === Number(event.currentTarget.value))
+            if (count) setDraftWaves(count)
+          }}>
+            {waveOptions.map(option => <option key={option} value={option}>{option}</option>)}
+          </select>
+        </div>
       </section>}
+      <button class="primary enter-battle" type="button"
+        onClick={() => enterBattle(createRound(draftWaves, selectedMission))}>Enter battle</button>
+    </main>
+  }
+
+  return (
+    <main class={showActions ? (canRefund && tower ? 'with-refund' : 'with-actions') : undefined}>
+      {header}
       <div class="hud">
         <strong aria-label={`Silver: ${round.silver}`}><span class="coin" aria-hidden="true" />{round.silver} silver</strong>
         <span>{round.lives} lives</span>
         <span>Wave {round.waveNumber} of {round.totalWaves}</span>
         <span role="status">{hudStatus}</span>
+        {mission && <span>{objectiveProgress(round)}/{mission.milestoneCount} {mission.milestone}</span>}
       </div>
       <div class="map-controls">
-        {!mission && <div class="map-setting">
-          <label for="waves">Waves</label>
-          <select id="waves" value={round.totalWaves} disabled={!initialSetup}
-            onChange={event => {
-              const count = waveOptions.find(option => option === Number(event.currentTarget.value))
-              if (count) setRound(current => ({ ...current, totalWaves: count }))
-            }}>
-            {waveOptions.map(option => <option key={option} value={option}>{option}</option>)}
-          </select>
-        </div>}
-        {(!mission || !setup) && speedPicker}
+        <button type="button" class="pause-control" onClick={showMenu}>Main menu</button>
+        {speedPicker}
         {running && <button type="button" class="pause-control" onClick={() => setPaused(value => !value)}>
           {paused ? 'Resume' : 'Pause'}
         </button>}
       </div>
+      {!finished && upcomingClosures && <p class="closure-note">Marked sites close next wave.</p>}
       <div class="board-view">
         <Battlefield round={round} selected={activeSite} onSelect={site => selectTile(site === activeSite ? null : site)} />
       </div>
       <div class="command-bar">
         <div class="round-controls">
-          {mission && setup && speedPicker}
           {setup ? (
             <>
               <button type="button" class="primary"
@@ -305,9 +405,9 @@ function App() {
             }}>Retry wave</button>
           )}
           {round.phase === 'won' && upcoming && <button class="primary" type="button"
-            onClick={() => openMode(upcoming)}>{upcoming.battleId === mission?.battleId ? 'Next level' : 'Next battle'}</button>}
+            onClick={() => openMission(upcoming)}>{upcoming.battleId === mission?.battleId ? 'Next level' : 'Next battle'}</button>}
           {finished && <button type="button"
-            onClick={() => { setPaused(false); setRound(createRound(round.totalWaves, mission)); selectTile(null) }}>{mission ? 'Restart level' : 'New battle'}</button>}
+            onClick={() => enterBattle(createRound(round.totalWaves, mission))}>{mission ? 'Restart level' : 'New battle'}</button>}
         </div>
         {showActions && activeSite !== null && (
           <section class="actions" aria-label="Tower actions">
@@ -316,7 +416,7 @@ function App() {
                 <>
                   {upgradeBranches.filter(option => !tower[option]).map(option => (
                     <button key={option} type="button" class="purchase-card" disabled={shortfall > 0}
-                      onClick={() => setRound(current => upgradeTower(current, tower.site, option))}>
+                      onClick={() => buy(current => upgradeTower(current, tower.site, option))}>
                       <TowerPortrait kind={tower.kind} upgrade={option} />
                       <span>
                         <strong>{towerDetails[tower.kind][option]}</strong>
@@ -331,7 +431,7 @@ function App() {
                 </>
               ) : towerKinds.map(kind => (
                 <button key={kind} type="button" class="purchase-card" disabled={shortfall > 0}
-                  onClick={() => setRound(current => buildTower(current, activeSite, kind))}>
+                  onClick={() => buy(current => buildTower(current, activeSite, kind))}>
                   <TowerPortrait kind={kind} />
                   <span>
                     <strong>Build {towerDetails[kind].name}</strong>

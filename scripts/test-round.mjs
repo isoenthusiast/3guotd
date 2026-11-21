@@ -10,7 +10,7 @@ const output = mkdtempSync(join(tmpdir(), '3guotd-round-'))
 try {
   execFileSync(process.execPath, [
     require.resolve('typescript/bin/tsc'), '--ignoreConfig', '--target', 'es2022',
-    '--module', 'commonjs', '--outDir', output, 'src/game/round.ts', 'src/game/campaign.ts',
+    '--module', 'commonjs', '--outDir', output, 'src/game/round.ts', 'src/game/campaign.ts', 'src/game/save-game.ts',
   ], { stdio: 'inherit' })
 
   const {
@@ -271,6 +271,27 @@ try {
     clearedIds.push(mission.id)
   }
   console.log('Passed: 30 campaign clears, route geometry, sequential unlocks, alternating routes, and site closures.')
+
+  const local = new Map()
+  Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: {
+    getItem: key => local.get(key) ?? null,
+    setItem: (key, value) => local.set(key, value),
+  } })
+  const { loadGame, saveGame, loadSound, saveSound } = require(join(output, 'save-game.js'))
+  assert.equal(loadGame(), null)
+  assert.equal(loadSound(), false)
+  saveSound(true)
+  assert.equal(loadSound(), true)
+  saveSound(false)
+  assert.equal(loadSound(), false)
+  for (const run of [arrivals, closure, startRound(createRound(60)), breachAtTransition]) {
+    assert.equal(saveGame(run, 3), true)
+    assert.deepEqual(loadGame(), { round: run, speed: 3 })
+  }
+  local.set('3guotd.saved-game.v1', '{"version":1,"missionId":null,"round":{},"speed":1}')
+  assert.equal(loadGame(), null, 'Incomplete snapshots must be refused')
+  local.set('3guotd.saved-game.v1', '{"version":2}')
+  assert.equal(loadGame(), null, 'Unknown format must be refused')
 
   let undefended = startRound(initial)
   for (let step = 0; step < 1200 && undefended.phase === 'running'; step++) {

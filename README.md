@@ -14,6 +14,12 @@ Choose **Campaign** to start at Village Watch. There are six battle maps and fiv
 
 Maps add different pressures. Red Cliffs and Jing have two approaches. Yiling marks tower sites that close on the next wave, refunds affected towers, and gives you five seconds to rebuild before attackers arrive. Wuzhang tracks supply deliveries. The current campaign uses the existing Archer and Drum towers. Road heroes and their upgrade economy are future systems. **Long battle** retains the 20–100 wave choices.
 
+## Main menu and saves
+
+Choose Campaign or Long battle from the main menu. Campaign shows the story briefing before you enter the battle. Use **Main menu** during play to freeze the battle, then **Continue** to return to the same run. **Restart** returns to wave one in the same mode and keeps the saved slot available.
+
+**Save game** writes one slot on this browser. **Restore saved game** opens that exact battle, including towers, enemies, silver, and wave state. A restored battle pauses if combat was active. The sound toggle is saved separately. Campaign clears are saved independently from the battle slot.
+
 ## Local development
 
 Use Node.js 20.19+ on the 20.x line or Node.js 22.12+.
