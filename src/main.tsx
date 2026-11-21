@@ -29,19 +29,17 @@ function upgradeEffect(kind: TowerKind, branch: Upgrade): string {
   return `${slow(speedFactor)}% → ${slow(strongerSpeedFactor)}% slower`
 }
 
-function Battlefield({ round, selected, kind, previewReach, onSelect }: {
+function Battlefield({ round, selected, onSelect }: {
   round: Round
   selected: number | null
-  kind: TowerKind
-  previewReach: boolean
   onSelect: (site: number | null) => void
 }) {
   const canvas = useRef<HTMLCanvasElement>(null)
   const cells = useRef<(HTMLButtonElement | null)[]>([])
   useEffect(() => {
     const ctx = canvas.current?.getContext('2d')
-    if (ctx) drawBattlefield(ctx, round, selected, kind, previewReach)
-  }, [round, selected, kind, previewReach])
+    if (ctx) drawBattlefield(ctx, round, selected)
+  }, [round, selected])
 
   return (
     <div class="battlefield">
@@ -86,8 +84,6 @@ function App() {
   const [offline, setOffline] = useState('')
   const [round, setRound] = useState(createRound)
   const [selected, setSelected] = useState<number | null>(null)
-  const [preview, setPreview] = useState<Upgrade | null>(null)
-  const [kind, setKind] = useState<TowerKind>('archer')
   const [speed, setSpeed] = useState<PlaySpeed>(1)
   const running = round.phase === 'running'
   const setup = round.phase === 'setup'
@@ -95,8 +91,6 @@ function App() {
   const initialSetup = setup && round.waveNumber === 1
   const finished = round.phase === 'won' || round.phase === 'lost'
   const tower = round.towers.find(candidate => candidate.site === selected)
-  const selection = selected === null ? null : sitePosition(selected)
-  const branch = tower && preview && !tower[preview] ? preview : null
   const price = tower ? upgradePrice(tower) : towerPrice
   const shortfall = Math.max(0, price - round.silver)
   const spendingOpen = canSpend(round)
@@ -104,7 +98,6 @@ function App() {
 
   function selectTile(site: number | null) {
     setSelected(site)
-    setPreview(null)
   }
 
   useEffect(() => {
@@ -167,62 +160,9 @@ function App() {
         </button>}
       </div>
       <div class="board-view">
-        <Battlefield round={round} selected={selected} kind={kind}
-          previewReach={branch === 'reach'} onSelect={selectTile} />
+        <Battlefield round={round} selected={selected} onSelect={site => selectTile(site === selected ? null : site)} />
       </div>
       <div class="command-bar">
-        <section class="actions" aria-label="Tower actions">
-          {selection ? (
-            <>
-              <p class="action-label">{tower ? towerDetails[tower.kind].name : 'Build tower'} · Row {selection[1] + 1}, column {selection[0] + 1}</p>
-              {tower ? (
-                <>
-                  <div class="action-grid">
-                    {upgradeBranches.map(option => (
-                      <button key={option} type="button" disabled={tower[option]}
-                        aria-pressed={branch === option} onClick={() => setPreview(option)}>
-                        {towerDetails[tower.kind][option]}
-                        <small>{tower[option] ? 'Purchased' : upgradeEffect(tower.kind, option)}</small>
-                      </button>
-                    ))}
-                  </div>
-                  <div class="action-grid">
-                    {(!tower.reach || !tower.power) && (
-                      <button type="button" class="primary" disabled={!branch || !spendingOpen || shortfall > 0}
-                        onClick={() => {
-                          if (branch) setRound(current => upgradeTower(current, tower.site, branch))
-                          setPreview(null)
-                        }}>
-                        Buy upgrade
-                        <small>{price} silver{price > baseUpgradePrice
-                          && ` · +${secondUpgradeSurcharge} for second upgrade`}</small>
-                      </button>
-                    )}
-                    {canRefund && <button type="button" onClick={() => {
-                      setRound(current => removeTower(current, tower.site))
-                      setPreview(null)
-                    }}>Remove &amp; refund</button>}
-                  </div>
-                </>
-              ) : (
-                <div class="action-grid">
-                  {towerKinds.map(option => (
-                    <button key={option} type="button" aria-pressed={kind === option} onClick={() => setKind(option)}>
-                      {towerDetails[option].name}<small>{option === 'archer' ? 'Deals damage' : 'Slows attackers'}</small>
-                    </button>
-                  ))}
-                  <button type="button" class="primary" disabled={!spendingOpen || shortfall > 0}
-                    onClick={() => setRound(current => buildTower(current, selected!, kind))}>
-                    Build {towerDetails[kind].name}<small>{towerPrice} silver</small>
-                  </button>
-                </div>
-              )}
-              {spendingOpen && (!tower || !tower.reach || !tower.power) && shortfall > 0
-                && <p class="action-note">Need {shortfall} more silver.{!tower && canRefund && ' Remove a tower for a refund.'}</p>}
-            </>
-          ) : <p class="action-label">Tap an empty tile to build or a tower to upgrade.
-            {canRefund && round.silver < towerPrice && ' Tap a tower to remove it for a refund.'}</p>}
-        </section>
         <div class="round-controls">
           {setup ? (
             <>
@@ -241,6 +181,34 @@ function App() {
           {finished && <button type="button"
             onClick={() => { setPaused(false); setRound(createRound(round.totalWaves)); selectTile(null) }}>New battle</button>}
         </div>
+        {selected !== null && spendingOpen && (!tower || !tower.reach || !tower.power || canRefund) && (
+          <section class="actions" aria-label="Tower actions">
+            <div class="action-grid">
+              {tower ? (
+                <>
+                  {upgradeBranches.filter(option => !tower[option]).map(option => (
+                    <button key={option} type="button" class="primary" disabled={shortfall > 0}
+                      onClick={() => setRound(current => upgradeTower(current, tower.site, option))}>
+                      {towerDetails[tower.kind][option]} · {price} silver
+                      <small>{upgradeEffect(tower.kind, option)}
+                        {price > baseUpgradePrice && ` · +${secondUpgradeSurcharge} for second upgrade`}</small>
+                    </button>
+                  ))}
+                  {canRefund && <button type="button"
+                    onClick={() => setRound(current => removeTower(current, tower.site))}>Remove &amp; refund</button>}
+                </>
+              ) : towerKinds.map(kind => (
+                <button key={kind} type="button" class="primary" disabled={shortfall > 0}
+                  onClick={() => setRound(current => buildTower(current, selected, kind))}>
+                  Build {towerDetails[kind].name} · {towerPrice} silver
+                  <small>{kind === 'archer' ? 'Deals damage' : 'Slows attackers'}</small>
+                </button>
+              ))}
+            </div>
+            {(!tower || !tower.reach || !tower.power) && shortfall > 0
+              && <p class="action-note">Need {shortfall} more silver.{!tower && canRefund && ' Remove a tower for a refund.'}</p>}
+          </section>
+        )}
       </div>
     </main>
   )

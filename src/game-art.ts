@@ -1,6 +1,6 @@
 import { columns, route, rows, sitePosition } from './game/board'
 import { enemyDetails, enemyPosition, impactTime, shotFlightTime, towerRange } from './game/round'
-import type { Round, TowerKind } from './game/round'
+import type { Round } from './game/round'
 
 export const tile = 64
 
@@ -20,7 +20,7 @@ function roof(ctx: CanvasRenderingContext2D, x: number, y: number, width: number
 }
 
 export function drawBattlefield(
-  ctx: CanvasRenderingContext2D, round: Round, selected: number | null, kind: TowerKind, previewReach: boolean,
+  ctx: CanvasRenderingContext2D, round: Round, selected: number | null,
 ) {
   for (let y = 0; y < rows; y++) {
     for (let x = 0; x < columns; x++) {
@@ -55,17 +55,17 @@ export function drawBattlefield(
   ctx.fillRect(gateX - 9, gateY + 1, 18, 23)
   roof(ctx, gateX, gateY - 22, 28, '#473b3b')
 
-  if (selected !== null) {
-    const active = round.towers.find(tower => tower.site === selected)
-    const [x, y] = center(sitePosition(selected))
+  const active = round.towers.find(tower => tower.site === selected)
+  if (active) {
+    const [x, y] = center(sitePosition(active.site))
     ctx.beginPath()
-    ctx.arc(x, y, towerRange(active?.kind ?? kind, active?.reach ?? false) * tile, 0, 2 * Math.PI)
+    ctx.arc(x, y, towerRange(active.kind, active.reach) * tile, 0, 2 * Math.PI)
     ctx.fillStyle = '#fff0af21'
     ctx.strokeStyle = '#ffe2a0b0'
     ctx.lineWidth = 3
     ctx.fill()
     ctx.stroke()
-    if (active && previewReach) {
+    if (!active.reach) {
       ctx.save()
       ctx.setLineDash([9, 5])
       ctx.strokeStyle = '#fff5c4'

@@ -3,8 +3,6 @@
   font-family: system-ui, sans-serif;
   color: #f5e5c9;
   background: #202720;
-  --bronze: #ebc084;
-  --panel: #30392e;
 }
 
 body { margin: 0; }
@@ -18,7 +16,7 @@ h1 { font-family: Georgia, serif; font-size: clamp(1.6rem, 6vw, 2.6rem); margin:
 .map-controls { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem .6rem; margin-bottom: .4rem; }
 .map-setting { display: inline-flex; align-items: center; gap: .25rem; font-size: .85rem; }
 .map-controls select { min-width: 44px; min-height: 44px; font: inherit; }
-.board-view .battlefield { width: min(100%, 34dvh, 22.6667rem); margin-inline: auto; }
+.board-view .battlefield { width: min(100%, calc((100dvh - 10rem) * 2 / 3), 22.6667rem); margin-inline: auto; }
 .battlefield { position: relative; background: #4c654d; border-radius: .5rem; overflow: hidden; }
 canvas { display: block; width: 100%; height: auto; }
 
@@ -44,14 +42,12 @@ button:focus-visible { outline: 2px solid #ffedaf; outline-offset: 2px; }
 @media (hover: hover) { .cell:hover { background: #fff0af24; } }
 
 .command-bar { position: sticky; bottom: 0; z-index: 1; background: #202720; padding: .55rem 0 .4rem; }
-.actions { min-height: 11rem; box-sizing: border-box; background: var(--panel); border: 1px solid #625e4e; border-radius: .5rem; padding: .55rem; }
-.action-label { margin: 0; color: #eadaca; font-size: .85rem; }
+.actions { margin-top: .35rem; }
 .action-note { margin: .4rem 0 0; color: #f5d69a; font-size: .78rem; }
-.action-grid { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .45rem; }
+.action-grid { display: flex; flex-wrap: wrap; gap: .35rem; }
 .action-grid button { flex: 1 1 5rem; min-height: 44px; padding: .35rem .3rem; font-size: .82rem; }
-.action-grid button[aria-pressed="true"] { border-color: var(--bronze); background: #594834; }
 button small { display: block; font-size: .7rem; line-height: 1.15; margin-top: .15rem; }
-.round-controls { display: flex; gap: .5rem; margin-top: .6rem; }
+.round-controls { display: flex; gap: .5rem; }
 .round-controls button { min-height: 44px; padding: .35rem .75rem; }
 .primary { background: #823f38; border-color: #b78661; }
 

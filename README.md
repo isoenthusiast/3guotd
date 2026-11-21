@@ -2,7 +2,7 @@
 
 A web-first tower defense game built with Preact, TypeScript, Canvas 2D, and Vite. The current round defends a Shu frontier outpost against infantry and fast runners.
 
-The full portrait map fits the phone screen. Tap an empty tile off the road to preview an Archer or Drum tower. Confirm the purchase in the action bar. Start with 90 silver, enough for three 30-silver towers. Kills pay 7 or 12 silver depending on enemy level. Spend silver during the wave to build more towers or buy upgrades. An Archer deals damage and a Drum slows attackers. Each tower can buy both upgrade branches in either order. Select a branch to see its effect and confirm the purchase. The first costs 18 silver and the second costs 27 silver, including a 9-silver surcharge.
+The full portrait map fits the phone screen. Tap an empty tile off the road to preview an Archer or Drum tower. Tap the priced Archer or Drum button to buy it. The action bar appears only when a tile or tower is selected. Start with 90 silver, enough for three 30-silver towers. Kills pay 7 or 12 silver depending on enemy level. Spend silver during the wave to build more towers or buy upgrades. An Archer deals damage and a Drum slows attackers. Each tower can buy both upgrade branches in either order. Select a tower to see the range preview and each available branch’s effect and price. Tap a priced branch to buy it. The first costs 18 silver and the second costs 27 silver, including a 9-silver surcharge.
 
 Choose 20, 40, 60, 80, or 100 waves before the battle. Waves advance automatically. Switch between 1×, 2×, and 3×, or use **Pause** and **Resume**. Buying and upgrading remain available when paused.
 
