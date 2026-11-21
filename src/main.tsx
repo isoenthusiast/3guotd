@@ -1,17 +1,20 @@
 import { render } from 'preact'
-import { useEffect, useRef, useState } from 'preact/hooks'
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { columns, rows, sitePosition } from './game/board'
 import {
   attackerName, baseUpgradePrice, buildTower, canBuildAt, canSpend, closedSites, createRound, enemiesRemaining, objectiveProgress, removeTower,
-  secondUpgradeSurcharge,
+  secondUpgradeSurcharge, roundRoutes,
   retryRound, speedOptions, startRound, tickRound, towerDetails, towerPrice, upgradePrice,
   upgradeTower, waveCueTime, roundFormation, waveOptions,
 } from './game/round'
 import type { Mission, PlaySpeed, Round, TowerKind, Upgrade } from './game/round'
+import { roadCoverage } from './battlefield-scenery'
+import { loadBattlefieldArt } from './battlefield-art-assets'
 import { drawBattlefield, drawTower, tile } from './game-art'
 import { battles, campaign, isMissionUnlocked, nextMission } from './game/campaign'
 import { loadGame, loadSound, saveGame, saveSound } from './game/save-game'
 import { enableAudio, playCue } from './sound'
+import { terrainArt } from './terrain-art'
 import villageGate from './assets/village-gate.webp?inline'
 import villageWatch from './assets/village-watch.webp?inline'
 import './style.css'
@@ -34,7 +37,18 @@ function upgradeEffect(kind: TowerKind, branch: Upgrade): string {
   return `${slow(speedFactor)}% → ${slow(strongerSpeedFactor)}% slower`
 }
 
+function useBattlefieldArt() {
+  const [ready, setReady] = useState(false)
+  useEffect(() => {
+    let mounted = true
+    loadBattlefieldArt().then(() => { if (mounted) setReady(true) }).catch(console.error)
+    return () => { mounted = false }
+  }, [])
+  return ready
+}
+
 function TowerPortrait({ kind, upgrade }: { kind: TowerKind; upgrade?: Upgrade }) {
+  const artReady = useBattlefieldArt()
   const canvas = useRef<HTMLCanvasElement>(null)
   useEffect(() => {
     const ctx = canvas.current?.getContext('2d')
@@ -55,7 +69,7 @@ function TowerPortrait({ kind, upgrade }: { kind: TowerKind; upgrade?: Upgrade }
       ctx.font = 'bold 15px system-ui'
       ctx.fillText('▲', 61, 19)
     }
-  }, [kind, upgrade])
+  }, [kind, upgrade, artReady])
   return <canvas ref={canvas} class="tower-portrait" width={80} height={80} aria-hidden="true" />
 }
 
@@ -64,12 +78,21 @@ function Battlefield({ round, selected, onSelect }: {
   selected: number | null
   onSelect: (site: number | null) => void
 }) {
+  const artReady = useBattlefieldArt()
   const canvas = useRef<HTMLCanvasElement>(null)
   const cells = useRef<(HTMLButtonElement | null)[]>([])
+  const reachable = useMemo(() => Array.from({ length: siteCount }, (_, site) =>
+    roadCoverage(roundRoutes(round), site, 'archer').reachesRoad), [round.mission])
   useEffect(() => {
     const ctx = canvas.current?.getContext('2d')
-    if (ctx) drawBattlefield(ctx, round, selected)
-  }, [round, selected])
+    if (!ctx) return
+    let frame = 0
+    const paint = () => {
+      if (drawBattlefield(ctx, round, selected)) frame = requestAnimationFrame(paint)
+    }
+    paint()
+    return () => cancelAnimationFrame(frame)
+  }, [round, selected, artReady])
 
   return (
     <div class="battlefield">
@@ -85,7 +108,7 @@ function Battlefield({ round, selected, onSelect }: {
           const label = tower ? towerDetails[tower.kind].name : 'Empty tile'
           return (
             <button key={site} ref={button => { cells.current[site] = button }}
-              type="button" class={tower ? 'cell' : 'cell empty-cell'} tabIndex={site === (selected ?? 0) ? 0 : -1}
+              type="button" class={tower ? 'cell' : reachable[site] ? 'cell empty-cell useful-site' : 'cell empty-cell'} tabIndex={site === (selected ?? 0) ? 0 : -1}
               aria-label={`${label}, row ${y + 1}, column ${x + 1}`}
               aria-pressed={selected === site} onClick={() => onSelect(site)}
               onKeyDown={event => {
@@ -159,7 +182,7 @@ function App() {
   const canRefund = setup && round.towers.length > 0
   const showActions = activeSite !== null && spendingOpen && (!tower || !tower.reach || !tower.power || canRefund)
   const report = finished ? { ...round.waveStats, waveNumber: round.waveNumber } : round.previousWave
-  let status = setup ? (round.towers.length ? '' : 'Tap a marked tile to build')
+  let status = setup ? (round.towers.length ? '' : 'Tap a stake beside the road')
     : round.phase === 'won' ? (mission ? 'Level cleared!' : 'Gate defended!') : 'The gate fell.'
   if (running) {
     status = paused ? 'Paused' : round.rebuildTime > 0
@@ -267,7 +290,7 @@ function App() {
 
   const speedPicker = (
     <div class="map-setting">
-      <label for="speed">Speed</label>
+      <label class="visually-hidden" for="speed">Speed</label>
       <select id="speed" value={speed} onChange={event => {
         const value = speedOptions.find(option => option === Number(event.currentTarget.value))
         if (value) setSpeed(value)
@@ -283,7 +306,7 @@ function App() {
   </header>
 
   if (screen === 'menu') {
-    return <main class="menu-screen">
+    return <main class="menu-screen title-screen">
       {header}
       <h2 class="visually-hidden">Main menu</h2>
       <img class="menu-art" src={villageGate} alt="" />
@@ -303,6 +326,8 @@ function App() {
           setConfirmation(null)
           setScreen('long')
         }}>Long battle</button>
+      </div>
+      <div class="session-actions">
         <button type="button" disabled={!hasRun} onClick={() => {
           const saved = saveGame(round, speed)
           if (saved) setHasSave(true)
@@ -343,6 +368,21 @@ function App() {
       <button type="button" onClick={showMenu}>Main menu</button>
       {selectedMission ? <section class="mission-briefing" aria-label="Mission briefing">
         <h2 class="visually-hidden">Campaign</h2>
+        <h3>{selectedMission.title} · Level {selectedMission.level}</h3>
+        <p class="mission-order">{selectedMission.objective} · Hold for {selectedMission.waves.length} waves</p>
+        <img class="briefing-art" src={selectedMission.battleId === 'village-watch'
+          ? villageWatch : terrainArt[selectedMission.terrain]} alt="" />
+        <details class="story-scene"><summary>Story</summary>
+          <p>{selectedMission.setting} · {selectedMission.briefing}</p>
+        </details>
+        {selectedMission.leadIn && <details class="story-scene"><summary>Before the battle</summary><p>{selectedMission.leadIn}</p></details>}
+
+        <p>{selectedMission.level === 5 ? 'Final threat · The commander waits for his escort to clear.'
+          : `Next threat · ${selectedMission.waves[0].name}`}</p>
+        {(clears.includes(`${selectedMission.battleId}:5`)
+          || (selectedMission.battleId === 'changban' && clears.includes('changban'))) &&
+          <details class="story-scene"><summary>{selectedMission.title} Chronicle</summary><p>{selectedMission.chronicle}</p></details>}
+        <details class="mission-select"><summary>Choose level</summary>
         <div class="campaign-options">
           <label for="battle">Battle</label>
           <select id="battle" value={selectedMission.battleId} onChange={event => {
@@ -366,19 +406,7 @@ function App() {
               </option>)}
           </select>
         </div>
-        <h3>{selectedMission.title} · Level {selectedMission.level}</h3>
-        {selectedMission.battleId === 'village-watch' && <img class="briefing-art" src={villageWatch}
-          alt="Villagers gather beneath the timber gate under the watch of a mounted guard." />}
-        {selectedMission.battleId === 'village-watch'
-          ? <details class="story-scene"><summary>Story</summary><p>{selectedMission.briefing}</p></details>
-          : <p><strong>{selectedMission.setting}</strong> · {selectedMission.briefing}</p>}
-        {selectedMission.leadIn && <details class="story-scene"><summary>Before the battle</summary><p>{selectedMission.leadIn}</p></details>}
-        <p>{selectedMission.objective} · Hold for {selectedMission.waves.length} waves</p>
-        <p>{selectedMission.level === 5 ? 'Final threat · The commander waits for his escort to clear.'
-          : `Next threat · ${selectedMission.waves[0].name}`}</p>
-        {(clears.includes(`${selectedMission.battleId}:5`)
-          || (selectedMission.battleId === 'changban' && clears.includes('changban'))) &&
-          <details class="story-scene"><summary>{selectedMission.title} Chronicle</summary><p>{selectedMission.chronicle}</p></details>}
+        </details>
       </section> : <section class="mission-briefing" aria-label="Long battle setup">
         <h2>Long battle</h2>
         <div class="map-setting"><label for="waves">Waves</label>
@@ -413,17 +441,11 @@ function App() {
         {mission && <span>{objectiveProgress(round)}/{mission.milestoneCount} {mission.milestone}</span>}
       </div>
       <div class="map-controls">
-        <button type="button" class="pause-control" onClick={showMenu}>Main menu</button>
+        <button type="button" class="pause-control" aria-label="Main menu" onClick={showMenu}>Menu</button>
         {speedPicker}
         {running && <button type="button" class="pause-control" onClick={() => setPaused(value => !value)}>
           {paused ? 'Resume' : 'Pause'}
         </button>}
-      </div>
-      {!finished && upcomingClosures && <p class="closure-note">Marked sites close next wave.</p>}
-      <div class="board-view">
-        <Battlefield round={round} selected={activeSite} onSelect={site => selectTile(site === activeSite ? null : site)} />
-      </div>
-      <div class="command-bar">
         <div class="round-controls">
           {setup ? (
             <>
@@ -446,6 +468,12 @@ function App() {
           {finished && <button type="button"
             onClick={() => enterBattle(createRound(round.totalWaves, mission))}>{mission ? 'Restart level' : 'New battle'}</button>}
         </div>
+      </div>
+      {!finished && upcomingClosures && <p class="closure-note">Marked sites close next wave.</p>}
+      <div class="board-view">
+        <Battlefield round={round} selected={activeSite} onSelect={site => selectTile(site === activeSite ? null : site)} />
+      </div>
+      <div class="command-bar">
         {showActions && activeSite !== null && (
           <section class="actions" aria-label="Tower actions">
             <div class="action-grid">
@@ -472,7 +500,7 @@ function App() {
                     <strong>Build {towerDetails[kind].name}</strong>
                     <span class="card-price">{towerPrice} silver</span>
                     <small><i class={`range-key ${kind}`} aria-hidden="true" />
-                      {kind === 'archer' ? 'Damage' : 'Slow'}</small>
+                      {!roadCoverage(roundRoutes(round), activeSite, kind).reachesRoad ? 'Road out of range' : kind === 'archer' ? 'Damage' : 'Slow'}</small>
                   </span>
                 </button>
               ))}

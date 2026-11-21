@@ -1,4 +1,5 @@
 import { defaultRoutes, isBuildable, route, sitePosition } from './board'
+import { campaign } from './campaign'
 
 import type { Point, Route } from './board'
 export type TowerKind = 'archer' | 'drum'
@@ -46,6 +47,7 @@ export type Formation = {
   name: string
   sequence: readonly AttackerKind[]
   interval?: number
+  healthBonus?: number
 }
 
 export type Mission = {
@@ -78,8 +80,17 @@ const formations = [
     'infantry', 'veteranRunner', 'veteran', 'runner'] },
 ] as const
 
-export function waveFormation(number: number) {
-  return formations[(number - 1) % formations.length]
+export function waveFormation(number: number): Formation {
+  const base = formations[(number - 1) % formations.length]
+  if (number <= 3) return base
+  const stage = Math.floor((number - 1) / 5)
+  return {
+    name: `${number % 5 === 0 ? 'Breakthrough' : base.name} · +${Math.min(24, stage * 2)} health`,
+    sequence: number % 5 === 0
+      ? Array<AttackerKind>(12).fill('cavalry') : base.sequence,
+    interval: Math.max(0.45, 1.25 - stage * 0.08),
+    healthBonus: Math.min(24, stage * 2),
+  }
 }
 
 const spawnInterval = 1.65
@@ -107,6 +118,7 @@ export function attackerName(kind: Enemy['kind']): string {
 type Opening = Pick<Round, 'towers' | 'silver' | 'lives'>
 
 export type Round = {
+  rulesVersion?: 2
   phase: 'setup' | 'running' | 'won' | 'lost'
   totalWaves: number
   mission: Mission | null
@@ -128,8 +140,11 @@ export type Round = {
 }
 
 export function createRound(totalWaves = 20, mission: Mission | null = null): Round {
+  // Explicit restarts adopt current rules; retry and wave transitions retain the snapshot's rules.
+  const missionId = mission?.id
+  if (missionId) mission = campaign.find(candidate => candidate.id === missionId) ?? mission
   return {
-    phase: 'setup', totalWaves: mission?.waves.length ?? totalWaves, mission, waveNumber: 1, towers: [], silver: startingSilver, opening: null,
+    rulesVersion: 2, phase: 'setup', totalWaves: mission?.waves.length ?? totalWaves, mission, waveNumber: 1, towers: [], silver: startingSilver, opening: null,
     enemies: [], shots: [], impacts: [], gateHit: null, waveAge: 0, rebuildTime: 0,
     waveStats: emptyStats, previousWave: null, lives: initialLives, spawned: 0, spawnTimer: 0,
   }
@@ -143,11 +158,12 @@ export function startRound(round: Round): Round {
 
 export function retryRound(round: Round): Round {
   if (!round.opening) return round
-  return { ...createRound(round.totalWaves, round.mission), waveNumber: round.waveNumber, previousWave: round.previousWave, ...round.opening }
+  return { ...createRound(round.totalWaves, round.mission), mission: round.mission, rulesVersion: round.rulesVersion, waveNumber: round.waveNumber, previousWave: round.previousWave, ...round.opening }
 }
 
 export function roundFormation(round: Round): Formation {
-  return round.mission?.waves[round.waveNumber - 1] ?? waveFormation(round.waveNumber)
+  return round.mission?.waves[round.waveNumber - 1]
+    ?? (round.rulesVersion === 2 ? waveFormation(round.waveNumber) : formations[(round.waveNumber - 1) % formations.length])
 }
 
 export function objectiveProgress(round: Round): number {
@@ -306,7 +322,7 @@ export function advanceRound(round: Round, seconds: number, visualSeconds = seco
   if (spawned < formation.sequence.length && spawnTimer <= 0) {
     const kind = formation.sequence[spawned]
     const routeIndex = (round.waveNumber + spawned - 1) % roundRoutes(round).length
-    enemies.push({ id: spawned, kind, health: attackers[kind].health, progress: 0, slowed: false, routeIndex })
+    enemies.push({ id: spawned, kind, health: attackers[kind].health + (formation.healthBonus ?? 0), progress: 0, slowed: false, routeIndex })
     spawned++
     spawnTimer += formation.interval ?? spawnInterval
   }
@@ -326,7 +342,7 @@ export function advanceRound(round: Round, seconds: number, visualSeconds = seco
   })
   const cleared = spawned === formation.sequence.length && enemies.length === 0
   if (lives > 0 && cleared && round.waveNumber < round.totalWaves) {
-    const next = { ...createRound(round.totalWaves, round.mission), waveNumber: round.waveNumber + 1 }
+    const next = { ...createRound(round.totalWaves, round.mission), mission: round.mission, rulesVersion: round.rulesVersion, waveNumber: round.waveNumber + 1 }
     const closed = closedSites(next)
     const needsRebuild = closed.length > closedSites(round).length
     const remaining = towers.filter(tower => !closed.includes(tower.site))

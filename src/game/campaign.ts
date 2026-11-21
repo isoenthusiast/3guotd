@@ -104,20 +104,57 @@ export const battles: readonly Battle[] = [
   },
 ]
 
-export const campaign: readonly Mission[] = battles.flatMap(({ id, withdrawnSites, ...battle }) =>
+// Later levels move an approach before setup, never underneath a live defense.
+const approaches = [
+  [connectRoute([1, 0], [1, 4], [5, 4], [5, 7], [3, 7], [3, 11])],
+  [connectRoute([6, 0], [6, 3], [3, 3], [3, 8], [2, 8], [2, 11])],
+  [connectRoute([0, 0], [0, 5], [2, 5], [2, 9], [3, 9], [3, 11]),
+    connectRoute([7, 0], [7, 5], [5, 5], [5, 9], [3, 9], [3, 11])],
+  [connectRoute([1, 0], [1, 6], [2, 6], [2, 10], [3, 10], [3, 11]),
+    connectRoute([6, 0], [6, 7], [5, 7], [5, 10], [3, 10], [3, 11])],
+  [connectRoute([1, 0], [1, 3], [5, 3], [5, 6], [3, 6], [3, 9], [2, 9], [2, 11])],
+  [connectRoute([6, 0], [6, 3], [2, 3], [2, 6], [5, 6], [5, 9], [4, 9], [4, 11])],
+]
+
+const threats: readonly (readonly AttackerKind[])[] = [
+  ['runner', 'veteranRunner', 'runner', 'veteran'],
+  ['cavalry', 'runner', 'cavalry', 'veteranRunner'],
+  ['bowman', 'veteran', 'bowman', 'cavalry'],
+  ['veteranRunner', 'cavalry', 'runner', 'cavalry'],
+  ['cavalry', 'veteran', 'veteranRunner', 'cavalry'],
+  ['veteran', 'veteran', 'cavalry', 'bowman'],
+]
+const threatNames = ['Raider rush', 'Road pursuit', 'Dock assault', 'Ferry rush', 'Fire pursuit', 'Supply raid']
+
+export const campaign: readonly Mission[] = battles.flatMap(({ id, withdrawnSites, ...battle }, chapter) =>
   levels.map((waves, index) => ({
-    ...battle, battleId: id, id: `${id}:${index + 1}`, level: index + 1, waves,
-    closedSites: withdrawnSites && waves.map((_, wave) => withdrawnSites.slice(0, wave)),
+    ...battle, battleId: id, id: `${id}:${index + 1}`, level: index + 1,
+    routes: index >= 2 ? approaches[chapter] : battle.routes,
+    objective: `${battle.objective}${index >= 2 ? ' · New approach: inspect the road before placing towers' : ''}${withdrawnSites ? ' · The inner bend closes after wave 1; towers are fully refunded' : ''}`,
+    waves: waves.map((opening, waveIndex) => {
+      if (waveIndex === 0 || (chapter === 0 && index === 0)) return opening
+      const sequence = Array.from({ length: 8 + (waveIndex > 1 ? index + waveIndex : 0) }, (_, enemy) =>
+        threats[chapter][enemy % threats[chapter].length])
+      if (index === 4 && waveIndex === waves.length - 1) sequence.push('commander')
+      const reinforcement = (waveIndex > 1 ? Math.floor(index / 3) + Math.max(0, waveIndex - 2) * (chapter === 0 || chapter >= 4 ? 4 : 2) : 0)
+      const healthBonus = (chapter === 2 ? Math.floor(reinforcement / 2) : chapter === 3 && index >= 3 && waveIndex === waves.length - 1 ? reinforcement + 4 : reinforcement)
+      return {
+        name: `${threatNames[chapter]} · +${healthBonus} health`,
+        sequence, interval: waveIndex === waves.length - 1 ? (chapter === 4 ? 1.0 : chapter === 5 ? 0.8 : 0.9) : Math.max(0.65, 1.4 - index * 0.04 - waveIndex * 0.04), healthBonus,
+      }
+    }),
+    closedSites: withdrawnSites && waves.map((_, wave) => [19, 36, 44].slice(0, wave)),
   })),
 )
 
 export const changban = campaign.find(mission => mission.id === 'changban:1')!
 
 export function isMissionUnlocked(mission: Mission, clears: readonly string[]): boolean {
-  const index = campaign.indexOf(mission)
+  const index = campaign.findIndex(candidate => candidate.id === mission.id)
   return index === 0 || (index > 0 && (clears.includes(mission.id) || clears.includes(campaign[index - 1].id)))
 }
 
 export function nextMission(mission: Mission): Mission | undefined {
-  return campaign[campaign.indexOf(mission) + 1]
+  const index = campaign.findIndex(candidate => candidate.id === mission.id)
+  return index < 0 ? undefined : campaign[index + 1]
 }

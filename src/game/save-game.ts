@@ -1,4 +1,5 @@
 import { campaign } from './campaign'
+import { campaign as legacyCampaign } from './legacy-campaign'
 import { columns, rows } from './board'
 import { attackerName, roundFormation, speedOptions, waveOptions } from './round'
 import type { PlaySpeed, Round } from './round'
@@ -24,6 +25,7 @@ const stats = (value: unknown): boolean => record(value)
 function decodeRound(value: unknown, mission: Round['mission']): Round | null {
   if (!record(value)) return null
   if (typeof value.phase !== 'string' || !['setup', 'running', 'won', 'lost'].includes(value.phase)
+    || (value.rulesVersion !== undefined && value.rulesVersion !== 2)
     || !integer(value.waveNumber) || value.waveNumber < 1
     || !integer(value.totalWaves) || value.waveNumber > value.totalWaves
     || !(mission ? value.totalWaves === mission.waves.length : waveOptions.some(count => count === value.totalWaves))
@@ -55,7 +57,8 @@ export function loadGame(): SavedGame | null {
   try {
     const data: unknown = JSON.parse(localStorage.getItem(saveKey) ?? 'null')
     if (!record(data) || data.version !== 1) return null
-    const mission = data.missionId === null ? null : campaign.find(level => level.id === data.missionId)
+    const missions = record(data.round) && data.round.rulesVersion === 2 ? campaign : legacyCampaign
+    const mission = data.missionId === null ? null : missions.find(level => level.id === data.missionId)
     const speed = speedOptions.find(option => option === data.speed)
     if (mission === undefined || !speed) return null
     const round = decodeRound(data.round, mission)

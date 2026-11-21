@@ -16,7 +16,7 @@ try {
   const {
     createRound, startRound, advanceRound, tickRound, canBuildAt, buildTower, upgradeTower, removeTower, retryRound,
     towerPrice, startingSilver, baseUpgradePrice, secondUpgradeSurcharge, towerRange, towerDetails,
-    shotFlightTime, enemiesRemaining, enemyCount, enemyDetails, waveFormation, evacuatedGroups, roundFormation,
+    shotFlightTime, enemiesRemaining, enemyCount, enemyDetails, waveFormation, evacuatedGroups, roundFormation, roundRoutes,
   } = require(join(output, 'round.js'))
   const { isBuildable, columns, rows, route, sitePosition } = require(join(output, 'board.js'))
   const site = (x, y) => y * columns + x
@@ -145,7 +145,7 @@ try {
   assert.equal(continuous.towers.length, 3)
   assert.equal(continuous.previousWave.waveNumber, 1)
   assert.equal(retryRound(continuous).waveNumber, 2)
-  assert.equal(tickRound({ ...continuous, waveNumber: 20, spawned: enemyCount }, 1).phase, 'won')
+  assert.equal(tickRound({ ...continuous, waveNumber: 20, spawned: waveFormation(20).sequence.length }, 1).phase, 'won')
 
   let breachAtTransition = startRound(layout([[1, 0, 'archer'], [1, 1, 'archer'], [3, 2, 'archer']]))
   for (let step = 0; step < 600 && breachAtTransition.phase === 'running'
@@ -157,8 +157,9 @@ try {
   assert.equal(breachAtTransition.waveAge, 0)
   assert.equal(breachAtTransition.previousWave.escaped, 1)
 
-  const { battles, campaign, changban, isMissionUnlocked, nextMission } = require(join(output, 'campaign.js'))
-  const chapter = createRound(20, changban)
+  const { battles, campaign, isMissionUnlocked, nextMission } = require(join(output, 'campaign.js'))
+  const { changban } = require(join(output, 'legacy-campaign.js'))
+  const chapter = { ...createRound(20, changban), mission: changban, rulesVersion: undefined }
   assert.equal(chapter.totalWaves, 3)
   assert.equal(evacuatedGroups(chapter), 0)
   let story = startRound([
@@ -192,8 +193,8 @@ try {
   assert.equal(campaign.length, 30)
   assert.equal(new Set(campaign.map(mission => mission.id)).size, campaign.length)
   assert.equal(new Set(battles.map(battle => JSON.stringify(battle.routes))).size, 6)
-  assert.equal(isMissionUnlocked(changban, []), false)
-  assert.equal(isMissionUnlocked(changban, ['village-watch:5']), true)
+  assert.equal(isMissionUnlocked(campaign[5], []), false)
+  assert.equal(isMissionUnlocked(campaign[5], ['village-watch:5']), true)
   assert.equal(nextMission(campaign[4]).id, changban.id)
   assert.equal(nextMission(campaign.at(-1)), undefined)
   for (const battle of battles) {
@@ -216,13 +217,13 @@ try {
   assert.deepEqual(arrivals.enemies.map(enemy => enemy.routeIndex), [0, 1])
 
   const retreat = createRound(20, campaign.find(mission => mission.id === 'yiling:1'))
-  let closure = startRound(buildTower(retreat, columns, 'archer'))
+  let closure = startRound(buildTower(retreat, 19, 'archer'))
   closure = tickRound({ ...closure, spawned: roundFormation(closure).sequence.length }, 1)
   assert.equal(closure.waveNumber, 2)
   assert.equal(closure.towers.length, 0)
   assert.equal(closure.silver, startingSilver)
-  assert.equal(canBuildAt(closure, columns), false)
-  assert.equal(buildTower(retryRound(closure), columns, 'archer').towers.length, 0)
+  assert.equal(canBuildAt(closure, 19), false)
+  assert.equal(buildTower(retryRound(closure), 19, 'archer').towers.length, 0)
   assert.equal(closure.rebuildTime, 5)
   closure = buildTower(closure, 0, 'drum')
   assert.equal(closure.towers.length, 1, 'Can rebuild with the refund before attackers arrive')
@@ -235,42 +236,103 @@ try {
   assert.equal(tickRound(closure, 3).spawned, 1)
 
 
-  const clearedIds = []
-  for (const mission of campaign) {
-    assert.ok(isMissionUnlocked(mission, clearedIds))
-    let level = createRound(20, mission)
-    assert.equal(level.totalWaves, mission.level + 2)
-    assert.equal(mission.waves.at(-1).sequence.includes('commander'), mission.level === 5)
+  // Deterministic legal-input policies, with no grants, skipped waves or altered stats.
+  const rankedSites = (level, coverageOnly = false) => {
     const score = cell => {
       const [x, y] = sitePosition(cell)
-      return mission.routes.reduce((sum, path) =>
-        sum + path.reduce((coverage, [rx, ry], index) => coverage
-          + (Math.hypot(rx - x, ry - y) <= 1.8 ? 1 + (path.length - index) / path.length * 0.3 : 0), 0), 0)
+      return roundRoutes(level).reduce((sum, path) => sum + path.reduce((coverage, [rx, ry], index) =>
+        coverage + (Math.hypot(rx - x, ry - y) <= 1.8
+          ? 1 + (coverageOnly ? 0 : (path.length - index) / path.length * 0.3) : 0), 0), 0)
     }
-    const sites = Array.from({ length: columns * rows }, (_, cell) => cell)
+    return Array.from({ length: columns * rows }, (_, cell) => cell)
       .filter(cell => canBuildAt(level, cell)).sort((a, b) => score(b) - score(a))
+  }
+  function playMission(mission, policy = {}) {
+    let level = createRound(policy.waves ?? 20, mission)
+    const sites = rankedSites(level, policy.coverageOnly)
     sites.slice(0, 3).forEach((cell, index) => {
-      level = buildTower(level, cell, index === 1 ? 'drum' : 'archer')
+      level = buildTower(level, cell, index === (policy.drumIndex ?? 1) ? 'drum' : 'archer')
     })
     level = startRound(level)
-    for (let step = 0; step < 6500 && level.phase === 'running'; step++) {
+    for (let step = 0; step < 14000 && level.phase === 'running'; step++) {
       level = tickRound(level, 3)
-      if (level.phase !== 'running') break
-      if (level.silver >= towerPrice && level.towers.length < 9) {
+      if (level.phase !== 'running' || policy.fixed || level.waveNumber > (policy.freezeAfter ?? Infinity)) continue
+      const beforePurchase = level.silver
+      const drum = level.towers.find(tower => tower.kind === 'drum' && !tower.reach)
+      const strongerDrum = policy.strong && level.towers.find(tower => tower.kind === 'drum' && !tower.power)
+      const archer = level.towers.find(tower => tower.kind === 'archer' && !tower.power)
+      const shouldUpgrade = policy.upgrade && level.towers.length >= (policy.minimum ?? 3)
+      if (shouldUpgrade && drum) level = upgradeTower(level, drum.site, 'reach')
+      else if (shouldUpgrade && strongerDrum) level = upgradeTower(level, strongerDrum.site, 'power')
+      else if (shouldUpgrade && archer) level = upgradeTower(level, archer.site, 'power')
+      else if (level.silver >= towerPrice && level.towers.length < columns * rows) {
         const cell = sites.find(candidate => canBuildAt(level, candidate)
           && !level.towers.some(tower => tower.site === candidate))
-        if (cell !== undefined) level = buildTower(level, cell, 'archer')
+        if (cell !== undefined) level = buildTower(level, cell,
+          policy.drumIndex !== -1 && level.towers.length % (policy.spacing ?? 4) === 1 ? 'drum' : 'archer')
       }
-      if (level.towers.length >= 6 && level.silver >= baseUpgradePrice) {
-        const archer = level.towers.find(tower => tower.kind === 'archer' && !tower.power && !tower.reach)
-        if (archer) level = upgradeTower(level, archer.site, 'power')
-      }
+      if (level.silver < beforePurchase) policy.events?.push({ wave: level.waveNumber, step })
     }
-    assert.equal(level.phase, 'won', `${mission.id} has a viable tower layout`)
-    assert.equal(evacuatedGroups(level), mission.milestoneCount)
+    return level
+  }
+  const clearedIds = []
+  // Fixed witnesses: [opening Drum rank, spacing between Drums, towers before upgrades, stronger slow].
+  // A failed witness is a regression, rather than a search for a different winning policy.
+  const plans = {
+    'village-watch:2': [0, 4, 9], 'village-watch:3': [1, 5, 3],
+    'village-watch:4': [2, 4, 3, true], 'village-watch:5': [1, 5, 3, true],
+    'changban:2': [0, 3, 7], 'changban:4': [0, 4, 5], 'changban:5': [0, 4, 3],
+    'jing:4': [0, 4, 3], 'jing:5': [0, 4, 3],
+    'yiling:2': [0, 3, 5], 'yiling:3': [0, 4, 7],
+    'yiling:4': [0, 4, 7, true], 'yiling:5': [1, 4, 7],
+    'wuzhang:4': [0, 3, 7, true], 'wuzhang:5': [0, 3, 9],
+  }
+  for (const mission of campaign) {
+    assert.ok(isMissionUnlocked(mission, clearedIds))
+    assert.equal(mission.waves.length, mission.level + 2)
+    assert.equal(mission.waves.at(-1).sequence.includes('commander'), mission.level === 5)
+    const [drumIndex, spacing, minimum, strong = false] = plans[mission.id] ?? [0, 3, 3]
+    const winner = playMission(mission, { drumIndex, spacing, minimum, strong, upgrade: true })
+    assert.equal(winner.phase, 'won', `${mission.id} has a viable mixed strategy`)
+    assert.equal(evacuatedGroups(winner), mission.milestoneCount)
     clearedIds.push(mission.id)
+    console.log(`Clear: ${mission.id} (${winner.lives} lives)`)
   }
   console.log('Passed: 30 campaign clears, route geometry, sequential unlocks, alternating routes, and site closures.')
+
+  const archerFailures = campaign.filter(mission =>
+    playMission(mission, { drumIndex: -1, coverageOnly: true }).phase === 'lost')
+  const fixedFailures = campaign.filter(mission => mission.battleId === 'village-watch'
+    && playMission(mission, { fixed: true, coverageOnly: true }).phase === 'lost')
+  console.log('Archer baseline loses:', archerFailures.map(mission => mission.id).join(', '))
+  console.log('Fixed Village opening loses:', fixedFailures.map(mission => mission.id).join(', '))
+  assert.ok(archerFailures.some(mission => mission.level >= 3), 'Archer spam must fail later campaign levels')
+  assert.ok(new Set(archerFailures.filter(mission => mission.level >= 3).map(mission => mission.battleId)).size >= 3,
+    'Archer baseline must fail later levels in at least three chapters')
+  assert.ok(fixedFailures.some(mission => mission.level >= 3), 'Village Watch must require reinvestment')
+  assert.equal(playMission(campaign[0], { fixed: true, coverageOnly: true }).phase, 'won',
+    'The first Village Watch mission remains forgiving')
+  for (const battle of battles) {
+    const levels = campaign.filter(mission => mission.battleId === battle.id)
+    assert.notDeepEqual(levels[0].routes, levels[2].routes, `${battle.id} changes an approach before setup`)
+    assert.match(levels[2].objective, /New approach/)
+  }
+  assert.equal(new Set(campaign.filter(mission => mission.level === 5)
+    .map(mission => JSON.stringify(mission.waves))).size, 6, 'Chapter schedules must differ')
+
+  const longPolicy = { drumIndex: 1, spacing: 3, upgrade: true }
+  for (const waves of [20, 40]) {
+    const events = []
+    const winner = playMission(null, { ...longPolicy, waves, events })
+    assert.equal(winner.phase, 'won', `Long ${waves} has a viable mixed strategy`)
+    assert.ok(events.at(-1).wave >= waves - 1, 'Reinvestment remains useful near the end')
+    const frozen = playMission(null, { ...longPolicy, waves, freezeAfter: 3 })
+    assert.equal(frozen.phase, 'lost', 'Long battles punish stopping investment after the opening')
+    console.log(`Long ${waves}: won; last purchase wave ${events.at(-1).wave}; frozen opening lost wave ${frozen.waveNumber}`)
+  }
+  assert.ok(waveFormation(40).healthBonus > waveFormation(20).healthBonus)
+  assert.ok(waveFormation(40).interval * waveFormation(40).sequence.length < 9 * 1.65,
+    'Late formations increase pressure without extending their spawn duration')
 
   const local = new Map()
   Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: {
@@ -288,6 +350,34 @@ try {
     assert.equal(saveGame(run, 3), true)
     assert.deepEqual(loadGame(), { round: run, speed: 3 })
   }
+  const { campaign: legacyCampaign } = require(join(output, 'legacy-campaign.js'))
+  // Unversioned snapshots retain the original schedule and geometry throughout resume/retry.
+  for (const mission of [...legacyCampaign, null]) {
+    let legacy = { ...createRound(40, mission), mission }
+    delete legacy.rulesVersion
+    legacy = startRound(legacy)
+    for (let tick = 0; tick < 40; tick++) legacy = tickRound(legacy, 1)
+    assert.equal(saveGame(legacy, 2), true)
+    const resumed = loadGame().round
+    assert.deepEqual(resumed, legacy)
+    assert.equal(retryRound(resumed).mission, mission)
+    const transition = tickRound({ ...resumed, enemies: [], shots: [], spawned: roundFormation(resumed).sequence.length }, 1)
+    assert.equal(transition.waveNumber, 2)
+    assert.equal(transition.rulesVersion, undefined)
+    assert.equal(transition.mission, mission)
+    const restarted = createRound(resumed.totalWaves, resumed.mission)
+    assert.equal(restarted.rulesVersion, 2)
+    assert.equal(restarted.mission, mission ? campaign.find(level => level.id === mission.id) : null)
+    if (mission) {
+      assert.equal(nextMission(mission), nextMission(restarted.mission))
+      assert.equal(isMissionUnlocked(mission, [mission.id]), true)
+    }
+    delete transition.rulesVersion // JSON omits optional undefined fields.
+    saveGame(transition, 3)
+    assert.deepEqual(loadGame(), { round: transition, speed: 3 })
+  }
+  assert.equal(nextMission({ ...campaign[0], id: 'unknown' }), undefined)
+  console.log('Passed: legacy saves resume/retry with old rules, restart with current rules, and navigate by mission ID.')
   const malformed = JSON.parse(local.get('3guotd.saved-game.v1'))
   malformed.round.phase = ['running']
   local.set('3guotd.saved-game.v1', JSON.stringify(malformed))

@@ -16,6 +16,12 @@ See the [AUD-008 remediation evidence](2026-11-21-three-kingdoms-ux-remediation.
 
 See the [campaign levels audit](2026-11-21-campaign-levels-audit.md) for Yiling and boss-preview verification.
 
+See the [main menu audit](2026-11-21-main-menu-audit.md) for unfinished-run protection and save validation.
+
+See the [Late Han artwork audit](2026-11-21-late-han-artwork.md) for build cues, landmarks and short-screen action trays.
+
+See the [campaign and battlefield remediation](2026-11-22-remediation.md) for the visual and tactical findings.
+
 From the checkout root, list open work:
 
 ```sh

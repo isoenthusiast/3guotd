@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 100">
+<defs><filter id="grain"><feTurbulence baseFrequency=".45" numOctaves="3" seed="8" result="noise"/><feComposite in="noise" in2="SourceGraphic" operator="in"/><feBlend in="SourceGraphic" mode="soft-light"/></filter></defs>
+<ellipse cx="91" cy="81" rx="78" ry="8" fill="#d4ded0" opacity=".45"/>
+<g stroke="#3e3022" stroke-width="2.5" stroke-linejoin="round" filter="url(#grain)">
+<path d="M8 59Q80 87 171 49L151 78Q76 106 25 79Z" fill="#725337"/>
+<path d="M8 59Q82 76 171 49L145 37Q82 55 28 43Z" fill="#b99860"/>
+<path d="M27 58L144 44M36 65L151 50M43 71L149 58M55 77L145 65" fill="none" stroke="#745538" stroke-width="1.4"/>
+<path d="M52 56L57 23Q87 5 119 19L137 48Z" fill="#bcab7b"/>
+<path d="M57 23Q86 34 119 19M67 20L65 52M81 18L82 50M97 17L101 48M113 18L121 46" fill="none" stroke="#725c37" stroke-width="2"/>
+<path d="M36 50L30 23M30 26L19 36L31 34" fill="#98452c"/>
+<path d="M144 41L163 7" fill="none" stroke="#d7b77b" stroke-width="4"/>
+<path d="M24 72Q79 96 155 67" fill="none" stroke="#d0ab6a"/>
+</g></svg>

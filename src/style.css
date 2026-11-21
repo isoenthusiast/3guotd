@@ -76,8 +76,6 @@ button small { display: block; font-size: .7rem; line-height: 1.15; margin-top: 
 .purchase-card:disabled { opacity: .78; }
 
 
-main.with-actions { --board-space: 18rem; }
-main.with-refund { --board-space: 21.25rem; }
 .wave-report { margin: .3rem 0; font-size: .85rem; color: #f5e5c9; }
 .wave-report summary { cursor: pointer; padding: .45rem 0; }
 .wave-report p { margin: .35rem 0; }
@@ -140,9 +138,6 @@ main.with-refund { --board-space: 21.25rem; }
 .setup-screen header { margin-bottom: .4rem; }
 .setup-screen h3 { margin: .4rem 0; }
 .setup-screen .campaign-options { margin-top: .4rem; }
-.battle-screen { --board-space: 9.5rem; }
-.battle-screen.with-actions { --board-space: 14rem; }
-.battle-screen.with-refund { --board-space: 17rem; }
 
 .range-key {
   display: inline-block;
@@ -153,41 +148,84 @@ main.with-refund { --board-space: 21.25rem; }
 }
 .range-key.drum { border-top: 2px dashed #b7f1e9; }
 
-.empty-cell::before {
+/* Reserve a consistent battlefield frame for placement, combat and upgrades. */
+.battle-screen .board-view .battlefield {
+  width: min(100%, 26rem, max(144px, calc((100dvh - 14rem) * 2 / 3)));
+  box-shadow: 0 0 0 1px #a78555, 0 .25rem 1rem #13181066;
+}
+.battle-screen .hud { min-height: 3rem; align-content: center; }
+.map-controls { align-items: center; gap: .2rem; min-height: 44px; }
+.map-controls .round-controls { margin-left: auto; gap: .2rem; }
+.map-controls button { padding-inline: .42rem; font-size: .82rem; }
+.battle-screen .closure-note { margin: 0; font-size: .7rem; }
+.battle-screen .actions { margin-top: 0; }
+.empty-cell::before { content: none; }
+.useful-site::before {
   content: '';
   display: block;
-  width: 58%;
-  height: 58%;
-  margin: auto;
-  pointer-events: none;
-  color: #f0d6a588;
-  background:
-    linear-gradient(currentColor, currentColor) top left / 24% 1px,
-    linear-gradient(currentColor, currentColor) top left / 1px 24%,
-    linear-gradient(currentColor, currentColor) top right / 24% 1px,
-    linear-gradient(currentColor, currentColor) top right / 1px 24%,
-    linear-gradient(currentColor, currentColor) bottom left / 24% 1px,
-    linear-gradient(currentColor, currentColor) bottom left / 1px 24%,
-    linear-gradient(currentColor, currentColor) bottom right / 24% 1px,
-    linear-gradient(currentColor, currentColor) bottom right / 1px 24%;
-  background-repeat: no-repeat;
+  width: 18%;
+  height: 8%;
+  margin: 51% auto 0;
+  border-radius: 45% 40% 12% 12%;
+  background: #d0ae74;
+  box-shadow: 1px 1px 0 #5e472b;
 }
-@media (max-height: 500px) {
-  :is(.with-actions, .with-refund) .command-bar { padding-block: .2rem; }
-  :is(.with-actions, .with-refund) .actions { margin-top: .2rem; }
+.cell[aria-pressed="true"] { background: #ffdf8e22; }
+.title-screen {
+  overflow: hidden;
+  padding: 0 0 .75rem;
+  background: #ecd8b3;
+  box-shadow: 0 .6rem 2.6rem #080e0c88;
 }
-@media (max-height: 500px) {
-  :is(.with-actions, .with-refund) .board-view .battlefield {
-    width: min(100%, max(180px, calc((100dvh - var(--board-space)) * 2 / 3)));
-  }
-  .with-refund .board-view .battlefield { width: min(100%, 170px); }
+.title-screen header { padding: 1.1rem 1rem .6rem; }
+.title-screen .menu-art { height: clamp(9rem, 42dvh, 21rem); object-position: center; border-radius: 0; }
+.title-screen > p, .title-screen .menu-confirm { margin-inline: 1rem; }
+.title-screen .menu-actions, .title-screen .session-actions { margin: .65rem 1rem; }
+.title-screen .menu-actions { display: flex; flex-direction: column; }
+.title-screen .menu-actions button { font: bold 1.2rem Georgia,serif; }
+.session-actions { display: flex; flex-wrap: wrap; gap: .15rem .5rem; border-top: 1px solid #ab9167; }
+.session-actions button { border: 0; background: transparent; font-size: .82rem; }
+.setup-screen header h1 { position: absolute; clip-path: inset(50%); }
+.setup-screen header { float: right; }
+.setup-screen .mission-briefing h3 { font: bold clamp(1.45rem,5vw,2rem) Georgia, serif; }
+.setup-screen .mission-order { font-weight: 650; }
+.setup-screen .briefing-art { height: clamp(7.5rem,32dvh,17rem); object-position: 50% 65%; }
+.mission-select summary { cursor: pointer; padding: .5rem 0; }
+.setup-screen .enter-battle { width: 100%; }
+@media(max-height:500px) {
+  .title-screen .menu-art { height: 28dvh; }
+  .setup-screen .briefing-art { height: 23dvh; }
+  .map-controls .pause-control, .map-controls .round-controls button { padding-inline: .27rem; font-size: .75rem; }
+  .battle-screen .hud { font-size: .76rem; }
+  .action-grid .purchase-card { padding: .2rem; }
 }
-@media (max-height: 500px) {
-  .setup-screen .briefing-art { height: clamp(5rem, 23dvh, 7rem); }
-  .setup-screen .enter-battle { margin-top: .45rem; }
+@media(max-height:500px) {
+  .battle-screen .board-view .battlefield { width: min(100%, calc((100dvh - 13rem) * 2 / 3)); }
+  .battle-screen .command-bar { padding-top: .2rem; }
+  .battle-screen .action-note { margin-top: .15rem; }
 }
 
-@media (max-height: 500px) {
-  .with-shortfall .board-view .battlefield { width: min(100%, 158px); }
-  .with-shortfall .action-note { margin-top: .2rem; }
+/* Short portrait phones keep controls beside the map so buying preserves tile size. */
+@media (max-width: 480px) and (max-height: 550px) and (orientation: portrait) {
+  .battle-screen {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 4.3rem;
+    grid-template-rows: 2.6rem 1rem auto auto;
+    column-gap: .4rem;
+  }
+  .battle-screen .hud { grid-area: 1 / 1 / 2 / 3; min-height: 0; }
+  .battle-screen .closure-note { grid-area: 2 / 1 / 3 / 3; }
+  .battle-screen .board-view { grid-area: 3 / 1; }
+  .battle-screen .board-view .battlefield { width: min(100%, calc((100dvh - 10.25rem) * 2 / 3)); }
+  .battle-screen .map-controls {
+    grid-area: 3 / 2;
+    flex-flow: column nowrap;
+    align-items: stretch;
+    justify-content: flex-start;
+    margin: 0;
+  }
+  .battle-screen .map-setting select { width: 100%; }
+  .battle-screen .round-controls { flex-direction: column; margin: .4rem 0 0; }
+  .battle-screen .command-bar { grid-area: 4 / 1 / 5 / 3; }
+  .battle-screen > :is(.mission-outcome, .wave-report) { grid-column: 1 / -1; }
 }

@@ -1,8 +1,14 @@
 import { columns, rows, sitePosition } from './game/board'
-import { closedSites, enemyDetails, enemyPosition, impactTime, roundRoutes, routeForEnemy, shotFlightTime, towerRange } from './game/round'
+import { canBuildAt, closedSites, enemyDetails, enemyPosition, impactTime, roundFormation, roundRoutes, routeForEnemy, shotFlightTime, towerRange } from './game/round'
 import type { Round, TowerKind } from './game/round'
 
+import { paintArt } from './battlefield-art-assets'
+import { drawLandscape, drawObjective, drawRoadCoverage, drawRoadWear, objectiveAnimationPending } from './battlefield-scenery'
+export { loadBattlefieldArt } from './battlefield-art-assets'
+export { placementCoverage, roadCoverage } from './battlefield-scenery'
+
 export const tile = 64
+export type BattlefieldArtOptions = { timeSeconds?: number; previewKind?: TowerKind }
 
 function center([x, y]: readonly [number, number]): [number, number] {
   return [(x + 0.5) * tile, (y + 0.5) * tile]
@@ -20,6 +26,9 @@ function roof(ctx: CanvasRenderingContext2D, x: number, y: number, width: number
 }
 
 export function drawTower(ctx: CanvasRenderingContext2D, x: number, y: number, kind: TowerKind) {
+  const width = kind === 'archer' ? 54 : 53
+  const height = kind === 'archer' ? 72 : 55
+  if (paintArt(ctx, kind, x - width / 2, y + 25 - height, width, height)) return
   ctx.save()
   ctx.translate(x, y)
   ctx.fillStyle = '#29262280'
@@ -70,37 +79,19 @@ export function drawTower(ctx: CanvasRenderingContext2D, x: number, y: number, k
   ctx.restore()
 }
 
+/** Returns true while a departure/delivery needs another animation frame,
+ * including after a win. Asset loading and frame scheduling belong to the app.
+ */
 export function drawBattlefield(
   ctx: CanvasRenderingContext2D, round: Round, selected: number | null,
+  options: BattlefieldArtOptions = {},
 ) {
+  const time = options.timeSeconds ?? (typeof performance === 'undefined' ? round.waveAge : performance.now() / 1000)
   const routes = roundRoutes(round)
-  const palette = ({
-    field: ['#68714b', '#646e48'], river: ['#446961', '#40645c'],
-    wood: ['#4c6246', '#465c41'], pass: ['#716049', '#6a5946'],
-  })[round.mission?.terrain ?? 'field']
-  for (let y = 0; y < rows; y++) {
-    for (let x = 0; x < columns; x++) {
-      ctx.fillStyle = palette[(x + y) % 2]
-      ctx.fillRect(x * tile, y * tile, tile, tile)
-      ctx.strokeStyle = '#28322220'
-      ctx.lineWidth = 1
-      ctx.strokeRect(x * tile + 0.5, y * tile + 0.5, tile - 1, tile - 1)
-      const px = x * tile
-      const py = y * tile
-      ctx.strokeStyle = '#2f41233f'
-      ctx.beginPath()
-      for (let stem = 0; stem < 3; stem++) {
-        const offset = 7 + stem * 5
-        const base = 16 + (x * 11 + y * 7) % 34
-        ctx.moveTo(px + offset, py + base)
-        ctx.lineTo(px + offset - 2 + stem * 2, py + base - 4 - stem)
-      }
-      ctx.stroke()
-    }
-  }
+  drawLandscape(ctx, round)
   ctx.lineCap = 'square'
   ctx.lineJoin = 'round'
-  for (const [width, color] of [[54, '#8b6a45'], [47, '#dbbb83']] as const) {
+  for (const [width, color] of [[57, '#6f6844'], [52, '#ac9461'], [45, '#dcc28c'], [32, '#e2ca98']] as const) {
     ctx.beginPath()
     for (const path of routes) {
       for (const [index, point] of path.entries()) {
@@ -115,6 +106,7 @@ export function drawBattlefield(
     ctx.stroke()
   }
 
+  drawRoadWear(ctx, routes)
   const [gateX, gateY] = center(routes[0][routes[0].length - 1])
   const closed = closedSites(round)
   const nextClosures = round.mission?.closedSites?.[round.waveNumber] ?? []
@@ -131,16 +123,12 @@ export function drawBattlefield(
     ctx.lineTo(x - 15, y + 15)
     ctx.stroke()
   }
-  ctx.fillStyle = '#a98351'
-  ctx.fillRect(gateX - 31, gateY - 5, 62, 26)
-  ctx.fillStyle = '#716653'
-  ctx.fillRect(gateX - 31, gateY + 16, 62, 7)
-  ctx.fillStyle = '#402b22'
-  ctx.fillRect(gateX - 19, gateY - 17, 38, 40)
-  ctx.fillStyle = '#8c6749'
-  ctx.fillRect(gateX - 13, gateY - 9, 11, 30)
-  ctx.fillRect(gateX + 2, gateY - 9, 11, 30)
-  roof(ctx, gateX, gateY - 19, 30, '#37383b')
+  const objective = drawObjective(ctx, round, time, gateX, gateY)
+  if (!objective && !paintArt(ctx, 'gate', gateX - 58, gateY - 55, 116, 80)) {
+    ctx.fillStyle = '#a98351'
+    ctx.fillRect(gateX - 31, gateY - 5, 62, 26)
+    roof(ctx, gateX, gateY - 19, 30, '#37383b')
+  }
 
   if (round.gateHit) {
     ctx.strokeStyle = '#ffa487'
@@ -178,7 +166,7 @@ export function drawBattlefield(
     ctx.fillText(label, labelX, y + 7)
   }
 
-  if (!round.towers.some(tower => tower.site === selected) && selected !== null) {
+  if (selected !== null && canBuildAt(round, selected) && !round.towers.some(tower => tower.site === selected)) {
     const [x, y] = center(sitePosition(selected))
     ctx.save()
     ctx.lineWidth = 4
@@ -216,17 +204,32 @@ export function drawBattlefield(
     }
   }
 
+  if (selected !== null) drawRoadCoverage(ctx, round, selected, options.previewKind)
+
   for (const tower of round.towers) {
     const [x, y] = center(sitePosition(tower.site))
-    if (tower.kind === 'drum' && round.enemies.some(enemy => {
-      const [enemyX, enemyY] = center(enemyPosition(enemy.progress, routeForEnemy(round, enemy)))
-      return enemy.slowed && Math.hypot(enemyX - x, enemyY - y) <= towerRange(tower.kind, tower.reach) * tile
-    })) {
-      ctx.strokeStyle = '#b7f1e9'
-      ctx.lineWidth = 4
-      ctx.beginPath()
-      ctx.arc(x, y, 28 + (Math.sin(round.waveAge * 9) + 1) * 5, 0, 2 * Math.PI)
-      ctx.stroke()
+    if (tower.kind === 'drum') {
+      const affected = round.enemies.filter(enemy => {
+        const [ex, ey] = center(enemyPosition(enemy.progress, routeForEnemy(round, enemy)))
+        return enemy.slowed && Math.hypot(ex - x, ey - y) <= towerRange(tower.kind, tower.reach) * tile
+      })
+      if (affected.length) {
+        const pulse = (round.waveAge * 1.8) % 1
+        ctx.save()
+        ctx.strokeStyle = '#b7f1e9'
+        ctx.lineWidth = 3
+        ctx.globalAlpha = .65 * (1 - pulse)
+        ctx.beginPath()
+        ctx.arc(x, y, 22 + pulse * towerRange(tower.kind, tower.reach) * tile, 0, 2 * Math.PI)
+        ctx.stroke()
+        ctx.globalAlpha = .55
+        ctx.setLineDash([3, 8])
+        for (const enemy of affected) {
+          const [ex, ey] = center(enemyPosition(enemy.progress, routeForEnemy(round, enemy)))
+          ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(ex, ey); ctx.stroke()
+        }
+        ctx.restore()
+      }
     }
     drawTower(ctx, x, y, tower.kind)
     ctx.fillStyle = '#fff0bb'
@@ -239,6 +242,20 @@ export function drawBattlefield(
     const [x, y] = center(enemyPosition(enemy.progress, routeForEnemy(round, enemy)))
     const detail = enemyDetails(enemy)
     targets.set(enemy.id, [x, y])
+    const sprite = enemy.kind === 'veteran' ? 'infantry'
+      : enemy.kind === 'veteranRunner' ? 'runner' : enemy.kind === 'bowman' ? 'infantry' : enemy.kind
+    const width = enemy.kind === 'cavalry' ? 54 : enemy.kind === 'commander' ? 46 : 36
+    const height = enemy.kind === 'cavalry' ? 48 : 48
+    const bob = round.phase === 'running' ? Math.sin(enemy.progress * 12 + enemy.id) * 1.3 : 0
+    ctx.save()
+    const path = routeForEnemy(round, enemy)
+    const i = Math.min(Math.floor(enemy.progress), path.length - 2)
+    const left = path[i + 1][0] < path[i][0]
+    ctx.translate(x, y + bob)
+    if (left) ctx.scale(-1, 1)
+    const painted = paintArt(ctx, sprite, -width / 2, 22 - height, width, height)
+    ctx.restore()
+    if (!painted) {
     ctx.fillStyle = detail.runner ? '#72382e' : '#33353c'
     ctx.beginPath()
     ctx.ellipse(x, y + 6, enemy.kind === 'cavalry' ? 21 : detail.runner ? 10 : 16,
@@ -286,6 +303,18 @@ export function drawBattlefield(
         ctx.lineTo(x - 20, y - 8)
       }
       ctx.stroke()
+    }
+    }
+    if (enemy.kind === 'bowman') {
+      // The approved sheet has four troop cutouts. A visible bow distinguishes
+      // the bowman without inventing an unapproved fifth illustrated character.
+      ctx.strokeStyle = '#f4d59c'; ctx.lineWidth = 2.5
+      ctx.beginPath(); ctx.arc(x + 12, y, 14, -Math.PI / 2, Math.PI / 2); ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(x + 12, y - 14); ctx.lineTo(x + 12, y + 14); ctx.stroke()
+    }
+    if (detail.level === 2 && enemy.kind !== 'commander' && enemy.kind !== 'cavalry') {
+      ctx.fillStyle = '#b33f2a'
+      ctx.fillRect(x - 12, y - 12, 6, 12)
     }
     if (enemy.slowed) {
       ctx.strokeStyle = '#c6f2f0'
@@ -340,14 +369,21 @@ export function drawBattlefield(
   }
   for (const enemy of round.enemies) {
     const [x, y] = targets.get(enemy.id)!
-    const max = enemyDetails(enemy).health
+    const max = enemyDetails(enemy).health + (roundFormation(round).healthBonus ?? 0)
     const width = 46
     ctx.fillStyle = '#262827'
-    ctx.fillRect(x - width / 2 - 2, y - 32, width + 4, 12)
+    const barX = Math.max(width / 2 + 2, Math.min(columns * tile - width / 2 - 2, x))
+    ctx.fillRect(barX - width / 2 - 2, y - 32, width + 4, 12)
     ctx.fillStyle = '#e8f69b'
-    const pipWidth = width / max
-    for (let pip = 0; pip < enemy.health; pip++) {
-      ctx.fillRect(x - width / 2 + pip * pipWidth, y - 30, pipWidth - 2, 8)
+    const health = Math.max(0, Math.min(max, enemy.health))
+    if (max > 10) {
+      ctx.fillRect(barX - width / 2, y - 30, width * health / max, 8)
+    } else {
+      const pipWidth = width / max
+      for (let pip = 0; pip < health; pip++) {
+        ctx.fillRect(barX - width / 2 + pip * pipWidth, y - 30, Math.max(1, pipWidth - 2), 8)
+      }
     }
   }
+  return objective && round.phase !== 'lost' && objectiveAnimationPending(ctx, time)
 }

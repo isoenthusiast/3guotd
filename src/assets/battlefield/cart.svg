@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 110">
+<defs><filter id="grain"><feTurbulence baseFrequency=".4" numOctaves="3" seed="4" result="noise"/><feComposite in="noise" in2="SourceGraphic" operator="in"/><feBlend in="SourceGraphic" mode="soft-light"/></filter></defs>
+<ellipse cx="72" cy="99" rx="58" ry="8" fill="#382c1f" opacity=".25"/>
+<g stroke="#3c3021" stroke-width="2.5" stroke-linejoin="round" filter="url(#grain)">
+<path d="M87 68L131 91M82 76L123 103" fill="none" stroke="#886139" stroke-width="5"/>
+<path d="M12 45L68 30L108 52L49 76Z" fill="#c19a5b"/>
+<path d="M12 45L14 73L49 94L49 76M49 94L107 71L108 52" fill="#89643b"/>
+<path d="M17 54L47 72M16 64L47 83M52 82L103 62" fill="none" stroke="#d4ad70"/>
+<path d="M20 44Q11 16 33 14Q52 13 54 39L41 52Z" fill="#bdb18b"/>
+<path d="M43 38Q38 5 60 8Q80 10 78 37L63 46Z" fill="#c5b78a"/>
+<path d="M70 44Q66 17 88 22Q107 25 101 50L87 55Z" fill="#ab9a6d"/>
+<path d="M23 20L40 19M48 15L69 17M75 29L95 32" stroke="#725c3d"/>
+<ellipse cx="48" cy="87" rx="17" ry="21" fill="#40372a"/>
+<ellipse cx="48" cy="87" rx="12" ry="16" fill="#aa824b"/>
+<path d="M48 71V103M36 87H60M40 75L56 99M40 99L56 75" stroke="#4c3925"/>
+<circle cx="48" cy="87" r="4" fill="#d2b37b"/>
+<path d="M15 47L15 30M48 77L48 57M107 53L107 36" stroke="#765333" stroke-width="4"/>
+</g></svg>
