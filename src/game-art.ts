@@ -1,5 +1,5 @@
-import { columns, route, rows, sitePosition } from './game/board'
-import { enemyDetails, enemyPosition, impactTime, shotFlightTime, towerRange } from './game/round'
+import { columns, rows, sitePosition } from './game/board'
+import { closedSites, enemyDetails, enemyPosition, impactTime, roundRoutes, routeForEnemy, shotFlightTime, towerRange } from './game/round'
 import type { Round, TowerKind } from './game/round'
 
 export const tile = 64
@@ -42,9 +42,14 @@ export function drawTower(ctx: CanvasRenderingContext2D, x: number, y: number, k
 export function drawBattlefield(
   ctx: CanvasRenderingContext2D, round: Round, selected: number | null,
 ) {
+  const routes = roundRoutes(round)
+  const palette = ({
+    field: ['#4c654d', '#49624a'], river: ['#3e5e5d', '#365857'],
+    wood: ['#485c40', '#40533a'], pass: ['#665747', '#5d5143'],
+  })[round.mission?.terrain ?? 'field']
   for (let y = 0; y < rows; y++) {
     for (let x = 0; x < columns; x++) {
-      ctx.fillStyle = (x + y) % 2 ? '#49624a' : '#4c654d'
+      ctx.fillStyle = palette[(x + y) % 2]
       ctx.fillRect(x * tile, y * tile, tile, tile)
       ctx.strokeStyle = '#263e322f'
       ctx.lineWidth = 1
@@ -55,18 +60,35 @@ export function drawBattlefield(
   ctx.lineJoin = 'round'
   for (const [width, color] of [[54, '#80664b'], [47, '#c7a778']] as const) {
     ctx.beginPath()
-    for (const [index, point] of route.entries()) {
-      const [x, y] = center(point)
-      if (index === 0) ctx.moveTo(x, y - tile / 2)
-      ctx.lineTo(x, y)
-      if (index === route.length - 1) ctx.lineTo(x, y + tile / 2)
+    for (const path of routes) {
+      for (const [index, point] of path.entries()) {
+        const [x, y] = center(point)
+        if (index === 0) ctx.moveTo(x, y - tile / 2)
+        ctx.lineTo(x, y)
+        if (index === path.length - 1) ctx.lineTo(x, y + tile / 2)
+      }
     }
     ctx.lineWidth = width
     ctx.strokeStyle = color
     ctx.stroke()
   }
 
-  const [gateX, gateY] = center(route[route.length - 1])
+  const [gateX, gateY] = center(routes[0][routes[0].length - 1])
+  const closed = closedSites(round)
+  const nextClosures = round.mission?.closedSites?.[round.waveNumber] ?? []
+  for (const site of new Set([...closed, ...nextClosures])) {
+    const [x, y] = center(sitePosition(site))
+    ctx.fillStyle = closed.includes(site) ? '#492e2e' : '#9b673b'
+    ctx.fillRect(x - 26, y - 26, 52, 52)
+    ctx.strokeStyle = '#ffe2ac'
+    ctx.lineWidth = 3
+    ctx.beginPath()
+    ctx.moveTo(x - 15, y - 15)
+    ctx.lineTo(x + 15, y + 15)
+    ctx.moveTo(x + 15, y - 15)
+    ctx.lineTo(x - 15, y + 15)
+    ctx.stroke()
+  }
   ctx.fillStyle = '#573b30'
   ctx.fillRect(gateX - 19, gateY - 23, 38, 48)
   ctx.fillStyle = '#ac835b'
@@ -81,18 +103,21 @@ export function drawBattlefield(
     ctx.strokeRect(gateX - 27, gateY - 26, 54, 54)
   }
 
-  const [entryX, entryY] = center(route[0])
   ctx.font = 'bold 20px system-ui'
-  ctx.textAlign = 'left'
-  for (const [label, x, y] of [
-    ['Entry', entryX + 33, entryY + 7],
-    [round.mission ? 'Evacuation gate' : 'Shu Outpost Gate', gateX + 33, gateY + 7],
-  ] as const) {
+  const landmarks = routes.map((path, index) => ({
+    label: routes.length > 1 ? `Entry ${index + 1}` : 'Entry',
+    point: center(path[0]),
+  }))
+  landmarks.push({ label: round.mission?.gate ?? 'Shu Outpost Gate', point: [gateX, gateY] })
+  for (const { label, point: [x, y] } of landmarks) {
+    const right = x < (columns * tile) / 2
+    const labelX = x + (right ? 32 : -32)
+    ctx.textAlign = right ? 'left' : 'right'
     ctx.lineWidth = 5
     ctx.strokeStyle = '#293c31'
     ctx.fillStyle = '#fff0cc'
-    ctx.strokeText(label, x, y)
-    ctx.fillText(label, x, y)
+    ctx.strokeText(label, labelX, y + 7)
+    ctx.fillText(label, labelX, y + 7)
   }
 
   if (!round.towers.some(tower => tower.site === selected) && selected !== null) {
@@ -136,7 +161,7 @@ export function drawBattlefield(
   for (const tower of round.towers) {
     const [x, y] = center(sitePosition(tower.site))
     if (tower.kind === 'drum' && round.enemies.some(enemy => {
-      const [enemyX, enemyY] = center(enemyPosition(enemy.progress))
+      const [enemyX, enemyY] = center(enemyPosition(enemy.progress, routeForEnemy(round, enemy)))
       return enemy.slowed && Math.hypot(enemyX - x, enemyY - y) <= towerRange(tower.kind, tower.reach) * tile
     })) {
       ctx.strokeStyle = '#b7f1e9'
@@ -153,12 +178,13 @@ export function drawBattlefield(
 
   const targets = new Map<number, [number, number]>()
   for (const enemy of round.enemies) {
-    const [x, y] = center(enemyPosition(enemy.progress))
+    const [x, y] = center(enemyPosition(enemy.progress, routeForEnemy(round, enemy)))
     const detail = enemyDetails(enemy)
     targets.set(enemy.id, [x, y])
     ctx.fillStyle = detail.runner ? '#593f78' : '#353959'
     ctx.beginPath()
-    ctx.ellipse(x, y + 6, detail.runner ? 10 : 16, 16, 0, 0, 2 * Math.PI)
+    ctx.ellipse(x, y + 6, enemy.kind === 'cavalry' ? 21 : detail.runner ? 10 : 16,
+      enemy.kind === 'commander' ? 20 : 16, 0, 0, 2 * Math.PI)
     ctx.fill()
     ctx.fillStyle = detail.level === 2 ? '#e5b168' : '#dcc5a0'
     ctx.beginPath()
@@ -174,6 +200,20 @@ export function drawBattlefield(
       ctx.closePath()
       ctx.fill()
       ctx.fillRect(x - 14, y - 6, 28, 4)
+    }
+    if (enemy.kind === 'bowman' || enemy.kind === 'commander') {
+      ctx.strokeStyle = '#f5d693'
+      ctx.lineWidth = 3
+      ctx.beginPath()
+      if (enemy.kind === 'bowman') {
+        ctx.arc(x + 11, y + 8, 10, -Math.PI / 2, Math.PI / 2)
+      } else {
+        ctx.moveTo(x - 20, y + 19)
+        ctx.lineTo(x - 20, y - 19)
+        ctx.lineTo(x - 4, y - 15)
+        ctx.lineTo(x - 20, y - 8)
+      }
+      ctx.stroke()
     }
     if (enemy.slowed) {
       ctx.strokeStyle = '#c6f2f0'

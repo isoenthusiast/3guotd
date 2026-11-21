@@ -1,3 +1,6 @@
+export type Point = readonly [number, number]
+export type Route = readonly Point[]
+
 export const columns = 8
 export const rows = 12
 
@@ -7,11 +10,26 @@ export const route = [
   [2, 8], [2, 9], [2, 10], [2, 11],
 ] as const
 
-const road = new Set<string>(route.map(([x, y]) => `${x},${y}`))
+export const defaultRoutes: readonly Route[] = [route]
 
-export function isBuildable(site: number): boolean {
-  return Number.isInteger(site) && site >= 0 && site < columns * rows
-    && !road.has(`${site % columns},${Math.floor(site / columns)}`)
+export function isBuildable(site: number, routes = defaultRoutes): boolean {
+  if (!Number.isInteger(site) || site < 0 || site >= columns * rows) return false
+  const [x, y] = sitePosition(site)
+  return !routes.some(path => path.some(([roadX, roadY]) => roadX === x && roadY === y))
+}
+
+export function connectRoute(...waypoints: Point[]): Route {
+  const tiles = [waypoints[0]]
+  for (const [targetX, targetY] of waypoints.slice(1)) {
+    let [x, y] = tiles[tiles.length - 1]
+    if (x !== targetX && y !== targetY) throw new Error('Road bends must follow the grid')
+    while (x !== targetX || y !== targetY) {
+      x += Math.sign(targetX - x)
+      y += Math.sign(targetY - y)
+      tiles.push([x, y])
+    }
+  }
+  return tiles
 }
 
 export function sitePosition(site: number): readonly [number, number] {

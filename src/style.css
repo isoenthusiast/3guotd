@@ -15,7 +15,7 @@ h1 { font-family: Georgia, serif; font-size: clamp(1.6rem, 6vw, 2.6rem); margin:
 .coin { width: .65rem; height: .65rem; border: 1px solid #f2d49c; border-radius: 50%; background: #ad8148; }
 .map-controls { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem .6rem; margin-bottom: .4rem; }
 .map-setting { display: inline-flex; align-items: center; gap: .25rem; font-size: .85rem; }
-.map-controls select { min-width: 44px; min-height: 44px; font: inherit; }
+.map-setting select { min-width: 44px; min-height: 44px; font: inherit; }
 .board-view .battlefield { width: min(100%, max(192px, calc((100dvh - var(--board-space) - var(--mode-space, 0rem)) * 2 / 3)), 22.6667rem); margin-inline: auto; }
 .battlefield { position: relative; background: #4c654d; border-radius: .5rem; overflow: hidden; }
 canvas { display: block; width: 100%; height: auto; }
@@ -93,3 +93,9 @@ main.campaign.with-actions { --board-space: 21rem; }
 main.campaign.with-refund { --board-space: 24rem; }
 main:not(.campaign):has(.mode-picker) { --mode-space: 3.2rem; }
 main.campaign:has(.mode-picker) { --mode-space: 7rem; }
+
+.campaign-options { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: .35rem; }
+.campaign-options select { min-width: 0; min-height: 44px; font: inherit; }
+.story-scene summary { cursor: pointer; color: #ffe0a3; }
+.round-controls { flex-wrap: wrap; }
+main.campaign:has(.campaign-options) { --mode-space: 8rem; }

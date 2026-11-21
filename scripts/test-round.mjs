@@ -14,11 +14,11 @@ try {
   ], { stdio: 'inherit' })
 
   const {
-    createRound, startRound, advanceRound, tickRound, buildTower, upgradeTower, removeTower, retryRound,
+    createRound, startRound, advanceRound, tickRound, canBuildAt, buildTower, upgradeTower, removeTower, retryRound,
     towerPrice, startingSilver, baseUpgradePrice, secondUpgradeSurcharge, towerRange, towerDetails,
     shotFlightTime, enemiesRemaining, enemyCount, enemyDetails, waveFormation, evacuatedGroups, roundFormation,
   } = require(join(output, 'round.js'))
-  const { isBuildable, columns, route } = require(join(output, 'board.js'))
+  const { isBuildable, columns, rows, route, sitePosition } = require(join(output, 'board.js'))
   const site = (x, y) => y * columns + x
   const initial = createRound()
   assert.equal(startingSilver, 3 * towerPrice)
@@ -157,7 +157,7 @@ try {
   assert.equal(breachAtTransition.waveAge, 0)
   assert.equal(breachAtTransition.previousWave.escaped, 1)
 
-  const { changban } = require(join(output, 'campaign.js'))
+  const { battles, campaign, changban, isMissionUnlocked, nextMission } = require(join(output, 'campaign.js'))
   const chapter = createRound(20, changban)
   assert.equal(chapter.totalWaves, 3)
   assert.equal(evacuatedGroups(chapter), 0)
@@ -187,6 +187,79 @@ try {
   assert.equal(lastLifeLost.phase, 'lost')
   assert.equal(evacuatedGroups(lastLifeLost), 2)
   assert.equal(evacuatedGroups(retryRound(lastLifeLost)), 2)
+
+  assert.equal(battles.length, 6)
+  assert.equal(campaign.length, 30)
+  assert.equal(new Set(campaign.map(mission => mission.id)).size, campaign.length)
+  assert.equal(new Set(battles.map(battle => JSON.stringify(battle.routes))).size, 6)
+  assert.equal(isMissionUnlocked(changban, []), false)
+  assert.equal(isMissionUnlocked(changban, ['village-watch:5']), true)
+  assert.equal(nextMission(campaign[4]).id, changban.id)
+  assert.equal(nextMission(campaign.at(-1)), undefined)
+  for (const battle of battles) {
+    for (const path of battle.routes) {
+      assert.equal(path[0][1], 0)
+      assert.equal(path.at(-1)[1], rows - 1)
+      for (const [index, [x, y]] of path.entries()) {
+        assert.ok(x >= 0 && x < columns && y >= 0 && y < rows)
+        assert.equal(isBuildable(site(x, y), battle.routes), false)
+        if (index > 0) {
+          const [prevX, prevY] = path[index - 1]
+          assert.equal(Math.abs(x - prevX) + Math.abs(y - prevY), 1)
+        }
+      }
+    }
+  }
+  const docks = createRound(20, campaign.find(mission => mission.id === 'red-cliffs:1'))
+  let arrivals = startRound(docks)
+  for (let tick = 0; tick < 40; tick++) arrivals = tickRound(arrivals, 1)
+  assert.deepEqual(arrivals.enemies.map(enemy => enemy.routeIndex), [0, 1])
+
+  const retreat = createRound(20, campaign.find(mission => mission.id === 'yiling:1'))
+  let closure = startRound(buildTower(retreat, columns, 'archer'))
+  closure = tickRound({ ...closure, spawned: roundFormation(closure).sequence.length }, 1)
+  assert.equal(closure.waveNumber, 2)
+  assert.equal(closure.towers.length, 0)
+  assert.equal(closure.silver, startingSilver)
+  assert.equal(canBuildAt(closure, columns), false)
+  assert.equal(buildTower(retryRound(closure), columns, 'archer').towers.length, 0)
+
+  const clearedIds = []
+  for (const mission of campaign) {
+    assert.ok(isMissionUnlocked(mission, clearedIds))
+    let level = createRound(20, mission)
+    assert.equal(level.totalWaves, mission.level + 2)
+    assert.equal(mission.waves.at(-1).sequence.includes('commander'), mission.level === 5)
+    const score = cell => {
+      const [x, y] = sitePosition(cell)
+      return mission.routes.reduce((sum, path) =>
+        sum + path.reduce((coverage, [rx, ry], index) => coverage
+          + (Math.hypot(rx - x, ry - y) <= 1.8 ? 1 + (path.length - index) / path.length * 0.3 : 0), 0), 0)
+    }
+    const sites = Array.from({ length: columns * rows }, (_, cell) => cell)
+      .filter(cell => canBuildAt(level, cell)).sort((a, b) => score(b) - score(a))
+    sites.slice(0, 3).forEach((cell, index) => {
+      level = buildTower(level, cell, index === 1 ? 'drum' : 'archer')
+    })
+    level = startRound(level)
+    for (let step = 0; step < 6500 && level.phase === 'running'; step++) {
+      level = tickRound(level, 3)
+      if (level.phase !== 'running') break
+      if (level.silver >= towerPrice && level.towers.length < 9) {
+        const cell = sites.find(candidate => canBuildAt(level, candidate)
+          && !level.towers.some(tower => tower.site === candidate))
+        if (cell !== undefined) level = buildTower(level, cell, 'archer')
+      }
+      if (level.towers.length >= 6 && level.silver >= baseUpgradePrice) {
+        const archer = level.towers.find(tower => tower.kind === 'archer' && !tower.power && !tower.reach)
+        if (archer) level = upgradeTower(level, archer.site, 'power')
+      }
+    }
+    assert.equal(level.phase, 'won', `${mission.id} has a viable tower layout`)
+    assert.equal(evacuatedGroups(level), mission.milestoneCount)
+    clearedIds.push(mission.id)
+  }
+  console.log('Passed: 30 campaign clears, route geometry, sequential unlocks, alternating routes, and site closures.')
 
   let undefended = startRound(initial)
   for (let step = 0; step < 1200 && undefended.phase === 'running'; step++) {

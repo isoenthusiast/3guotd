@@ -1,6 +1,6 @@
-import { isBuildable, route, sitePosition } from './board'
+import { defaultRoutes, isBuildable, route, sitePosition } from './board'
 
-type Point = readonly [number, number]
+import type { Point, Route } from './board'
 export type TowerKind = 'archer' | 'drum'
 export type Upgrade = 'reach' | 'power'
 export const waveOptions = [20, 40, 60, 80, 100] as const
@@ -35,18 +35,38 @@ const attackers = {
   infantry: { health: 4, speed: 1.6, reward: 7, runner: false, level: 1 },
   runner: { health: 3, speed: 2.4, reward: 7, runner: true, level: 1 },
   veteran: { health: 6, speed: 1.6, reward: 12, runner: false, level: 2 },
+  bowman: { health: 4, speed: 1.32, reward: 8, runner: false, level: 1 },
+  cavalry: { health: 4, speed: 2.7, reward: 10, runner: true, level: 2 },
+  commander: { health: 10, speed: 1.18, reward: 20, runner: false, level: 2 },
   veteranRunner: { health: 4, speed: 2.4, reward: 12, runner: true, level: 2 },
 } as const
+
+export type AttackerKind = keyof typeof attackers
+export type Formation = {
+  name: string
+  sequence: readonly AttackerKind[]
+  interval?: number
+}
 
 export type Mission = {
   id: string
   title: string
   setting: string
   briefing: string
+  leadIn?: string
   victory: string
   defeat: string
   chronicle: string
-  waves: readonly { name: string; sequence: readonly (keyof typeof attackers)[] }[]
+  battleId: string
+  level: number
+  routes: readonly Route[]
+  gate: string
+  objective: string
+  milestone: string
+  milestoneCount: number
+  terrain: 'field' | 'river' | 'wood' | 'pass'
+  waves: readonly Formation[]
+  closedSites?: readonly (readonly number[])[]
 }
 
 export const enemyCount = wave.length
@@ -67,7 +87,7 @@ const gateCueTime = 1.35
 export const waveCueTime = 1.15
 export const rewardCueTime = 0.7
 
-type Enemy = { id: number; kind: keyof typeof attackers; progress: number; health: number; slowed: boolean }
+type Enemy = { id: number; kind: AttackerKind; progress: number; health: number; slowed: boolean; routeIndex?: number }
 export type Tower = { site: number; kind: TowerKind; reach: boolean; power: boolean; cooldown: number }
 type Shot = { from: Point; targetId: number; elapsed: number }
 type Impact = { at: Point; elapsed: number; silver: number }
@@ -79,6 +99,7 @@ const emptyStats: WaveStats = { stopped: 0, escaped: 0, runnersEscaped: 0, earne
 export function attackerName(kind: Enemy['kind']): string {
   return ({
     infantry: 'Infantry', runner: 'Runner', veteran: 'Veteran', veteranRunner: 'Veteran runner',
+    bowman: 'Bowman', cavalry: 'Cavalry', commander: 'Pursuit commander',
   })[kind]
 }
 
@@ -123,12 +144,31 @@ export function retryRound(round: Round): Round {
   return { ...createRound(round.totalWaves, round.mission), waveNumber: round.waveNumber, previousWave: round.previousWave, ...round.opening }
 }
 
-export function roundFormation(round: Round) {
+export function roundFormation(round: Round): Formation {
   return round.mission?.waves[round.waveNumber - 1] ?? waveFormation(round.waveNumber)
 }
 
-export function evacuatedGroups(round: Round): number {
-  return round.waveNumber - 1 + (round.phase === 'won' ? 1 : 0)
+export function objectiveProgress(round: Round): number {
+  const cleared = round.waveNumber - 1 + Number(round.phase === 'won')
+  return Math.floor(cleared * (round.mission?.milestoneCount ?? round.totalWaves) / round.totalWaves)
+}
+
+export const evacuatedGroups = objectiveProgress
+
+export function roundRoutes(round: Round): readonly Route[] {
+  return round.mission?.routes ?? defaultRoutes
+}
+
+export function closedSites(round: Round): readonly number[] {
+  return round.mission?.closedSites?.[round.waveNumber - 1] ?? []
+}
+
+export function canBuildAt(round: Round, site: number): boolean {
+  return isBuildable(site, roundRoutes(round)) && !closedSites(round).includes(site)
+}
+
+export function routeForEnemy(round: Round, enemy: Enemy): Route {
+  return roundRoutes(round)[enemy.routeIndex ?? 0]
 }
 
 export function enemiesRemaining(round: Round): number {
@@ -152,7 +192,7 @@ export function canSpend(round: Round): boolean {
 }
 
 export function buildTower(round: Round, site: number, kind: TowerKind): Round {
-  if (!canSpend(round) || round.silver < towerPrice || !isBuildable(site)
+  if (!canSpend(round) || round.silver < towerPrice || !canBuildAt(round, site)
     || round.towers.some(tower => tower.site === site)) return round
   const tower: Tower = { site, kind, reach: false, power: false, cooldown: 0 }
   return { ...round, silver: round.silver - towerPrice, towers: [...round.towers, tower] }
@@ -168,22 +208,25 @@ export function upgradeTower(round: Round, site: number, branch: Upgrade): Round
   }
 }
 
+function towerRefund(tower: Tower): number {
+  return towerPrice + Number(tower.reach || tower.power) * baseUpgradePrice
+    + Number(tower.reach && tower.power) * (baseUpgradePrice + secondUpgradeSurcharge)
+}
+
 export function removeTower(round: Round, site: number): Round {
   const tower = round.towers.find(candidate => candidate.site === site)
   if ((round.phase !== 'setup') || !tower) return round
-  const refunds = [towerPrice, towerPrice + baseUpgradePrice, towerPrice + 2 * baseUpgradePrice + secondUpgradeSurcharge]
-  const branches = Number(tower.reach) + Number(tower.power)
   return {
-    ...round, silver: round.silver + refunds[branches],
+    ...round, silver: round.silver + towerRefund(tower),
     towers: round.towers.filter(candidate => candidate !== tower),
   }
 }
 
-export function enemyPosition(progress: number): Point {
-  const index = Math.min(Math.floor(progress), route.length - 2)
+export function enemyPosition(progress: number, path: Route = route): Point {
+  const index = Math.min(Math.floor(progress), path.length - 2)
   const fraction = progress - index
-  const [x, y] = route[index]
-  const [nextX, nextY] = route[index + 1]
+  const [x, y] = path[index]
+  const [nextX, nextY] = path[index + 1]
   return [x + (nextX - x) * fraction, y + (nextY - y) * fraction]
 }
 
@@ -203,7 +246,8 @@ export function advanceRound(round: Round, seconds: number, visualSeconds = seco
   const drums = round.towers.filter(tower => tower.kind === 'drum')
   const moving = round.enemies.map(enemy => {
     let speedFactor = 1
-    const position = enemyPosition(enemy.progress)
+    const path = routeForEnemy(round, enemy)
+    const position = enemyPosition(enemy.progress, path)
     for (const drum of drums) {
       if (inRange(drum, position)) {
         const stats = towerDetails.drum
@@ -212,7 +256,8 @@ export function advanceRound(round: Round, seconds: number, visualSeconds = seco
     }
     return {
       ...enemy, slowed: speedFactor < 1,
-      progress: Math.min(route.length - 1, enemy.progress + seconds * enemyDetails(enemy).speed * speedFactor),
+      progress: Math.min(path.length - 1, enemy.progress + seconds * enemyDetails(enemy).speed * speedFactor
+        * (enemy.kind === 'commander' && round.enemies.some(other => other.id < enemy.id) ? 0 : 1)),
     }
   })
   const targets = new Map(moving.map(enemy => [enemy.id, enemy]))
@@ -234,7 +279,7 @@ export function advanceRound(round: Round, seconds: number, visualSeconds = seco
         waveStats.earned += reward
         waveStats.stopped++
       }
-      impacts.push({ at: enemyPosition(target.progress), elapsed: 0, silver: reward })
+      impacts.push({ at: enemyPosition(target.progress, routeForEnemy(round, target)), elapsed: 0, silver: reward })
     } else {
       shots.push({ ...shot, elapsed })
       incoming.set(target.id, (incoming.get(target.id) ?? 0) + 1)
@@ -242,7 +287,7 @@ export function advanceRound(round: Round, seconds: number, visualSeconds = seco
   }
   const enemies = moving.filter(enemy => {
     if (enemy.health <= 0) return false
-    if (enemy.progress < route.length - 1) return true
+    if (enemy.progress < routeForEnemy(round, enemy).length - 1) return true
     if (lives > 0) {
       lives--
       waveStats.escaped++
@@ -254,9 +299,10 @@ export function advanceRound(round: Round, seconds: number, visualSeconds = seco
   const formation = roundFormation(round)
   if (spawned < formation.sequence.length && spawnTimer <= 0) {
     const kind = formation.sequence[spawned]
-    enemies.push({ id: spawned, kind, health: attackers[kind].health, progress: 0, slowed: false })
+    const routeIndex = (round.waveNumber + spawned - 1) % roundRoutes(round).length
+    enemies.push({ id: spawned, kind, health: attackers[kind].health, progress: 0, slowed: false, routeIndex })
     spawned++
-    spawnTimer += spawnInterval
+    spawnTimer += formation.interval ?? spawnInterval
   }
   const activeIds = new Set(enemies.map(enemy => enemy.id))
   const towers = round.towers.map(tower => {
@@ -265,7 +311,7 @@ export function advanceRound(round: Round, seconds: number, visualSeconds = seco
     if (cooldown > 0) return { ...tower, cooldown }
 
     const target = enemies.find(enemy => enemy.health > (incoming.get(enemy.id) ?? 0)
-      && inRange(tower, enemyPosition(enemy.progress)))
+      && inRange(tower, enemyPosition(enemy.progress, routeForEnemy(round, enemy))))
     if (!target) return { ...tower, cooldown }
     shots.push({ from: sitePosition(tower.site), targetId: target.id, elapsed: 0 })
     incoming.set(target.id, (incoming.get(target.id) ?? 0) + 1)
@@ -274,9 +320,12 @@ export function advanceRound(round: Round, seconds: number, visualSeconds = seco
   })
   const cleared = spawned === formation.sequence.length && enemies.length === 0
   if (lives > 0 && cleared && round.waveNumber < round.totalWaves) {
+    const next = { ...createRound(round.totalWaves, round.mission), waveNumber: round.waveNumber + 1 }
+    const closed = closedSites(next)
+    const remaining = towers.filter(tower => !closed.includes(tower.site))
+    const refund = towers.reduce((amount, tower) => amount + (closed.includes(tower.site) ? towerRefund(tower) : 0), 0)
     return startRound({
-      ...createRound(round.totalWaves, round.mission), waveNumber: round.waveNumber + 1,
-      towers: towers.map(tower => ({ ...tower, cooldown: 0 })), silver, lives,
+      ...next, towers: remaining.map(tower => ({ ...tower, cooldown: 0 })), silver: silver + refund, lives,
       previousWave: { ...waveStats, waveNumber: round.waveNumber }, gateHit, impacts,
     })
   }

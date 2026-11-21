@@ -1,15 +1,15 @@
 import { render } from 'preact'
 import { useEffect, useRef, useState } from 'preact/hooks'
-import { columns, isBuildable, rows, sitePosition } from './game/board'
+import { columns, rows, sitePosition } from './game/board'
 import {
-  attackerName, baseUpgradePrice, buildTower, canSpend, createRound, enemiesRemaining, evacuatedGroups, removeTower,
+  attackerName, baseUpgradePrice, buildTower, canBuildAt, canSpend, closedSites, createRound, enemiesRemaining, objectiveProgress, removeTower,
   secondUpgradeSurcharge,
   retryRound, speedOptions, startRound, tickRound, towerDetails, towerPrice, upgradePrice,
   upgradeTower, waveCueTime, roundFormation, waveOptions,
 } from './game/round'
-import type { PlaySpeed, Round, TowerKind, Upgrade } from './game/round'
+import type { Mission, PlaySpeed, Round, TowerKind, Upgrade } from './game/round'
 import { drawBattlefield, drawTower, tile } from './game-art'
-import { changban } from './game/campaign'
+import { battles, campaign, isMissionUnlocked, nextMission } from './game/campaign'
 import './style.css'
 
 const siteCount = columns * rows
@@ -70,12 +70,12 @@ function Battlefield({ round, selected, onSelect }: {
   return (
     <div class="battlefield">
       <canvas ref={canvas} width={columns * tile} height={rows * tile} role="img"
-        aria-label={round.mission ? 'Changban Road, with the evacuation gate at the bottom'
+        aria-label={round.mission ? `${round.mission.title}, with ${round.mission.gate} at the bottom`
           : 'Shu frontier battlefield, with an enemy road from top to bottom ending at the gate'} />
       <div class="cells" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
         gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))` }} role="group" aria-label="Battlefield tiles. Use arrow keys to select a nearby tile.">
         {Array.from({ length: siteCount }, (_, site) => {
-          if (!isBuildable(site)) return <span key={site} aria-hidden="true" />
+          if (!canBuildAt(round, site)) return <span key={site} aria-hidden="true" />
           const [x, y] = sitePosition(site)
           const tower = round.towers.find(candidate => candidate.site === site)
           const label = tower ? towerDetails[tower.kind].name : 'Empty tile'
@@ -112,7 +112,10 @@ const progressKey = '3guotd.cleared-missions.v1'
 function loadClears(): string[] {
   try {
     const value: unknown = JSON.parse(localStorage.getItem(progressKey) ?? '[]')
-    return Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : []
+    if (!Array.isArray(value)) return []
+    const ids = value.filter((id): id is string => typeof id === 'string')
+    if (ids.includes('changban') && !ids.includes('changban:1')) return [...ids, 'changban:1']
+    return ids
   } catch {
     return []
   }
@@ -127,20 +130,24 @@ function App() {
   const running = round.phase === 'running'
   const mission = round.mission
   const formation = roundFormation(round)
-  const missionCleared = mission !== null && (round.phase === 'won' || clears.includes(mission.id))
+  const upcoming = mission ? nextMission(mission) : undefined
+  const showChronicle = mission !== null && ((mission.level === 5 && round.phase === 'won') || clears.includes(`${mission.battleId}:5`)
+    || (mission.battleId === 'changban' && clears.includes('changban')))
+  const upcomingClosures = (mission?.closedSites?.[round.waveNumber]?.length ?? 0) > closedSites(round).length
   const setup = round.phase === 'setup'
   const [paused, setPaused] = useState(false)
   const initialSetup = setup && round.waveNumber === 1
   const finished = round.phase === 'won' || round.phase === 'lost'
-  const tower = round.towers.find(candidate => candidate.site === selected)
+  const activeSite = selected !== null && canBuildAt(round, selected) ? selected : null
+  const tower = round.towers.find(candidate => candidate.site === activeSite)
   const price = tower ? upgradePrice(tower) : towerPrice
   const shortfall = Math.max(0, price - round.silver)
   const spendingOpen = canSpend(round)
   const canRefund = setup && round.towers.length > 0
-  const showActions = selected !== null && spendingOpen && (!tower || !tower.reach || !tower.power || canRefund)
+  const showActions = activeSite !== null && spendingOpen && (!tower || !tower.reach || !tower.power || canRefund)
   const report = finished ? { ...round.waveStats, waveNumber: round.waveNumber } : round.previousWave
   let status = setup ? (round.towers.length ? 'Prepare defenses' : 'Tap grass to build')
-    : round.phase === 'won' ? (mission ? 'Evacuation complete!' : 'Gate defended!') : 'The gate fell.'
+    : round.phase === 'won' ? (mission ? 'Level cleared!' : 'Gate defended!') : 'The gate fell.'
   if (running) {
     status = paused ? 'Paused' : round.waveAge < waveCueTime
       ? `Wave ${round.waveNumber} starts · ${formation.name}`
@@ -156,7 +163,7 @@ function App() {
 
   useEffect(() => {
     if (round.phase !== 'won' || !mission || clears.includes(mission.id)) return
-    const next = [...clears, mission.id]
+    const next = [...new Set([...loadClears(), ...clears, mission.id])]
     setClears(next)
     try {
       localStorage.setItem(progressKey, JSON.stringify(next))
@@ -165,8 +172,9 @@ function App() {
     }
   }, [round.phase, mission, clears])
 
-  function openMode(campaign: boolean) {
-    setRound(createRound(20, campaign ? changban : null))
+  function openMode(next: Mission | null) {
+    if (next && !isMissionUnlocked(next, clears) && !(round.phase === 'won' && upcoming === next)) return
+    setRound(createRound(20, next))
     setPaused(false)
     selectTile(null)
   }
@@ -192,6 +200,18 @@ function App() {
     return () => navigator.serviceWorker.removeEventListener('controllerchange', ready)
   }, [])
 
+  const speedPicker = (
+    <div class="map-setting">
+      <label for="speed">Speed</label>
+      <select id="speed" value={speed} onChange={event => {
+        const value = speedOptions.find(option => option === Number(event.currentTarget.value))
+        if (value) setSpeed(value)
+      }}>
+        {speedOptions.map(option => <option key={option} value={option}>{option}×</option>)}
+      </select>
+    </div>
+  )
+
   return (
     <main class={`${mission ? 'campaign' : ''} ${showActions ? (canRefund && tower ? 'with-refund' : 'with-actions') : ''}`}>
       <header>
@@ -199,19 +219,44 @@ function App() {
         {offline && <span class="offline">{offline}</span>}
       </header>
       {!running && <nav class="mode-picker" aria-label="Game mode">
-        <button type="button" aria-pressed={mission !== null} onClick={() => { if (!mission) openMode(true) }}>Changban story</button>
-        <button type="button" aria-pressed={mission === null} onClick={() => { if (mission) openMode(false) }}>Long battle</button>
+        <button type="button" aria-pressed={mission !== null} onClick={() => { if (!mission) openMode(campaign[0]) }}>Campaign</button>
+        <button type="button" aria-pressed={mission === null} onClick={() => { if (mission) openMode(null) }}>Long battle</button>
       </nav>}
       {mission && <section class="mission-briefing" aria-label="Story mission">
+        {!running && <div class="campaign-options">
+          <label for="battle">Battle</label>
+          <select id="battle" value={mission.battleId} onChange={event => {
+            const first = campaign.find(level => level.battleId === event.currentTarget.value
+              && isMissionUnlocked(level, clears))
+            if (first) openMode(first)
+          }}>
+            {battles.map(battle => <option key={battle.id} value={battle.id}
+              disabled={!campaign.some(level => level.battleId === battle.id && isMissionUnlocked(level, clears))}>
+              {battle.title}
+            </option>)}
+          </select>
+          <label for="level">Level</label>
+          <select id="level" value={mission.id} onChange={event => {
+            const level = campaign.find(candidate => candidate.id === event.currentTarget.value)
+            if (level) openMode(level)
+          }}>
+            {campaign.filter(level => level.battleId === mission.battleId).map(level =>
+              <option key={level.id} value={level.id} disabled={!isMissionUnlocked(level, clears)}>
+                {level.level}{clears.includes(level.id) ? ' · Cleared' : ''}
+              </option>)}
+          </select>
+        </div>}
         {initialSetup && <>
-          <h2>{mission.title}</h2>
-          <p><strong>{mission.setting}</strong> · {mission.briefing}</p>
+          <p class="mission-setup"><strong>{mission.setting}</strong> · {mission.briefing}</p>
+          {mission.leadIn && <details class="story-scene"><summary>Before the battle</summary><p>{mission.leadIn}</p></details>}
         </>}
-        <p aria-label={`Evacuated groups: ${evacuatedGroups(round)} of ${round.totalWaves}`}>
-          {evacuatedGroups(round)} of {round.totalWaves} groups across
-          {initialSetup && ` · Hold for ${round.totalWaves} waves`}
+        {running && <p>{mission.title} · Level {mission.level}</p>}
+        <p>
+          {initialSetup && `${mission.objective} · Hold for ${round.totalWaves} waves · `}
+          {objectiveProgress(round)} of {mission.milestoneCount} {mission.milestone}
         </p>
         {setup && <p>Next threat · {formation.name}</p>}
+        {!finished && upcomingClosures && <p>Marked sites close next wave. Towers there are refunded.</p>}
       </section>}
       <div class="hud">
         <strong aria-label={`Silver: ${round.silver}`}><span class="coin" aria-hidden="true" />{round.silver} silver</strong>
@@ -230,24 +275,17 @@ function App() {
             {waveOptions.map(option => <option key={option} value={option}>{option}</option>)}
           </select>
         </div>}
-        <div class="map-setting">
-          <label for="speed">Speed</label>
-          <select id="speed" value={speed} onChange={event => {
-            const value = speedOptions.find(option => option === Number(event.currentTarget.value))
-            if (value) setSpeed(value)
-          }}>
-            {speedOptions.map(option => <option key={option} value={option}>{option}×</option>)}
-          </select>
-        </div>
+        {(!mission || !setup) && speedPicker}
         {running && <button type="button" class="pause-control" onClick={() => setPaused(value => !value)}>
           {paused ? 'Resume' : 'Pause'}
         </button>}
       </div>
       <div class="board-view">
-        <Battlefield round={round} selected={selected} onSelect={site => selectTile(site === selected ? null : site)} />
+        <Battlefield round={round} selected={activeSite} onSelect={site => selectTile(site === activeSite ? null : site)} />
       </div>
       <div class="command-bar">
         <div class="round-controls">
+          {mission && setup && speedPicker}
           {setup ? (
             <>
               <button type="button" class="primary"
@@ -262,10 +300,12 @@ function App() {
               selectTile(null)
             }}>Retry wave</button>
           )}
+          {round.phase === 'won' && upcoming && <button class="primary" type="button"
+            onClick={() => openMode(upcoming)}>{upcoming.battleId === mission?.battleId ? 'Next level' : 'Next battle'}</button>}
           {finished && <button type="button"
-            onClick={() => { setPaused(false); setRound(createRound(round.totalWaves, mission)); selectTile(null) }}>{mission ? 'Restart chapter' : 'New battle'}</button>}
+            onClick={() => { setPaused(false); setRound(createRound(round.totalWaves, mission)); selectTile(null) }}>{mission ? 'Restart level' : 'New battle'}</button>}
         </div>
-        {showActions && selected !== null && (
+        {showActions && activeSite !== null && (
           <section class="actions" aria-label="Tower actions">
             <div class="action-grid">
               {tower ? (
@@ -287,7 +327,7 @@ function App() {
                 </>
               ) : towerKinds.map(kind => (
                 <button key={kind} type="button" class="purchase-card" disabled={shortfall > 0}
-                  onClick={() => setRound(current => buildTower(current, selected, kind))}>
+                  onClick={() => setRound(current => buildTower(current, activeSite, kind))}>
                   <TowerPortrait kind={kind} />
                   <span>
                     <strong>Build {towerDetails[kind].name}</strong>
@@ -302,11 +342,11 @@ function App() {
           </section>
         )}
       </div>
-      {mission && finished && <p class="mission-outcome">{round.phase === 'won' ? mission.victory : mission.defeat}</p>}
-      {missionCleared && <details class="wave-report" open={round.phase === 'won'}>
-        <summary>Changban Chronicle</summary>
+      {mission && finished && <p class="mission-outcome">{round.phase === 'lost' ? mission.defeat
+        : mission.level === 5 ? mission.victory : `Level ${mission.level} cleared. Level ${mission.level + 1} unlocked.`}</p>}
+      {showChronicle && <details class="wave-report" open={round.phase === 'won'}>
+        <summary>{mission?.title} Chronicle</summary>
         <p>{mission?.chronicle}</p>
-        <p>Next chapter · Lanterns at Red Cliffs (in development)</p>
       </details>}
       {report && <details class="wave-report">
         <summary>Wave {report.waveNumber} summary</summary>

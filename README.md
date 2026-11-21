@@ -8,9 +8,11 @@ Choose 20, 40, 60, 80, or 100 waves before the battle. Waves advance automatical
 
 **Retry wave** restores the towers, upgrades, silver, and lives from the start of that wave, and lets you edit on the full map. Remove a tower for a full refund if you want to change the layout with an empty purse. **Clear towers** in the first setup restores the starting purse.
 
-## Changban story
+## Campaign
 
-Choose **Changban story** to defend an evacuation crossing in 208 CE. Clear three waves with at least one life remaining to get all three groups across. Retry restores the current wave’s opening defenses and evacuation tally. Victory opens the Chronicle, and this browser remembers the clear. **Long battle** retains the existing 20–100 wave choices.
+Choose **Campaign** to start at Village Watch. There are six battle maps and five levels per map. Clear a level to unlock the next one. The fifth level on each map ends with a pursuit commander and opens the battle’s Chronicle. Progress is saved by level ID in this browser, including earlier Changban clears.
+
+Maps add different pressures. Red Cliffs and Jing have two approaches. Yiling marks tower sites that close on the next wave and refunds towers on those sites. Wuzhang tracks supply deliveries. The current campaign uses the existing Archer and Drum towers. Road heroes and their upgrade economy are future systems. **Long battle** retains the 20–100 wave choices.
 
 ## Local development
 
