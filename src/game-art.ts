@@ -20,7 +20,7 @@ function roof(ctx: CanvasRenderingContext2D, x: number, y: number, width: number
 }
 
 export function drawBattlefield(
-  ctx: CanvasRenderingContext2D, round: Round, selected: number | null, kind: TowerKind,
+  ctx: CanvasRenderingContext2D, round: Round, selected: number | null, kind: TowerKind, previewReach: boolean,
 ) {
   for (let y = 0; y < rows; y++) {
     for (let x = 0; x < columns; x++) {
@@ -65,6 +65,16 @@ export function drawBattlefield(
     ctx.lineWidth = 3
     ctx.fill()
     ctx.stroke()
+    if (active && previewReach) {
+      ctx.save()
+      ctx.setLineDash([9, 5])
+      ctx.strokeStyle = '#fff5c4'
+      ctx.lineWidth = 4
+      ctx.beginPath()
+      ctx.arc(x, y, towerRange(active.kind, true) * tile, 0, 2 * Math.PI)
+      ctx.stroke()
+      ctx.restore()
+    }
   }
 
   for (const tower of round.towers) {

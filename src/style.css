@@ -48,8 +48,9 @@ button:focus-visible { outline: 2px solid #ffedaf; outline-offset: 2px; }
 @media (hover: hover) { .cell:hover { background: #fff0af24; } }
 
 .command-bar { position: sticky; bottom: 0; z-index: 1; background: #202720; padding: .55rem 0 .4rem; }
-.actions { min-height: 7rem; box-sizing: border-box; background: var(--panel); border: 1px solid #625e4e; border-radius: .5rem; padding: .55rem; }
+.actions { min-height: 11rem; box-sizing: border-box; background: var(--panel); border: 1px solid #625e4e; border-radius: .5rem; padding: .55rem; }
 .action-label { margin: 0; color: #eadaca; font-size: .85rem; }
+.action-note { margin: .4rem 0 0; color: #f5d69a; font-size: .78rem; }
 .action-grid { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .45rem; }
 .action-grid button { flex: 1 1 5rem; min-height: 44px; padding: .35rem .3rem; font-size: .82rem; }
 .action-grid button[aria-pressed="true"] { border-color: var(--bronze); background: #594834; }

@@ -8,6 +8,8 @@ See the [single-page silver round audit](2026-11-21-single-page-audit.md) for th
 
 See the [portrait and multi-wave audit](2026-11-21-portrait-wave-audit.md) for the intermission finding and closure evidence.
 
+See the [retry and purchase feedback audit](2026-11-21-retry-purchase-audit.md) for the retry fix and purchase-preview evidence.
+
 From the checkout root, list open work:
 
 ```sh

@@ -16,8 +16,14 @@ export const shotFlightTime = 0.25
 export const impactTime = 0.25
 
 export const towerDetails = {
-  archer: { name: 'Archer', reach: 'Longer range', power: 'Faster fire', range: 1.8, extendedRange: 2.5 },
-  drum: { name: 'Drum', reach: 'Wider reach', power: 'Stronger slow', range: 2.2, extendedRange: 2.8 },
+  archer: {
+    name: 'Archer', reach: 'Longer range', power: 'Faster fire', range: 1.8, extendedRange: 2.5,
+    shotInterval: 1.05, fasterShotInterval: 0.75,
+  },
+  drum: {
+    name: 'Drum', reach: 'Wider reach', power: 'Stronger slow', range: 2.2, extendedRange: 2.8,
+    speedFactor: 0.28, strongerSpeedFactor: 0.18,
+  },
 } as const
 
 const wave = [
@@ -144,7 +150,10 @@ export function advanceRound(round: Round, seconds: number): Round {
     let speedFactor = 1
     const position = enemyPosition(enemy.progress)
     for (const drum of drums) {
-      if (inRange(drum, position)) speedFactor = Math.min(speedFactor, drum.power ? 0.18 : 0.28)
+      if (inRange(drum, position)) {
+        const stats = towerDetails.drum
+        speedFactor = Math.min(speedFactor, drum.power ? stats.strongerSpeedFactor : stats.speedFactor)
+      }
     }
     return {
       ...enemy, slowed: speedFactor < 1,
@@ -195,7 +204,8 @@ export function advanceRound(round: Round, seconds: number): Round {
     if (!target) return { ...tower, cooldown }
     shots.push({ from: sitePosition(tower.site), targetId: target.id, elapsed: 0 })
     incoming.set(target.id, (incoming.get(target.id) ?? 0) + 1)
-    return { ...tower, cooldown: tower.power ? 0.72 : 1.05 }
+    const stats = towerDetails.archer
+    return { ...tower, cooldown: tower.power ? stats.fasterShotInterval : stats.shotInterval }
   })
   const cleared = spawned === enemyCount && enemies.length === 0 && impacts.length === 0
   if (lives > 0 && cleared && round.waveNumber < round.totalWaves) {

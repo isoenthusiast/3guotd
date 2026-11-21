@@ -15,7 +15,7 @@ try {
 
   const {
     createRound, startRound, advanceRound, tickRound, buildTower, upgradeTower, removeTower, retryRound,
-    towerPrice, startingSilver, baseUpgradePrice, secondUpgradeSurcharge, towerRange,
+    towerPrice, startingSilver, baseUpgradePrice, secondUpgradeSurcharge, towerRange, towerDetails,
     shotFlightTime, enemiesRemaining, enemyCount, enemyDetails,
   } = require(join(output, 'round.js'))
   const { isBuildable, columns, route } = require(join(output, 'board.js'))
@@ -63,9 +63,24 @@ try {
   assert.ok(upgradedMidWave.towers[0].power)
   assert.deepEqual(retryRound(upgradedMidWave), built)
 
+  for (const upgraded of [false, true]) {
+    const archerSite = site(1, 1)
+    const base = buildTower(initial, archerSite, 'archer')
+    let cadence = tickRound(startRound(upgraded ? upgradeTower(base, archerSite, 'power') : base), 1)
+    assert.ok(cadence.shots.some(shot => shot.elapsed === 0))
+    let ticks = 0
+    do {
+      cadence = tickRound(cadence, 1)
+      ticks++
+    } while (!cadence.shots.some(shot => shot.elapsed === 0) && ticks < 30)
+    assert.equal(ticks, Math.round((upgraded
+      ? towerDetails.archer.fasterShotInterval : towerDetails.archer.shotInterval) * 20))
+  }
+
   const layout = (placements, waves = 1) => placements.reduce((round, [x, y, kind]) =>
     buildTower(round, site(x, y), kind), createRound(waves))
-  let round = startRound(layout([[1, 0, 'archer'], [1, 1, 'archer'], [1, 2, 'archer']]))
+  const spentPurseOpening = layout([[1, 0, 'archer'], [1, 1, 'archer'], [1, 2, 'archer']])
+  let round = startRound(spentPurseOpening)
   assert.equal(round.silver, 0)
   assert.equal(buildTower(round, 0, 'drum'), round)
   const rewards = new Set()
@@ -89,7 +104,14 @@ try {
   assert.equal(round.towers.length, 4, 'Kill rewards can buy a fourth tower')
   assert.ok(rewards.has(7) && rewards.has(12), 'Payout must differ by level')
   assert.ok(sawSlow && sawRunner, 'Runners enter the wave and a Drum slows attackers')
-  assert.deepEqual(retryRound(round), layout([[1, 0, 'archer'], [1, 1, 'archer'], [1, 2, 'archer']]))
+  const restored = retryRound(round)
+  assert.deepEqual(restored, spentPurseOpening)
+  const refunded = removeTower(restored, site(1, 1))
+  assert.equal(refunded.silver, towerPrice)
+  const revised = buildTower(refunded, site(1, 3), 'drum')
+  assert.equal(revised.silver, 0)
+  assert.ok(revised.towers.some(tower => tower.site === site(1, 3) && tower.kind === 'drum'))
+  assert.deepEqual(retryRound(startRound(revised)), revised)
 
   const opening = [[1, 0, 'archer'], [1, 1, 'drum'], [1, 2, 'archer']]
   let mixed = startRound(layout(opening))
