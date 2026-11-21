@@ -85,7 +85,7 @@ function Battlefield({ round, selected, onSelect }: {
           const label = tower ? towerDetails[tower.kind].name : 'Empty tile'
           return (
             <button key={site} ref={button => { cells.current[site] = button }}
-              type="button" class="cell" tabIndex={site === (selected ?? 0) ? 0 : -1}
+              type="button" class={tower ? 'cell' : 'cell empty-cell'} tabIndex={site === (selected ?? 0) ? 0 : -1}
               aria-label={`${label}, row ${y + 1}, column ${x + 1}`}
               aria-pressed={selected === site} onClick={() => onSelect(site)}
               onKeyDown={event => {
@@ -159,7 +159,7 @@ function App() {
   const canRefund = setup && round.towers.length > 0
   const showActions = activeSite !== null && spendingOpen && (!tower || !tower.reach || !tower.power || canRefund)
   const report = finished ? { ...round.waveStats, waveNumber: round.waveNumber } : round.previousWave
-  let status = setup ? (round.towers.length ? '' : 'Tap a tile to build')
+  let status = setup ? (round.towers.length ? '' : 'Tap a marked tile to build')
     : round.phase === 'won' ? (mission ? 'Level cleared!' : 'Gate defended!') : 'The gate fell.'
   if (running) {
     status = paused ? 'Paused' : round.rebuildTime > 0

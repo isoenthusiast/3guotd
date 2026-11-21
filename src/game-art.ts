@@ -161,6 +161,23 @@ export function drawBattlefield(
     ctx.stroke()
   }
 
+  const landmarks = routes.map((path, index) => ({
+    label: routes.length > 1 ? `Entry ${index + 1}` : 'Entry',
+    point: center(path[0]),
+  }))
+  landmarks.push({ label: round.mission?.gate ?? 'Shu Outpost Gate', point: [gateX, gateY] })
+  ctx.font = 'bold 21px system-ui'
+  for (const { label, point: [x, y] } of landmarks) {
+    const right = x < columns * tile / 2
+    const labelX = x + (right ? 34 : -34)
+    ctx.textAlign = right ? 'left' : 'right'
+    ctx.lineWidth = 5
+    ctx.strokeStyle = '#29332a'
+    ctx.fillStyle = '#fff0cc'
+    ctx.strokeText(label, labelX, y + 7)
+    ctx.fillText(label, labelX, y + 7)
+  }
+
   if (!round.towers.some(tower => tower.site === selected) && selected !== null) {
     const [x, y] = center(sitePosition(selected))
     ctx.save()

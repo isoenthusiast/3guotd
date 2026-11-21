@@ -152,3 +152,27 @@ main.with-refund { --board-space: 21.25rem; }
   border-top: 2px solid #ffd08a;
 }
 .range-key.drum { border-top: 2px dashed #b7f1e9; }
+
+.empty-cell::before {
+  content: '';
+  display: block;
+  width: 58%;
+  height: 58%;
+  margin: auto;
+  pointer-events: none;
+  color: #f0d6a588;
+  background:
+    linear-gradient(currentColor, currentColor) top left / 24% 1px,
+    linear-gradient(currentColor, currentColor) top left / 1px 24%,
+    linear-gradient(currentColor, currentColor) top right / 24% 1px,
+    linear-gradient(currentColor, currentColor) top right / 1px 24%,
+    linear-gradient(currentColor, currentColor) bottom left / 24% 1px,
+    linear-gradient(currentColor, currentColor) bottom left / 1px 24%,
+    linear-gradient(currentColor, currentColor) bottom right / 24% 1px,
+    linear-gradient(currentColor, currentColor) bottom right / 1px 24%;
+  background-repeat: no-repeat;
+}
+@media (max-height: 500px) {
+  .with-actions .command-bar { padding-block: .2rem; }
+  .with-actions .actions { margin-top: .2rem; }
+}
