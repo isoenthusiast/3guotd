@@ -129,7 +129,9 @@ function App() {
       ? `Wave ${round.waveNumber} starts · ${waveFormation(round.waveNumber).name}`
       : `${enemiesRemaining(round)} of ${enemyCount} attackers`
   }
-  const breach = round.gateHit && `${attackerName(round.gateHit.kind)} reached the gate`
+  const breach = round.gateHit && !paused && `${attackerName(round.gateHit.kind)} reached the gate`
+  const showWaveStart = running && round.waveAge < waveCueTime
+  const hudStatus = breach ? (showWaveStart || finished ? `${status} · ${breach}` : breach) : status
 
   function selectTile(site: number | null) {
     setSelected(site)
@@ -166,7 +168,7 @@ function App() {
         <strong aria-label={`Silver: ${round.silver}`}><span class="coin" aria-hidden="true" />{round.silver} silver</strong>
         <span>{round.lives} lives</span>
         <span>Wave {round.waveNumber} of {round.totalWaves}</span>
-        <span role="status">{breach && !paused ? `${breach}${finished ? ` · ${status}` : ''}` : status}</span>
+        <span role="status">{hudStatus}</span>
       </div>
       <div class="map-controls">
         <div class="map-setting">

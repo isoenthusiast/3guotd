@@ -16,3 +16,7 @@ Follow-up to [AUD-008](2026-11-21-three-kingdoms-ux-top-10.md). All ten items ha
 | GF-029 | Label Entry and Shu Outpost Gate on the battlefield. | Chromium observed both map labels. Keep testing the visible route endpoints on narrow screens. |
 
 The build, model tests, and direct build and upgrade paths passed. No human discovery, comprehension, or long-session pacing results are claimed.
+
+## Acceptance recheck
+
+SimaYi rejected the first candidate because a breach at the end of a wave masked the next-wave cue. The HUD now shows both together. A model regression reproduces the last veteran runner reaching the gate exactly as wave two begins. Chromium showed the runner breach, the new formation, two remaining lives, and the prior wave summary at both phone sizes. Repeat this overlap check when changing HUD message priority.

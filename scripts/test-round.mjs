@@ -147,6 +147,16 @@ try {
   assert.equal(retryRound(continuous).waveNumber, 2)
   assert.equal(tickRound({ ...continuous, waveNumber: 20, spawned: enemyCount }, 1).phase, 'won')
 
+  let breachAtTransition = startRound(layout([[1, 0, 'archer'], [1, 1, 'archer'], [3, 2, 'archer']]))
+  for (let step = 0; step < 600 && breachAtTransition.phase === 'running'
+    && breachAtTransition.waveNumber === 1; step++) {
+    breachAtTransition = tickRound(breachAtTransition, 1)
+  }
+  assert.equal(breachAtTransition.waveNumber, 2)
+  assert.equal(breachAtTransition.gateHit.kind, 'veteranRunner')
+  assert.equal(breachAtTransition.waveAge, 0)
+  assert.equal(breachAtTransition.previousWave.escaped, 1)
+
   let undefended = startRound(initial)
   for (let step = 0; step < 1200 && undefended.phase === 'running'; step++) {
     undefended = advanceRound(undefended, 0.05)
