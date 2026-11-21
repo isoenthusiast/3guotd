@@ -207,7 +207,7 @@ button small { display: block; font-size: .7rem; line-height: 1.15; margin-top: 
 
 /* Short portrait phones keep controls beside the map so buying preserves tile size. */
 @media (max-width: 480px) and (max-height: 550px) and (orientation: portrait),
-       (max-width: 360px) and (orientation: portrait) {
+       (max-width: 360px) and (max-height: 590px) and (orientation: portrait) {
   .battle-screen {
     margin-block: .15rem;
     display: grid;
@@ -242,3 +242,17 @@ button small { display: block; font-size: .7rem; line-height: 1.15; margin-top: 
 }
 .battle-report::backdrop { background: #101810bb; }
 .battle-report button { min-height: 44px; padding-inline: 1rem; }
+
+@media (max-width: 360px) and (min-height: 591px) {
+  .battle-screen {
+    margin-block: .15rem;
+    display: flex;
+    flex-direction: column;
+  }
+  .battle-screen .hud { order: -2; min-height: 3.4rem; line-height: 1.15; }
+  .battle-screen .board-view { order: -1; }
+  .battle-screen .map-controls { margin-block: .25rem; }
+
+  .battle-screen .board-view .battlefield { width: min(100%, calc((100dvh - 15.75rem) * 9 / 13)); }
+  .battle-screen .map-controls button { padding-inline: .3rem; font-size: .75rem; }
+}

@@ -4,7 +4,7 @@ import { chromium } from 'playwright'
 const url = process.argv[2] ?? 'http://localhost:4173/'
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH })
 
-async function checkPhone(width, height) {
+async function checkPhone(width, height, previousBoardWidth) {
   const context = await browser.newContext({ viewport: { width, height }, hasTouch: true, isMobile: true })
   try {
     const page = await context.newPage()
@@ -27,6 +27,9 @@ async function checkPhone(width, height) {
 
     const board = page.locator('.battlefield')
     const original = await board.boundingBox()
+    // Worst case is the old 19-step Wuzhang road. Every shorter road also gains four steps.
+    const longestRoadPixels = 23 * original.width / 9
+    assert(longestRoadPixels > 19 * previousBoardWidth / 8, 'Route must grow in rendered CSS pixels')
     const checkFrame = async () => {
       const current = await board.boundingBox()
       assert(await fits(board))
@@ -98,9 +101,12 @@ async function checkPhone(width, height) {
 }
 
 try {
-  await checkPhone(320, 480)
-  await checkPhone(320, 568)
-  await checkPhone(390, 740)
+  // Board widths measured on the preceding 8 × 12 release.
+  await checkPhone(320, 480, 210.66)
+  await checkPhone(320, 568, 229.33)
+  await checkPhone(320, 640, 277.33)
+  await checkPhone(320, 740, 308)
+  await checkPhone(390, 740, 344)
 } finally {
   await browser.close()
 }
