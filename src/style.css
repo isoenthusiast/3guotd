@@ -18,11 +18,7 @@ h1 { font-family: Georgia, serif; font-size: clamp(1.6rem, 6vw, 2.6rem); margin:
 .map-controls { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem .6rem; margin-bottom: .4rem; }
 .map-setting { display: inline-flex; align-items: center; gap: .25rem; font-size: .85rem; }
 .map-controls select { min-width: 44px; min-height: 44px; font: inherit; }
-.map-mode { min-height: 44px; padding: .3rem .55rem; font-size: .85rem; }
-.board-view { overflow: auto; height: min(51dvh, 34rem); border-radius: .5rem; background: #2a382e; }
-.board-view.zoomed .battlefield { width: var(--build-width); margin-inline: auto; }
-.board-view:not(.zoomed) .battlefield { width: min(100%, 34dvh, 22.6667rem); margin-inline: auto; }
-.board-view:not(.zoomed) .cells { display: none; }
+.board-view .battlefield { width: min(100%, 34dvh, 22.6667rem); margin-inline: auto; }
 .battlefield { position: relative; background: #4c654d; border-radius: .5rem; overflow: hidden; }
 canvas { display: block; width: 100%; height: auto; }
 

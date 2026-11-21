@@ -88,7 +88,6 @@ function App() {
   const [selected, setSelected] = useState<number | null>(null)
   const [preview, setPreview] = useState<Upgrade | null>(null)
   const [kind, setKind] = useState<TowerKind>('archer')
-  const [zoomed, setZoomed] = useState(true)
   const [speed, setSpeed] = useState<PlaySpeed>(1)
   const running = round.phase === 'running'
   const setup = round.phase === 'setup'
@@ -163,12 +162,8 @@ function App() {
             {speedOptions.map(option => <option key={option} value={option}>{option}×</option>)}
           </select>
         </div>
-        <button type="button" class="map-mode" aria-pressed={!zoomed}
-          onClick={() => { setZoomed(current => !current); selectTile(null) }}>
-          {zoomed ? 'View full map' : 'Zoom to build'}
-        </button>
       </div>
-      <div class={`board-view ${zoomed ? 'zoomed' : ''}`} style={{ '--build-width': `${columns * 44}px` }}>
+      <div class="board-view">
         <Battlefield round={round} selected={selected} kind={kind}
           previewReach={branch === 'reach'} onSelect={selectTile} />
       </div>
@@ -222,10 +217,8 @@ function App() {
               {spendingOpen && (!tower || !tower.reach || !tower.power) && shortfall > 0
                 && <p class="action-note">Need {shortfall} more silver.{!tower && canRefund && ' Remove a tower for a refund.'}</p>}
             </>
-          ) : <p class="action-label">{zoomed
-            ? 'Tap an empty tile to build or a tower to upgrade.'
-            : 'Choose Zoom to build to edit your defenses.'}
-            {zoomed && canRefund && round.silver < towerPrice && ' Tap a tower to remove it for a refund.'}</p>}
+          ) : <p class="action-label">Tap an empty tile to build or a tower to upgrade.
+            {canRefund && round.silver < towerPrice && ' Tap a tower to remove it for a refund.'}</p>}
         </section>
         <div class="round-controls">
           {setup || between ? (
@@ -238,12 +231,11 @@ function App() {
           ) : (
             <button type="button" onClick={() => {
               setRound(retryRound)
-              setZoomed(true)
               selectTile(null)
             }}>Retry wave</button>
           )}
           {(between || finished) && <button type="button"
-            onClick={() => { setRound(createRound(round.totalWaves)); setZoomed(true); selectTile(null) }}>New battle</button>}
+            onClick={() => { setRound(createRound(round.totalWaves)); selectTile(null) }}>New battle</button>}
         </div>
       </div>
     </main>
