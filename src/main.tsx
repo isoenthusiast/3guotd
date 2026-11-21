@@ -8,7 +8,7 @@ import {
   upgradeTower, waveOptions,
 } from './game/round'
 import type { PlaySpeed, Round, TowerKind, Upgrade } from './game/round'
-import { drawBattlefield, tile } from './game-art'
+import { drawBattlefield, drawTower, tile } from './game-art'
 import './style.css'
 
 const siteCount = columns * rows
@@ -27,6 +27,31 @@ function upgradeEffect(kind: TowerKind, branch: Upgrade): string {
   const { speedFactor, strongerSpeedFactor } = towerDetails.drum
   const slow = (factor: number) => Math.round((1 - factor) * 100)
   return `${slow(speedFactor)}% → ${slow(strongerSpeedFactor)}% slower`
+}
+
+function TowerPortrait({ kind, upgrade }: { kind: TowerKind; upgrade?: Upgrade }) {
+  const canvas = useRef<HTMLCanvasElement>(null)
+  useEffect(() => {
+    const ctx = canvas.current?.getContext('2d')
+    if (!ctx) return
+    ctx.clearRect(0, 0, 80, 80)
+    if (upgrade === 'reach') {
+      ctx.strokeStyle = '#ffe6a4'
+      ctx.lineWidth = 2
+      ctx.setLineDash([5, 4])
+      ctx.beginPath()
+      ctx.arc(40, 40, 35, 0, Math.PI * 2)
+      ctx.stroke()
+      ctx.setLineDash([])
+    }
+    drawTower(ctx, 40, 40, kind)
+    if (upgrade === 'power') {
+      ctx.fillStyle = '#ffe6a4'
+      ctx.font = 'bold 15px system-ui'
+      ctx.fillText('▲', 61, 19)
+    }
+  }, [kind, upgrade])
+  return <canvas ref={canvas} class="tower-portrait" width={80} height={80} aria-hidden="true" />
 }
 
 function Battlefield({ round, selected, onSelect }: {
@@ -187,21 +212,29 @@ function App() {
               {tower ? (
                 <>
                   {upgradeBranches.filter(option => !tower[option]).map(option => (
-                    <button key={option} type="button" class="primary" disabled={shortfall > 0}
+                    <button key={option} type="button" class="purchase-card" disabled={shortfall > 0}
                       onClick={() => setRound(current => upgradeTower(current, tower.site, option))}>
-                      {towerDetails[tower.kind][option]} · {price} silver
-                      <small>{upgradeEffect(tower.kind, option)}
-                        {price > baseUpgradePrice && ` · +${secondUpgradeSurcharge} for second upgrade`}</small>
+                      <TowerPortrait kind={tower.kind} upgrade={option} />
+                      <span>
+                        <strong>{towerDetails[tower.kind][option]}</strong>
+                        <span class="card-price">{price} silver</span>
+                        <small>{upgradeEffect(tower.kind, option)}
+                          {price > baseUpgradePrice && ` · +${secondUpgradeSurcharge} for second upgrade`}</small>
+                      </span>
                     </button>
                   ))}
                   {canRefund && <button type="button"
                     onClick={() => setRound(current => removeTower(current, tower.site))}>Remove &amp; refund</button>}
                 </>
               ) : towerKinds.map(kind => (
-                <button key={kind} type="button" class="primary" disabled={shortfall > 0}
+                <button key={kind} type="button" class="purchase-card" disabled={shortfall > 0}
                   onClick={() => setRound(current => buildTower(current, selected, kind))}>
-                  Build {towerDetails[kind].name} · {towerPrice} silver
-                  <small>{kind === 'archer' ? 'Deals damage' : 'Slows attackers'}</small>
+                  <TowerPortrait kind={kind} />
+                  <span>
+                    <strong>Build {towerDetails[kind].name}</strong>
+                    <span class="card-price">{towerPrice} silver</span>
+                    <small>{kind === 'archer' ? 'Deals damage' : 'Slows attackers'}</small>
+                  </span>
                 </button>
               ))}
             </div>

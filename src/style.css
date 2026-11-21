@@ -41,7 +41,7 @@ button:focus-visible { outline: 2px solid #ffedaf; outline-offset: 2px; }
 .cell[aria-pressed="true"], .cell:focus-visible { outline: 2px solid #ffedaf; outline-offset: -2px; }
 @media (hover: hover) { .cell:hover { background: #fff0af24; } }
 
-.command-bar { position: sticky; bottom: 0; z-index: 1; background: #202720; padding: .55rem 0 .4rem; }
+.command-bar { background: #202720; padding: .55rem 0 .4rem; }
 .actions { margin-top: .35rem; }
 .action-note { margin: .4rem 0 0; color: #f5d69a; font-size: .78rem; }
 .action-grid { display: flex; flex-wrap: wrap; gap: .35rem; }
@@ -52,3 +52,25 @@ button small { display: block; font-size: .7rem; line-height: 1.15; margin-top: 
 .primary { background: #823f38; border-color: #b78661; }
 
 .pause-control { min-height: 44px; padding: .35rem .75rem; }
+
+.action-grid .purchase-card {
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+  flex: 1 1 7rem;
+  text-align: left;
+  padding: .35rem;
+  background: #343c30;
+  border-color: #a38256;
+}
+
+.tower-portrait {
+  width: 38px;
+  flex: 0 0 38px;
+  background: #222d24;
+  border-radius: .3rem;
+}
+
+.purchase-card strong, .card-price { display: block; }
+.card-price { color: #ffe0a3; font-weight: 700; }
+.purchase-card:disabled { opacity: .78; }

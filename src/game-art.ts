@@ -1,6 +1,6 @@
 import { columns, route, rows, sitePosition } from './game/board'
 import { enemyDetails, enemyPosition, impactTime, shotFlightTime, towerRange } from './game/round'
-import type { Round } from './game/round'
+import type { Round, TowerKind } from './game/round'
 
 export const tile = 64
 
@@ -17,6 +17,26 @@ function roof(ctx: CanvasRenderingContext2D, x: number, y: number, width: number
   ctx.quadraticCurveTo(x + width * 0.55, y + 8, x + width, y + 8)
   ctx.closePath()
   ctx.fill()
+}
+
+export function drawTower(ctx: CanvasRenderingContext2D, x: number, y: number, kind: TowerKind) {
+  const archer = kind === 'archer'
+  const half = archer ? 16 : 21
+  ctx.fillStyle = '#382b27'
+  ctx.fillRect(x - half, y - 10, half * 2, 31)
+  ctx.fillStyle = '#d1a979'
+  ctx.fillRect(x - half + 4, y - 7, 5, 25)
+  ctx.fillRect(x + half - 9, y - 7, 5, 25)
+  roof(ctx, x, y - (archer ? 18 : 12), half + 7, '#7b3934')
+  ctx.strokeStyle = '#f6cc8b'
+  ctx.lineWidth = 3
+  ctx.beginPath()
+  if (archer) {
+    ctx.arc(x - 5, y + 5, 10, -Math.PI / 2, Math.PI / 2)
+  } else {
+    ctx.arc(x, y + 9, 9, 0, 2 * Math.PI)
+  }
+  ctx.stroke()
 }
 
 export function drawBattlefield(
@@ -79,23 +99,7 @@ export function drawBattlefield(
 
   for (const tower of round.towers) {
     const [x, y] = center(sitePosition(tower.site))
-    const archer = tower.kind === 'archer'
-    const half = archer ? 16 : 21
-    ctx.fillStyle = '#382b27'
-    ctx.fillRect(x - half, y - 10, half * 2, 31)
-    ctx.fillStyle = '#d1a979'
-    ctx.fillRect(x - half + 4, y - 7, 5, 25)
-    ctx.fillRect(x + half - 9, y - 7, 5, 25)
-    roof(ctx, x, y - (archer ? 18 : 12), half + 7, '#7b3934')
-    ctx.strokeStyle = '#f6cc8b'
-    ctx.lineWidth = 3
-    ctx.beginPath()
-    if (archer) {
-      ctx.arc(x - 5, y + 5, 10, -Math.PI / 2, Math.PI / 2)
-    } else {
-      ctx.arc(x, y + 9, 9, 0, 2 * Math.PI)
-    }
-    ctx.stroke()
+    drawTower(ctx, x, y, tower.kind)
     ctx.fillStyle = '#fff0bb'
     if (tower.reach) ctx.fillRect(x - 10, y + 24, 8, 4)
     if (tower.power) ctx.fillRect(x + 2, y + 24, 8, 4)
