@@ -91,7 +91,7 @@ function App() {
   const [speed, setSpeed] = useState<PlaySpeed>(1)
   const running = round.phase === 'running'
   const setup = round.phase === 'setup'
-  const between = round.phase === 'between'
+  const [paused, setPaused] = useState(false)
   const initialSetup = setup && round.waveNumber === 1
   const finished = round.phase === 'won' || round.phase === 'lost'
   const tower = round.towers.find(candidate => candidate.site === selected)
@@ -100,7 +100,7 @@ function App() {
   const price = tower ? upgradePrice(tower) : towerPrice
   const shortfall = Math.max(0, price - round.silver)
   const spendingOpen = canSpend(round)
-  const canRefund = (setup || between) && round.towers.length > 0
+  const canRefund = setup && round.towers.length > 0
 
   function selectTile(site: number | null) {
     setSelected(site)
@@ -108,12 +108,12 @@ function App() {
   }
 
   useEffect(() => {
-    if (!running) return
+    if (!running || paused) return
     const timer = window.setInterval(() => {
       if (!document.hidden) setRound(current => tickRound(current, speed))
     }, 50)
     return () => window.clearInterval(timer)
-  }, [running, speed])
+  }, [running, speed, paused])
 
   useEffect(() => {
     const platform = (window as Window & { Capacitor?: { isNativePlatform(): boolean } }).Capacitor
@@ -138,8 +138,8 @@ function App() {
         <strong aria-label={`Silver: ${round.silver}`}><span class="coin" aria-hidden="true" />{round.silver} silver</strong>
         <span>{round.lives} lives</span>
         <span>Wave {round.waveNumber} of {round.totalWaves}</span>
-        <span role="status">{running ? `${enemiesRemaining(round)} of ${enemyCount} attackers` : setup
-          ? 'Prepare defenses' : between ? 'Ready for the next wave' : round.phase === 'won'
+        <span role="status">{running ? (paused ? 'Paused' : `${enemiesRemaining(round)} of ${enemyCount} attackers`) : setup
+          ? 'Prepare defenses' : round.phase === 'won'
             ? 'Gate defended!' : 'The gate fell.'}</span>
       </div>
       <div class="map-controls">
@@ -162,6 +162,9 @@ function App() {
             {speedOptions.map(option => <option key={option} value={option}>{option}×</option>)}
           </select>
         </div>
+        {running && <button type="button" class="pause-control" onClick={() => setPaused(value => !value)}>
+          {paused ? 'Resume' : 'Pause'}
+        </button>}
       </div>
       <div class="board-view">
         <Battlefield round={round} selected={selected} kind={kind}
@@ -221,21 +224,22 @@ function App() {
             {canRefund && round.silver < towerPrice && ' Tap a tower to remove it for a refund.'}</p>}
         </section>
         <div class="round-controls">
-          {setup || between ? (
+          {setup ? (
             <>
               <button type="button" class="primary"
-                onClick={() => setRound(startRound)}>{between ? 'Next wave' : 'Start wave'}</button>
+                onClick={() => setRound(startRound)}>Start wave</button>
               {initialSetup && round.towers.length > 0 && <button type="button"
                 onClick={() => { setRound(createRound(round.totalWaves)); selectTile(null) }}>Clear towers</button>}
             </>
           ) : (
             <button type="button" onClick={() => {
+              setPaused(false)
               setRound(retryRound)
               selectTile(null)
             }}>Retry wave</button>
           )}
-          {(between || finished) && <button type="button"
-            onClick={() => { setRound(createRound(round.totalWaves)); selectTile(null) }}>New battle</button>}
+          {finished && <button type="button"
+            onClick={() => { setPaused(false); setRound(createRound(round.totalWaves)); selectTile(null) }}>New battle</button>}
         </div>
       </div>
     </main>

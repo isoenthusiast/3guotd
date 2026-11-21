@@ -54,3 +54,5 @@ button small { display: block; font-size: .7rem; line-height: 1.15; margin-top: 
 .round-controls { display: flex; gap: .5rem; margin-top: .6rem; }
 .round-controls button { min-height: 44px; padding: .35rem .75rem; }
 .primary { background: #823f38; border-color: #b78661; }
+
+.pause-control { min-height: 44px; padding: .35rem .75rem; }

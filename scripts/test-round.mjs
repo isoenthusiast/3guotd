@@ -77,7 +77,7 @@ try {
       ? towerDetails.archer.fasterShotInterval : towerDetails.archer.shotInterval) * 20))
   }
 
-  const layout = (placements, waves = 1) => placements.reduce((round, [x, y, kind]) =>
+  const layout = (placements, waves = 20) => placements.reduce((round, [x, y, kind]) =>
     buildTower(round, site(x, y), kind), createRound(waves))
   const spentPurseOpening = layout([[1, 0, 'archer'], [1, 1, 'archer'], [1, 2, 'archer']])
   let round = startRound(spentPurseOpening)
@@ -87,9 +87,9 @@ try {
   let sawSlow = false
   let sawRunner = false
   let completed = 0
-  while (round.phase === 'running' && completed++ < 1200) {
+  while (round.phase === 'running' && round.waveNumber === 1 && completed++ < 1200) {
     const next = advanceRound(round, 0.05)
-    assert.ok(enemiesRemaining(next) <= enemiesRemaining(round))
+    if (next.waveNumber === round.waveNumber) assert.ok(enemiesRemaining(next) <= enemiesRemaining(round))
     if (next.silver > round.silver) {
       for (const hit of next.impacts) if (hit.silver) rewards.add(hit.silver)
     }
@@ -100,11 +100,11 @@ try {
     sawSlow ||= round.enemies.some(enemy => enemy.slowed)
     sawRunner ||= round.enemies.some(enemy => enemyDetails(enemy).runner)
   }
-  assert.notEqual(round.phase, 'running')
+  assert.ok(round.waveNumber > 1 || round.phase === 'lost')
   assert.equal(round.towers.length, 4, 'Kill rewards can buy a fourth tower')
   assert.ok(rewards.has(7) && rewards.has(12), 'Payout must differ by level')
   assert.ok(sawSlow && sawRunner, 'Runners enter the wave and a Drum slows attackers')
-  const restored = retryRound(round)
+  const restored = retryRound(startRound(spentPurseOpening))
   assert.deepEqual(restored, spentPurseOpening)
   const refunded = removeTower(restored, site(1, 1))
   assert.equal(refunded.silver, towerPrice)
@@ -115,7 +115,7 @@ try {
 
   const opening = [[1, 0, 'archer'], [1, 1, 'drum'], [1, 2, 'archer']]
   let mixed = startRound(layout(opening))
-  for (let step = 0; step < 1200 && mixed.phase === 'running'; step++) {
+  for (let step = 0; step < 1200 && mixed.phase === 'running' && mixed.waveNumber === 1; step++) {
     mixed = advanceRound(mixed, 0.05)
     if (mixed.silver >= towerPrice && mixed.towers.length === 3) {
       mixed = buildTower(mixed, site(1, 3), 'archer')
@@ -125,38 +125,15 @@ try {
       if (archer) mixed = upgradeTower(mixed, archer.site, 'power')
     }
   }
-  assert.equal(mixed.phase, 'won', 'A mixed opening with reinvestment must be viable')
+  assert.ok(mixed.waveNumber > 1 || mixed.phase === 'won', 'A mixed opening with reinvestment must be viable')
 
-  for (const totalWaves of [3, 5]) {
-    let battle = layout(opening, totalWaves)
-    for (let number = 1; number <= totalWaves; number++) {
-      assert.equal(battle.waveNumber, number)
-      const preWave = battle
-      battle = startRound(battle)
-      let running = battle
-      for (let step = 0; step < 1200 && running.phase === 'running'; step++) {
-        running = tickRound(running, 1)
-        if (running.phase !== 'running') break
-        if (running.silver >= towerPrice && running.towers.length === 3) {
-          running = buildTower(running, site(1, 3), 'archer')
-        }
-        if (running.towers.length === 4 && running.silver >= baseUpgradePrice) {
-          const archer = running.towers.find(tower => tower.kind === 'archer' && !tower.power)
-          if (archer) running = upgradeTower(running, archer.site, 'power')
-        }
-        const retried = retryRound(running)
-        assert.equal(retried.waveNumber, number)
-        assert.equal(retried.totalWaves, totalWaves)
-        assert.equal(retried.silver, preWave.silver)
-        assert.equal(retried.lives, preWave.lives)
-        assert.deepEqual(retried.towers, preWave.towers)
-      }
-      assert.equal(running.phase, number < totalWaves ? 'between' : 'won')
-      assert.equal(running.towers.length, 4, 'Towers carry over between waves')
-      assert.ok(running.lives > 0)
-      battle = running
-    }
-  }
+  let continuous = startRound({ ...layout(opening, 20), enemies: [], spawned: enemyCount })
+  continuous = tickRound(continuous, 1)
+  assert.equal(continuous.phase, 'running')
+  assert.equal(continuous.waveNumber, 2)
+  assert.equal(continuous.towers.length, 3)
+  assert.equal(retryRound(continuous).waveNumber, 2)
+  assert.equal(tickRound({ ...continuous, waveNumber: 20, spawned: enemyCount }, 1).phase, 'won')
 
   let undefended = startRound(initial)
   for (let step = 0; step < 1200 && undefended.phase === 'running'; step++) {

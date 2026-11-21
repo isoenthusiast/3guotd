@@ -3,7 +3,7 @@ import { isBuildable, route, sitePosition } from './board'
 type Point = readonly [number, number]
 export type TowerKind = 'archer' | 'drum'
 export type Upgrade = 'reach' | 'power'
-export const waveOptions = [1, 3, 5] as const
+export const waveOptions = [20, 40, 60, 80, 100] as const
 export const speedOptions = [1, 2, 3] as const
 export type WaveCount = typeof waveOptions[number]
 export type PlaySpeed = typeof speedOptions[number]
@@ -48,7 +48,7 @@ type Impact = { at: Point; elapsed: number; silver: number }
 type Opening = Pick<Round, 'towers' | 'silver' | 'lives'>
 
 export type Round = {
-  phase: 'setup' | 'running' | 'between' | 'won' | 'lost'
+  phase: 'setup' | 'running' | 'won' | 'lost'
   totalWaves: WaveCount
   waveNumber: number
   towers: Tower[]
@@ -62,7 +62,7 @@ export type Round = {
   spawnTimer: number
 }
 
-export function createRound(totalWaves: WaveCount = 1): Round {
+export function createRound(totalWaves: WaveCount = 20): Round {
   return {
     phase: 'setup', totalWaves, waveNumber: 1, towers: [], silver: startingSilver, opening: null,
     enemies: [], shots: [], impacts: [], lives: initialLives, spawned: 0, spawnTimer: 0,
@@ -70,7 +70,7 @@ export function createRound(totalWaves: WaveCount = 1): Round {
 }
 
 export function startRound(round: Round): Round {
-  if (round.phase !== 'setup' && round.phase !== 'between') return round
+  if (round.phase !== 'setup') return round
   const opening = { towers: round.towers, silver: round.silver, lives: round.lives }
   return { ...round, phase: 'running', opening }
 }
@@ -97,7 +97,7 @@ export function upgradePrice(tower: Tower): number {
 }
 
 export function canSpend(round: Round): boolean {
-  return round.phase === 'setup' || round.phase === 'running' || round.phase === 'between'
+  return round.phase === 'setup' || round.phase === 'running'
 }
 
 export function buildTower(round: Round, site: number, kind: TowerKind): Round {
@@ -119,7 +119,7 @@ export function upgradeTower(round: Round, site: number, branch: Upgrade): Round
 
 export function removeTower(round: Round, site: number): Round {
   const tower = round.towers.find(candidate => candidate.site === site)
-  if ((round.phase !== 'setup' && round.phase !== 'between') || !tower) return round
+  if ((round.phase !== 'setup') || !tower) return round
   const refunds = [towerPrice, towerPrice + baseUpgradePrice, towerPrice + 2 * baseUpgradePrice + secondUpgradeSurcharge]
   const branches = Number(tower.reach) + Number(tower.power)
   return {
@@ -209,10 +209,10 @@ export function advanceRound(round: Round, seconds: number): Round {
   })
   const cleared = spawned === enemyCount && enemies.length === 0 && impacts.length === 0
   if (lives > 0 && cleared && round.waveNumber < round.totalWaves) {
-    return {
-      ...createRound(round.totalWaves), phase: 'between', waveNumber: round.waveNumber + 1,
+    return startRound({
+      ...createRound(round.totalWaves), waveNumber: round.waveNumber + 1,
       towers: towers.map(tower => ({ ...tower, cooldown: 0 })), silver, lives,
-    }
+    })
   }
   const phase = lives === 0 ? 'lost' : cleared ? 'won' : 'running'
   return {
