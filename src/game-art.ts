@@ -20,23 +20,54 @@ function roof(ctx: CanvasRenderingContext2D, x: number, y: number, width: number
 }
 
 export function drawTower(ctx: CanvasRenderingContext2D, x: number, y: number, kind: TowerKind) {
-  const archer = kind === 'archer'
-  const half = archer ? 16 : 21
-  ctx.fillStyle = '#382b27'
-  ctx.fillRect(x - half, y - 10, half * 2, 31)
-  ctx.fillStyle = '#d1a979'
-  ctx.fillRect(x - half + 4, y - 7, 5, 25)
-  ctx.fillRect(x + half - 9, y - 7, 5, 25)
-  roof(ctx, x, y - (archer ? 18 : 12), half + 7, '#7b3934')
-  ctx.strokeStyle = '#f6cc8b'
-  ctx.lineWidth = 3
+  ctx.save()
+  ctx.translate(x, y)
+  ctx.fillStyle = '#29262280'
   ctx.beginPath()
-  if (archer) {
-    ctx.arc(x - 5, y + 5, 10, -Math.PI / 2, Math.PI / 2)
-  } else {
-    ctx.arc(x, y + 9, 9, 0, 2 * Math.PI)
-  }
+  ctx.ellipse(0, 21, 24, 7, 0, 0, Math.PI * 2)
+  ctx.fill()
+
+  ctx.strokeStyle = '#38291f'
+  ctx.lineWidth = 7
+  ctx.beginPath()
+  const top = kind === 'archer' ? -14 : 8
+  ctx.moveTo(-19, 21)
+  ctx.lineTo(-12, top)
+  ctx.lineTo(12, top)
+  ctx.lineTo(19, 21)
+  ctx.moveTo(-15, 5)
+  ctx.lineTo(16, 19)
+  ctx.moveTo(15, 5)
+  ctx.lineTo(-16, 19)
   ctx.stroke()
+  ctx.strokeStyle = '#ac835d'
+  ctx.lineWidth = 3
+  ctx.stroke()
+
+  if (kind === 'archer') {
+    ctx.fillStyle = '#b88759'
+    ctx.fillRect(-18, -11, 36, 6)
+    ctx.fillRect(-14, -23, 3, 14)
+    ctx.fillRect(11, -23, 3, 14)
+    roof(ctx, 0, -24, 27, '#343437')
+    ctx.strokeStyle = '#888077'
+    ctx.beginPath()
+    ctx.moveTo(-19, -20)
+    ctx.lineTo(19, -20)
+    ctx.stroke()
+  } else {
+    ctx.fillStyle = '#80372a'
+    ctx.beginPath()
+    ctx.ellipse(1, -5, 22, 15, 0, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.fillStyle = '#e2bf8a'
+    ctx.beginPath()
+    ctx.ellipse(-9, -5, 13, 15, 0, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.strokeStyle = '#452a24'
+    ctx.stroke()
+  }
+  ctx.restore()
 }
 
 export function drawBattlefield(
@@ -44,21 +75,32 @@ export function drawBattlefield(
 ) {
   const routes = roundRoutes(round)
   const palette = ({
-    field: ['#4c654d', '#49624a'], river: ['#3e5e5d', '#365857'],
-    wood: ['#485c40', '#40533a'], pass: ['#665747', '#5d5143'],
+    field: ['#68714b', '#646e48'], river: ['#446961', '#40645c'],
+    wood: ['#4c6246', '#465c41'], pass: ['#716049', '#6a5946'],
   })[round.mission?.terrain ?? 'field']
   for (let y = 0; y < rows; y++) {
     for (let x = 0; x < columns; x++) {
       ctx.fillStyle = palette[(x + y) % 2]
       ctx.fillRect(x * tile, y * tile, tile, tile)
-      ctx.strokeStyle = '#263e322f'
+      ctx.strokeStyle = '#28322220'
       ctx.lineWidth = 1
       ctx.strokeRect(x * tile + 0.5, y * tile + 0.5, tile - 1, tile - 1)
+      const px = x * tile
+      const py = y * tile
+      ctx.strokeStyle = '#2f41233f'
+      ctx.beginPath()
+      for (let stem = 0; stem < 3; stem++) {
+        const offset = 7 + stem * 5
+        const base = 16 + (x * 11 + y * 7) % 34
+        ctx.moveTo(px + offset, py + base)
+        ctx.lineTo(px + offset - 2 + stem * 2, py + base - 4 - stem)
+      }
+      ctx.stroke()
     }
   }
   ctx.lineCap = 'square'
   ctx.lineJoin = 'round'
-  for (const [width, color] of [[54, '#80664b'], [47, '#c7a778']] as const) {
+  for (const [width, color] of [[54, '#8b6a45'], [47, '#dbbb83']] as const) {
     ctx.beginPath()
     for (const path of routes) {
       for (const [index, point] of path.entries()) {
@@ -89,13 +131,16 @@ export function drawBattlefield(
     ctx.lineTo(x - 15, y + 15)
     ctx.stroke()
   }
-  ctx.fillStyle = '#573b30'
-  ctx.fillRect(gateX - 19, gateY - 23, 38, 48)
-  ctx.fillStyle = '#ac835b'
-  ctx.fillRect(gateX - 14, gateY - 18, 28, 39)
-  ctx.fillStyle = '#362b25'
-  ctx.fillRect(gateX - 9, gateY + 1, 18, 23)
-  roof(ctx, gateX, gateY - 22, 28, '#473b3b')
+  ctx.fillStyle = '#a98351'
+  ctx.fillRect(gateX - 31, gateY - 5, 62, 26)
+  ctx.fillStyle = '#716653'
+  ctx.fillRect(gateX - 31, gateY + 16, 62, 7)
+  ctx.fillStyle = '#402b22'
+  ctx.fillRect(gateX - 19, gateY - 17, 38, 40)
+  ctx.fillStyle = '#8c6749'
+  ctx.fillRect(gateX - 13, gateY - 9, 11, 30)
+  ctx.fillRect(gateX + 2, gateY - 9, 11, 30)
+  roof(ctx, gateX, gateY - 19, 30, '#37383b')
 
   if (round.gateHit) {
     ctx.strokeStyle = '#ffa487'
@@ -103,21 +148,17 @@ export function drawBattlefield(
     ctx.strokeRect(gateX - 27, gateY - 26, 54, 54)
   }
 
-  ctx.font = 'bold 20px system-ui'
-  const landmarks = routes.map((path, index) => ({
-    label: routes.length > 1 ? `Entry ${index + 1}` : 'Entry',
-    point: center(path[0]),
-  }))
-  landmarks.push({ label: round.mission?.gate ?? 'Shu Outpost Gate', point: [gateX, gateY] })
-  for (const { label, point: [x, y] } of landmarks) {
-    const right = x < (columns * tile) / 2
-    const labelX = x + (right ? 32 : -32)
-    ctx.textAlign = right ? 'left' : 'right'
-    ctx.lineWidth = 5
-    ctx.strokeStyle = '#293c31'
-    ctx.fillStyle = '#fff0cc'
-    ctx.strokeText(label, labelX, y + 7)
-    ctx.fillText(label, labelX, y + 7)
+  for (const path of routes) {
+    const [x, y] = center(path[0])
+    ctx.fillStyle = '#652b24'
+    ctx.fillRect(x - 12, y - 22, 24, 17)
+    ctx.strokeStyle = '#fff0cc'
+    ctx.lineWidth = 3
+    ctx.beginPath()
+    ctx.moveTo(x - 6, y - 16)
+    ctx.lineTo(x, y - 10)
+    ctx.lineTo(x + 6, y - 16)
+    ctx.stroke()
   }
 
   if (!round.towers.some(tower => tower.site === selected) && selected !== null) {
@@ -181,11 +222,25 @@ export function drawBattlefield(
     const [x, y] = center(enemyPosition(enemy.progress, routeForEnemy(round, enemy)))
     const detail = enemyDetails(enemy)
     targets.set(enemy.id, [x, y])
-    ctx.fillStyle = detail.runner ? '#593f78' : '#353959'
+    ctx.fillStyle = detail.runner ? '#72382e' : '#33353c'
     ctx.beginPath()
     ctx.ellipse(x, y + 6, enemy.kind === 'cavalry' ? 21 : detail.runner ? 10 : 16,
       enemy.kind === 'commander' ? 20 : 16, 0, 0, 2 * Math.PI)
     ctx.fill()
+    if (enemy.kind === 'cavalry') {
+      ctx.fillStyle = '#6b402e'
+      ctx.fillRect(x + 13, y - 8, 13, 11)
+      ctx.fillRect(x - 16, y + 12, 6, 12)
+      ctx.fillRect(x + 10, y + 12, 6, 12)
+    } else if (enemy.kind === 'infantry' || enemy.kind === 'veteran') {
+      ctx.fillStyle = '#906842'
+      ctx.strokeStyle = '#342c26'
+      ctx.lineWidth = 3
+      ctx.beginPath()
+      ctx.arc(x + 10, y + 8, 9, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.stroke()
+    }
     ctx.fillStyle = detail.level === 2 ? '#e5b168' : '#dcc5a0'
     ctx.beginPath()
     ctx.arc(x, y - 5, detail.runner ? 6 : 8, 0, 2 * Math.PI)

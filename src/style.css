@@ -105,3 +105,50 @@ main.with-refund { --board-space: 21.25rem; }
   .hud { gap: .2rem .55rem; font-size: .78rem; }
   .map-controls { gap: .25rem .4rem; }
 }
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.menu-screen {
+  box-sizing: border-box;
+  padding: .8rem;
+  color-scheme: light;
+  background: #eddbb5;
+  color: #32261c;
+  border: 1px solid #b18d5d;
+  border-radius: .45rem;
+}
+.menu-screen .offline { color: #65513c; }
+.menu-screen button { background: #f5e6c6; border-color: #a08056; }
+.menu-screen button.primary { background: #82352b; border-color: #67281d; color: #fff1d2; }
+.menu-screen button:focus-visible { outline-color: #60291f; }
+.menu-screen .story-scene summary { color: #692e26; }
+.menu-art, .briefing-art {
+  display: block;
+  width: 100%;
+  object-fit: cover;
+  border-radius: .25rem;
+}
+.menu-art { height: clamp(6rem, 28dvh, 12rem); margin: .4rem 0 .65rem; }
+.briefing-art { height: clamp(6rem, 27dvh, 12rem); object-position: center 68%; }
+.setup-screen header { margin-bottom: .4rem; }
+.setup-screen h3 { margin: .4rem 0; }
+.setup-screen .campaign-options { margin-top: .4rem; }
+.battle-screen { --board-space: 9.5rem; }
+.battle-screen.with-actions { --board-space: 14rem; }
+.battle-screen.with-refund { --board-space: 17rem; }
+
+.range-key {
+  display: inline-block;
+  width: .65rem;
+  vertical-align: middle;
+  margin-right: .25rem;
+  border-top: 2px solid #ffd08a;
+}
+.range-key.drum { border-top: 2px dashed #b7f1e9; }

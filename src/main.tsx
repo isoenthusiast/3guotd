@@ -12,6 +12,8 @@ import { drawBattlefield, drawTower, tile } from './game-art'
 import { battles, campaign, isMissionUnlocked, nextMission } from './game/campaign'
 import { loadGame, loadSound, saveGame, saveSound } from './game/save-game'
 import { enableAudio, playCue } from './sound'
+import villageGate from './assets/village-gate.webp?inline'
+import villageWatch from './assets/village-watch.webp?inline'
 import './style.css'
 
 const siteCount = columns * rows
@@ -157,7 +159,7 @@ function App() {
   const canRefund = setup && round.towers.length > 0
   const showActions = activeSite !== null && spendingOpen && (!tower || !tower.reach || !tower.power || canRefund)
   const report = finished ? { ...round.waveStats, waveNumber: round.waveNumber } : round.previousWave
-  let status = setup ? (round.towers.length ? 'Prepare defenses' : 'Tap grass to build')
+  let status = setup ? (round.towers.length ? '' : 'Tap a tile to build')
     : round.phase === 'won' ? (mission ? 'Level cleared!' : 'Gate defended!') : 'The gate fell.'
   if (running) {
     status = paused ? 'Paused' : round.rebuildTime > 0
@@ -283,7 +285,8 @@ function App() {
   if (screen === 'menu') {
     return <main class="menu-screen">
       {header}
-      <h2>Main menu</h2>
+      <h2 class="visually-hidden">Main menu</h2>
+      <img class="menu-art" src={villageGate} alt="" />
       {hasRun && <p>{mission ? `${mission.title} · Level ${mission.level}` : 'Long battle'}
         {` · Wave ${round.waveNumber} of ${round.totalWaves}`}</p>}
       <div class="menu-actions">
@@ -292,7 +295,7 @@ function App() {
           setConfirmation(null)
           setScreen('battle')
         }}>Continue</button>}
-        <button type="button" onClick={() => {
+        <button type="button" class={hasRun ? undefined : 'primary'} onClick={() => {
           setConfirmation(null)
           setScreen('campaign')
         }}>Campaign</button>
@@ -335,11 +338,11 @@ function App() {
 
   if (screen === 'campaign' || screen === 'long') {
     const selectedMission = screen === 'campaign' ? draftMission : null
-    return <main class="menu-screen">
+    return <main class="menu-screen setup-screen">
       {header}
       <button type="button" onClick={showMenu}>Main menu</button>
       {selectedMission ? <section class="mission-briefing" aria-label="Mission briefing">
-        <h2>Campaign</h2>
+        <h2 class="visually-hidden">Campaign</h2>
         <div class="campaign-options">
           <label for="battle">Battle</label>
           <select id="battle" value={selectedMission.battleId} onChange={event => {
@@ -364,7 +367,11 @@ function App() {
           </select>
         </div>
         <h3>{selectedMission.title} · Level {selectedMission.level}</h3>
-        <p><strong>{selectedMission.setting}</strong> · {selectedMission.briefing}</p>
+        {selectedMission.battleId === 'village-watch' && <img class="briefing-art" src={villageWatch}
+          alt="Villagers gather beneath the timber gate under the watch of a mounted guard." />}
+        {selectedMission.battleId === 'village-watch'
+          ? <details class="story-scene"><summary>Story</summary><p>{selectedMission.briefing}</p></details>
+          : <p><strong>{selectedMission.setting}</strong> · {selectedMission.briefing}</p>}
         {selectedMission.leadIn && <details class="story-scene"><summary>Before the battle</summary><p>{selectedMission.leadIn}</p></details>}
         <p>{selectedMission.objective} · Hold for {selectedMission.waves.length} waves</p>
         <p>{selectedMission.level === 5 ? 'Final threat · The commander waits for his escort to clear.'
@@ -396,8 +403,8 @@ function App() {
   }
 
   return (
-    <main class={showActions ? (canRefund && tower ? 'with-refund' : 'with-actions') : undefined}>
-      {header}
+    <main class={`battle-screen ${showActions ? (canRefund && tower ? 'with-refund' : 'with-actions') : ''}`.trim()}>
+      <h1 class="visually-hidden">3Guo Tower Defense</h1>
       <div class="hud">
         <strong aria-label={`Silver: ${round.silver}`}><span class="coin" aria-hidden="true" />{round.silver} silver</strong>
         <span>{round.lives} lives</span>
@@ -464,7 +471,8 @@ function App() {
                   <span>
                     <strong>Build {towerDetails[kind].name}</strong>
                     <span class="card-price">{towerPrice} silver</span>
-                    <small>{kind === 'archer' ? 'Damage · solid range' : 'Slow · dashed range'}</small>
+                    <small><i class={`range-key ${kind}`} aria-hidden="true" />
+                      {kind === 'archer' ? 'Damage' : 'Slow'}</small>
                   </span>
                 </button>
               ))}
