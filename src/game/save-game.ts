@@ -1,7 +1,7 @@
 import { campaign } from './campaign'
 import { campaign as legacyCampaign } from './legacy-campaign'
 import { columns, rows } from './board'
-import { attackerName, roundFormation, speedOptions, waveOptions } from './round'
+import { attackerName, levelPrepMs, roundFormation, speedOptions, waveOptions } from './round'
 import type { PlaySpeed, Round } from './round'
 
 const saveKey = '3guotd.saved-game.v1'
@@ -25,6 +25,10 @@ const stats = (value: unknown): boolean => record(value)
 function decodeRound(value: unknown, mission: Round['mission']): Round | null {
   if (!record(value)) return null
   if (typeof value.phase !== 'string' || !['setup', 'running', 'won', 'lost'].includes(value.phase)
+    || (value.continuedStory !== undefined && (value.continuedStory !== true || !mission || mission.level < 2))
+    || (value.levelPrepRemainingMs !== undefined && (!value.continuedStory || !mission || value.phase !== 'setup'
+      || value.waveNumber !== 1 || !integer(value.levelPrepRemainingMs) || value.levelPrepRemainingMs < 1
+      || value.levelPrepRemainingMs > levelPrepMs))
     || (value.rulesVersion !== undefined && value.rulesVersion !== 2)
     || !integer(value.waveNumber) || value.waveNumber < 1
     || !integer(value.totalWaves) || value.waveNumber > value.totalWaves

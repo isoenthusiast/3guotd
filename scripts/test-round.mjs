@@ -14,7 +14,7 @@ try {
   ], { stdio: 'inherit' })
 
   const {
-    createRound, startRound, advanceRound, tickRound, canBuildAt, buildTower, upgradeTower, removeTower, retryRound,
+    createRound, prepareNextLevel, enemyMaxHealth, startRound, advanceRound, tickRound, canBuildAt, buildTower, upgradeTower, removeTower, retryRound,
     towerPrice, startingSilver, baseUpgradePrice, secondUpgradeSurcharge, towerRange, towerDetails,
     shotFlightTime, enemiesRemaining, enemyCount, enemyDetails, waveFormation, evacuatedGroups, roundFormation, roundRoutes,
   } = require(join(output, 'round.js'))
@@ -247,13 +247,15 @@ try {
     return Array.from({ length: columns * rows }, (_, cell) => cell)
       .filter(cell => canBuildAt(level, cell)).sort((a, b) => score(b) - score(a))
   }
-  function playMission(mission, policy = {}) {
-    let level = createRound(policy.waves ?? 20, mission)
+  function playMission(mission, policy = {}, opening) {
+    let level = opening ?? createRound(policy.waves ?? 20, mission)
     const sites = rankedSites(level, policy.coverageOnly)
     sites.slice(0, 3).forEach((cell, index) => {
       level = buildTower(level, cell, index === (policy.drumIndex ?? 1) ? 'drum' : 'archer')
     })
-    level = startRound(level)
+    if (level.levelPrepRemainingMs !== undefined) {
+      for (let i = 0; i < 200; i++) level = tickRound(level, 3)
+    } else level = startRound(level)
     for (let step = 0; step < 14000 && level.phase === 'running'; step++) {
       level = tickRound(level, 3)
       if (level.phase !== 'running' || policy.fixed || level.waveNumber > (policy.freezeAfter ?? Infinity)) continue
@@ -300,6 +302,34 @@ try {
   }
   console.log('Passed: 30 campaign clears, route geometry, sequential unlocks, alternating routes, and site closures.')
 
+  for (const battle of battles) {
+    let previous
+    for (const mission of campaign.filter(level => level.battleId === battle.id)) {
+      const [drumIndex, spacing, minimum, strong = false] = plans[mission.id] ?? [0, 3, 3]
+      const opening = previous && prepareNextLevel(previous, mission)
+      if (opening) {
+        assert.deepEqual(opening.towers, previous.towers.map(tower => ({ ...tower, cooldown: 0 })))
+        assert.equal(opening.silver, previous.silver + startingSilver)
+        const fresh = createRound(20, mission)
+        assert(enemyMaxHealth(opening, 'runner') > enemyMaxHealth(fresh, 'runner'))
+        let timed = opening
+        for (let i = 0; i < 199; i++) timed = tickRound(timed, 3)
+        assert.equal(timed.phase, 'setup')
+        assert.equal(timed.levelPrepRemainingMs, 50)
+        timed = tickRound(timed, 3)
+        assert.equal(timed.phase, 'running')
+        const faster = tickRound(tickRound(timed, 1), 1)
+        const normal = tickRound(tickRound(startRound(fresh), 1), 1)
+        // Compare movement without interference from the carried defenses.
+        const empty = tickRound(tickRound({ ...timed, towers: [] }, 1), 1)
+        assert(empty.enemies[0].progress > normal.enemies[0].progress)
+        assert.equal(faster.continuedStory, true)
+      }
+      previous = playMission(mission, { drumIndex, spacing, minimum, strong, upgrade: true }, opening)
+      assert.equal(previous.phase, 'won', `${mission.id} winnable with retained defenses`)
+    }
+  }
+  console.log('Passed: six continuous stories with retained upgrades, timed starts, faster and tougher enemies.')
   const archerFailures = campaign.filter(mission =>
     playMission(mission, { drumIndex: -1, coverageOnly: true }).phase === 'lost')
   const fixedFailures = campaign.filter(mission => mission.battleId === 'village-watch'

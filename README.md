@@ -12,6 +12,8 @@ Choose 20, 40, 60, 80, or 100 waves before the battle. Waves advance automatical
 
 Choose **Campaign** to start at Village Watch. There are six battle maps and five levels per map. Clear a level to unlock the next one. The fifth level on each map ends with a pursuit commander and opens the battle’s Chronicle. Progress is saved by level ID in this browser, including earlier Changban clears.
 
+Between levels of the same battle, towers keep their positions and upgrades. Unspent silver carries over, and each new level grants 90 silver. You have ten seconds to build or upgrade before the first wave starts automatically. Pause or open the menu to hold the countdown. During continuous play, each level after the first adds 8% of base movement speed and 12% of formation health, reaching +32% speed and +48% health at level five.
+
 Maps add different pressures. Red Cliffs and Jing have two approaches. Yiling marks tower sites that close on the next wave, refunds affected towers, and gives you five seconds to rebuild before attackers arrive. Wuzhang tracks supply deliveries. The current campaign uses the existing Archer and Drum towers. Road heroes and their upgrade economy are future systems. **Long battle** retains the 20–100 wave choices.
 
 ## Main menu and saves

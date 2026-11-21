@@ -117,7 +117,11 @@ export function attackerName(kind: Enemy['kind']): string {
 
 type Opening = Pick<Round, 'towers' | 'silver' | 'lives'>
 
+export const levelPrepMs = 10_000
+
 export type Round = {
+  continuedStory?: true
+  levelPrepRemainingMs?: number
   rulesVersion?: 2
   phase: 'setup' | 'running' | 'won' | 'lost'
   totalWaves: number
@@ -150,6 +154,22 @@ export function createRound(totalWaves = 20, mission: Mission | null = null): Ro
   }
 }
 
+export function prepareNextLevel(round: Round, next: Mission): Round {
+  if (round.phase !== 'won' || next.battleId !== round.mission?.battleId || next.level !== round.mission.level + 1) return round
+  return {
+    ...createRound(20, next), continuedStory: true, levelPrepRemainingMs: levelPrepMs,
+    towers: round.towers.map(tower => ({ ...tower, cooldown: 0 })), silver: round.silver + startingSilver,
+  }
+}
+
+function storySteps(round: Round): number {
+  return round.continuedStory && round.mission ? round.mission.level - 1 : 0
+}
+
+export function enemyMaxHealth(round: Round, kind: AttackerKind): number {
+  return Math.ceil((attackers[kind].health + (roundFormation(round).healthBonus ?? 0)) * (1 + storySteps(round) * 0.12))
+}
+
 export function startRound(round: Round): Round {
   if (round.phase !== 'setup') return round
   const opening = { towers: round.towers, silver: round.silver, lives: round.lives }
@@ -158,7 +178,7 @@ export function startRound(round: Round): Round {
 
 export function retryRound(round: Round): Round {
   if (!round.opening) return round
-  return { ...createRound(round.totalWaves, round.mission), mission: round.mission, rulesVersion: round.rulesVersion, waveNumber: round.waveNumber, previousWave: round.previousWave, ...round.opening }
+  return { ...createRound(round.totalWaves, round.mission), mission: round.mission, ...(round.continuedStory && { continuedStory: true as const }), rulesVersion: round.rulesVersion, waveNumber: round.waveNumber, previousWave: round.previousWave, ...round.opening }
 }
 
 export function roundFormation(round: Round): Formation {
@@ -278,7 +298,7 @@ export function advanceRound(round: Round, seconds: number, visualSeconds = seco
     }
     return {
       ...enemy, slowed: speedFactor < 1,
-      progress: Math.min(path.length - 1, enemy.progress + seconds * enemyDetails(enemy).speed * speedFactor
+      progress: Math.min(path.length - 1, enemy.progress + seconds * enemyDetails(enemy).speed * (1 + storySteps(round) * 0.08) * speedFactor
         * (enemy.kind === 'commander' && round.enemies.some(other => other.id < enemy.id) ? 0 : 1)),
     }
   })
@@ -322,7 +342,7 @@ export function advanceRound(round: Round, seconds: number, visualSeconds = seco
   if (spawned < formation.sequence.length && spawnTimer <= 0) {
     const kind = formation.sequence[spawned]
     const routeIndex = (round.waveNumber + spawned - 1) % roundRoutes(round).length
-    enemies.push({ id: spawned, kind, health: attackers[kind].health + (formation.healthBonus ?? 0), progress: 0, slowed: false, routeIndex })
+    enemies.push({ id: spawned, kind, health: enemyMaxHealth(round, kind), progress: 0, slowed: false, routeIndex })
     spawned++
     spawnTimer += formation.interval ?? spawnInterval
   }
@@ -342,7 +362,7 @@ export function advanceRound(round: Round, seconds: number, visualSeconds = seco
   })
   const cleared = spawned === formation.sequence.length && enemies.length === 0
   if (lives > 0 && cleared && round.waveNumber < round.totalWaves) {
-    const next = { ...createRound(round.totalWaves, round.mission), mission: round.mission, rulesVersion: round.rulesVersion, waveNumber: round.waveNumber + 1 }
+    const next = { ...createRound(round.totalWaves, round.mission), mission: round.mission, ...(round.continuedStory && { continuedStory: true as const }), rulesVersion: round.rulesVersion, waveNumber: round.waveNumber + 1 }
     const closed = closedSites(next)
     const needsRebuild = closed.length > closedSites(round).length
     const remaining = towers.filter(tower => !closed.includes(tower.site))
@@ -361,6 +381,11 @@ export function advanceRound(round: Round, seconds: number, visualSeconds = seco
 }
 
 export function tickRound(round: Round, speed: PlaySpeed): Round {
+  if (round.phase === 'setup' && round.levelPrepRemainingMs !== undefined) {
+    const remaining = round.levelPrepRemainingMs - 50
+    if (remaining > 0) return { ...round, levelPrepRemainingMs: remaining }
+    return startRound({ ...round, levelPrepRemainingMs: undefined })
+  }
   for (let step = 0; step < speed && round.phase === 'running'; step++) {
     round = advanceRound(round, 0.05, 0.05 / speed)
   }

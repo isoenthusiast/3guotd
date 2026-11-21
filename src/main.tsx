@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { columns, rows, sitePosition } from './game/board'
 import {
   attackerName, baseUpgradePrice, buildTower, canBuildAt, canSpend, closedSites, createRound, enemiesRemaining, objectiveProgress, removeTower,
-  secondUpgradeSurcharge, roundRoutes,
+  secondUpgradeSurcharge, roundRoutes, prepareNextLevel,
   retryRound, speedOptions, startRound, tickRound, towerDetails, towerPrice, upgradePrice,
   upgradeTower, waveCueTime, roundFormation, waveOptions,
 } from './game/round'
@@ -102,9 +102,9 @@ function Battlefield({ round, selected, onSelect }: {
       <div class="cells" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
         gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))` }} role="group" aria-label="Battlefield tiles. Use arrow keys to select a nearby tile.">
         {Array.from({ length: siteCount }, (_, site) => {
-          if (!canBuildAt(round, site)) return <span key={site} aria-hidden="true" />
-          const [x, y] = sitePosition(site)
           const tower = round.towers.find(candidate => candidate.site === site)
+          if (!tower && !canBuildAt(round, site)) return <span key={site} aria-hidden="true" />
+          const [x, y] = sitePosition(site)
           const label = tower ? towerDetails[tower.kind].name : 'Empty tile'
           return (
             <button key={site} ref={button => { cells.current[site] = button }}
@@ -172,9 +172,10 @@ function App() {
   const upcomingClosures = (mission?.closedSites?.[round.waveNumber]?.length ?? 0) > closedSites(round).length
   const setup = round.phase === 'setup'
   const [paused, setPaused] = useState(false)
+  const preparingLevel = round.levelPrepRemainingMs !== undefined
   const initialSetup = setup && round.waveNumber === 1
   const finished = round.phase === 'won' || round.phase === 'lost'
-  const activeSite = selected !== null && canBuildAt(round, selected) ? selected : null
+  const activeSite = selected !== null && (canBuildAt(round, selected) || round.towers.some(tower => tower.site === selected)) ? selected : null
   const tower = round.towers.find(candidate => candidate.site === activeSite)
   const price = tower ? upgradePrice(tower) : towerPrice
   const shortfall = Math.max(0, price - round.silver)
@@ -190,6 +191,10 @@ function App() {
       : round.waveAge < waveCueTime
       ? `Wave ${round.waveNumber} starts · ${formation.name}`
       : `${enemiesRemaining(round)} of ${formation.sequence.length} attackers`
+  }
+  if (preparingLevel) {
+    const seconds = Math.ceil(round.levelPrepRemainingMs! / 1000)
+    status = `Level ${mission?.level} · Wave 1 in ${seconds}s${paused ? ' · Paused' : ''}`
   }
   const breach = round.gateHit && !paused && `${attackerName(round.gateHit.kind)} reached the gate`
   const showWaveStart = running && round.waveAge < waveCueTime
@@ -210,6 +215,14 @@ function App() {
     }
   }, [round.phase, mission, clears])
 
+  useEffect(() => {
+    if (screen !== 'battle' || round.phase !== 'won' || !upcoming || upcoming.battleId !== mission?.battleId) return
+    setRound(current => prepareNextLevel(current, upcoming))
+    setDraftMission(upcoming)
+    selectTile(null)
+    setPaused(false)
+  }, [screen, round.phase, mission, upcoming])
+
   function showMenu() {
     previousAudio.current = null
     setNotice('')
@@ -221,7 +234,7 @@ function App() {
     setConfirmation(null)
     setRound(next)
     setHasRun(true)
-    setPaused(restore && next.phase === 'running')
+    setPaused(restore && (next.phase === 'running' || next.levelPrepRemainingMs !== undefined))
     selectTile(null)
     previousAudio.current = null
     if (sound) enableAudio()
@@ -259,12 +272,12 @@ function App() {
   }
 
   useEffect(() => {
-    if (screen !== 'battle' || !running || paused) return
+    if (screen !== 'battle' || (!running && !preparingLevel) || paused) return
     const timer = window.setInterval(() => {
       if (!document.hidden) setRound(current => tickRound(current, speed))
     }, 50)
     return () => window.clearInterval(timer)
-  }, [screen, running, speed, paused])
+  }, [screen, running, preparingLevel, speed, paused])
 
   useEffect(() => {
     const previous = previousAudio.current
@@ -443,15 +456,15 @@ function App() {
       <div class="map-controls">
         <button type="button" class="pause-control" aria-label="Main menu" onClick={showMenu}>Menu</button>
         {speedPicker}
-        {running && <button type="button" class="pause-control" onClick={() => setPaused(value => !value)}>
+        {(running || preparingLevel) && <button type="button" class="pause-control" onClick={() => setPaused(value => !value)}>
           {paused ? 'Resume' : 'Pause'}
         </button>}
         <div class="round-controls">
           {setup ? (
             <>
-              <button type="button" class="primary"
-                onClick={() => setRound(startRound)}>Start wave</button>
-              {initialSetup && round.towers.length > 0 && !(canRefund && tower) && <button type="button"
+              {!preparingLevel && <button type="button" class="primary"
+                onClick={() => setRound(startRound)}>Start wave</button>}
+              {initialSetup && !round.continuedStory && round.towers.length > 0 && !(canRefund && tower) && <button type="button"
                 onClick={() => { setRound(createRound(round.totalWaves, mission)); selectTile(null) }}>Clear towers</button>}
               {canRefund && tower && <button type="button"
                 onClick={() => setRound(current => removeTower(current, tower.site))}>Remove &amp; refund</button>}
@@ -463,8 +476,8 @@ function App() {
               selectTile(null)
             }}>Retry wave</button>
           )}
-          {round.phase === 'won' && upcoming && <button class="primary" type="button"
-            onClick={() => openMission(upcoming)}>{upcoming.battleId === mission?.battleId ? 'Next level' : 'Next battle'}</button>}
+          {round.phase === 'won' && upcoming && upcoming.battleId !== mission?.battleId && <button class="primary" type="button"
+            onClick={() => openMission(upcoming)}>Next battle</button>}
           {finished && <button type="button"
             onClick={() => enterBattle(createRound(round.totalWaves, mission))}>{mission ? 'Restart level' : 'New battle'}</button>}
         </div>

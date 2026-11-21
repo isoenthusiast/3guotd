@@ -1,5 +1,5 @@
 import { columns, rows, sitePosition } from './game/board'
-import { canBuildAt, closedSites, enemyDetails, enemyPosition, impactTime, roundFormation, roundRoutes, routeForEnemy, shotFlightTime, towerRange } from './game/round'
+import { canBuildAt, closedSites, enemyDetails, enemyPosition, impactTime, enemyMaxHealth, roundRoutes, routeForEnemy, shotFlightTime, towerRange } from './game/round'
 import type { Round, TowerKind } from './game/round'
 
 import { paintArt } from './battlefield-art-assets'
@@ -369,7 +369,7 @@ export function drawBattlefield(
   }
   for (const enemy of round.enemies) {
     const [x, y] = targets.get(enemy.id)!
-    const max = enemyDetails(enemy).health + (roundFormation(round).healthBonus ?? 0)
+    const max = enemyMaxHealth(round, enemy.kind)
     const width = 46
     ctx.fillStyle = '#262827'
     const barX = Math.max(width / 2 + 2, Math.min(columns * tile - width / 2 - 2, x))
