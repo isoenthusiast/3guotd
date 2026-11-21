@@ -153,7 +153,7 @@ export function drawBattlefield(
     label: routes.length > 1 ? `Entry ${index + 1}` : 'Entry',
     point: center(path[0]),
   }))
-  landmarks.push({ label: round.mission?.gate ?? 'Shu Outpost Gate', point: [gateX, gateY] })
+  landmarks.push({ label: round.mission?.gate ?? 'Shu Outpost Gate', point: [gateX, objective ? gateY - 48 : gateY] })
   ctx.font = 'bold 21px system-ui'
   for (const { label, point: [x, y] } of landmarks) {
     const right = x < columns * tile / 2

@@ -13,3 +13,9 @@
 | GF-049 | Put ferries at Jing’s landing and delivery carts at Wuzhang. Reflect milestone progress in the scene. | Compare mission-specific landmarks and milestone states. |
 
 Earlier playtest findings GF-020, GF-023, GF-025 and GF-028 have engineering checks. Their acceptance criteria also call for observations of first-time placement, purchase discovery, understanding Drum effects, and engagement during longer runs. Record actual player observations in gameflow.db.
+
+## Acceptance
+
+SimaYi verified GF-038 through GF-050 on `3a32e9c` and accepted the game for private playtesting. Chromium checked the stationary board at both phone sizes and captured the ferry and cart moving through real objective transitions from seeded wave-end states. A small overlap between the ferry and its label at 320 × 480 prompted a follow-up to move the landmark label above the animation.
+
+The model suite found a winning mixed defense for every mission. The audited Archer-only policy lost five missions. A static Village Watch opening won the first mission and lost the other four. In Long battle, the fixed opening lost on wave 12 and active builds won the 20- and 40-wave runs. These tests measure game rules. The four earlier player-observation findings remain in progress.
