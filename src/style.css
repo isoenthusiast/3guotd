@@ -39,9 +39,22 @@ figcaption, header p {
   transform: translate(-50%, -50%);
   display: grid;
   place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.tower-marker {
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
   width: clamp(27px, 8vw, 44px);
   aspect-ratio: 1;
-  padding: 0;
+  pointer-events: none;
   border-radius: .4rem;
   border: 1px solid #d6c397;
   background: #25352c;
@@ -49,12 +62,13 @@ figcaption, header p {
   font-size: 1rem;
 }
 
-.tower-site[aria-pressed="true"] {
+.tower-site[aria-pressed="true"] .tower-marker {
   color: #18251f;
   background: #edbd74;
 }
 
-.tower-site[aria-pressed="false"]:disabled { opacity: .45; }
+.tower-site:focus-visible { outline: 2px solid #fff4c5; }
+.tower-site[aria-pressed="false"]:disabled .tower-marker { opacity: .45; }
 .controls { display: flex; gap: .75rem; margin-top: 1rem; }
 
 .controls button {

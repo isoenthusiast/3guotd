@@ -6,7 +6,7 @@ export const towerSites: readonly Point[] = [
   [2, 3], [4, 4], [5, 6], [7, 4], [9, 3], [10, 1],
 ]
 export const towerBudget = 3
-const enemyCount = 9
+export const enemyCount = 9
 const spawnInterval = 1.3
 const speed = 1.6
 export const towerRange = 1.8
@@ -34,6 +34,17 @@ export type Round = {
 
 export function createRound(): Round {
   return { phase: 'setup', towers: [], enemies: [], shots: [], impacts: [], lives: initialLives, spawned: 0, spawnTimer: 0 }
+}
+
+export function retryRound(round: Round): Round {
+  return {
+    ...createRound(),
+    towers: round.towers.map(({ site }) => ({ site, cooldown: 0 })),
+  }
+}
+
+export function enemiesRemaining(round: Round): number {
+  return enemyCount - round.spawned + round.enemies.length
 }
 
 export function toggleTower(round: Round, site: number): Round {

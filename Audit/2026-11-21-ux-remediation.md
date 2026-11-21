@@ -1,0 +1,9 @@
+# AUD-002 UX remediation · 2026-11-21
+
+| ID | Root cause | Fix and prevention rationale | Verification |
+|---|---|---|---|
+| GF-006 | The visible marker and its touch target shared the same size. | Give the button a fixed 44 × 44 px hit area around its compact marker. That prevents responsive marker scaling from shrinking the target. A documented narrow-viewport check catches target overlap when site geometry changes. | Touch-enabled Chromium at 320 and 360 px confirmed all six rectangles were 44 × 44 px and distinct. Tapping near each corner outside its marker toggled only that tower. |
+| GF-007 | A single Reset action cleared combat and setup together. | Retry reconstructs combat state from a fresh round and retains only site selections. Clear towers is a separate setup action. A round regression test protects the distinction after future model changes. | Model test confirmed a fresh round with the same placement. In Chromium, retry after a complete loss and retry mid-wave kept the site. Clear towers removed it. |
+| GF-008 | The HUD lacked a count derived from wave state. | Derive the running count from live attackers and pending spawns. Show it in place of the setup help while the wave is running. Regression checks cover spawning, kills, and escapes so the count stays accurate when timing or wave rules change. | In Chromium the HUD showed nine at wave start and after spawning, then eight after an escape. The model test exercised removal by kills and escapes across all 42 layouts. The board stayed in place when the wave started. |
+
+SimaYi reviewed the changes independently and found no source-level blocker. KongMing completed the requested live-browser checks in offline mode on the production preview. TypeScript, the 42-layout simulation, and the build passed. All three findings are verified in `gameflow.db`.

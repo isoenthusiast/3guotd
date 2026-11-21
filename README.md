@@ -1,6 +1,6 @@
 # 3Guo Tower Defense
 
-A web-first tower defense starter built with Preact, TypeScript, Canvas 2D, and Vite. The starter includes one playable wave. Tap up to three tower sites, select Start wave, and survive with at least one life. Select Reset to try a different placement.
+A web-first tower defense starter built with Preact, TypeScript, Canvas 2D, and Vite. The starter includes one playable wave. Tap up to three tower sites, select Start wave, and survive with at least one life. Select **Retry round** to keep your towers and adjust the layout, or **Clear towers** in setup to start with an empty board.
 
 ## Local development
 
@@ -33,4 +33,6 @@ Open [3Guo Tower Defense](https://edward-z370-hd3.tail94dc7a.ts.net:8472/) on a 
 
 Commit the reviewed changes, then run `bash scripts/publish.sh` on Ed-Z370. The script builds and tests the committed source in staging and switches the active release with one rename. It prints the published commit for the audit record. `npm run build` is available for local verification in `dist/`.
 
-For changes to the offline update path, open the old release and leave a tab open when publishing the new build. Check that the new worker waits and that the old tab can still reload offline. Close all game tabs and reopen to let the waiting worker activate. Confirm the new release then reloads offline. For private-link changes, also record a check from an intended tailnet device.
+For changes to the offline update path, open the old release and leave a tab open when publishing the new build. Check that the new worker waits and that the old tab can still reload offline. Close all game tabs and reopen to let the waiting worker activate. Confirm the new release then reloads offline.
+
+For changes to the board layout or round controls, verify touch at a 320 px viewport. Check that each tower has a distinct 44 × 44 px hit area. Complete a round, confirm the HUD count includes pending spawns, and check that **Retry round** keeps the layout while **Clear towers** removes it. For private-link changes, also record a check from an intended tailnet device.

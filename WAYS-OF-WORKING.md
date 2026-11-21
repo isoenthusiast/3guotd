@@ -24,7 +24,13 @@ Whenever adding an agent, create a dedicated Herdr pane in this workspace. Read 
 
 ## Audit follow-up
 
-Record SimaYi’s reviews and track findings, actions, and preventive methods in [Audit](Audit/README.md). For each finding, confirm its cause, plan a fix, and check whether the plan also prevents recurrence. Add a separate preventive step only when needed. Replan if the fix fails the acceptance check. Record the action, test evidence, and learning before closing the finding.
+Record every audit finding in [Audit](Audit/README.md) and work it through to verified closure.
+
+1. Identify the root cause and define the acceptance check.
+2. Plan a fix for that cause. Check whether the plan fixes the issue and prevents recurrence.
+3. Add a preventive step when the fix alone will not prevent recurrence. Replan if the solution will not fix the issue.
+4. Implement the fix and test it against the finding. Ask SimaYi to review the evidence for closure.
+5. Record the action taken, prevention, verification, and learning in `Audit/gameflow.db`. Report completed fixes. If a finding is blocked, keep it open and report the specific blocker.
 
 ## Recording decisions
 

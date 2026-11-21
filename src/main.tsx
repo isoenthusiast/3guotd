@@ -1,7 +1,7 @@
 import { render } from 'preact'
 import { useEffect, useRef, useState } from 'preact/hooks'
 import { columns, route, rows } from './game/board'
-import { advanceRound, createRound, enemyMaxHealth, enemyPosition, impactTime, shotFlightTime, toggleTower, towerBudget, towerRange, towerSites } from './game/round'
+import { advanceRound, createRound, enemiesRemaining, enemyCount, enemyMaxHealth, enemyPosition, impactTime, retryRound, shotFlightTime, toggleTower, towerBudget, towerRange, towerSites } from './game/round'
 import type { Round } from './game/round'
 import './style.css'
 
@@ -118,7 +118,9 @@ function Battlefield({ round, onToggle }: { round: Round; onToggle: (site: numbe
             style={{ left: `${(x + 0.5) / columns * 100}%`, top: `${(y + 0.5) / rows * 100}%` }}
             disabled={round.phase !== 'setup' || (!placed && round.towers.length >= towerBudget)}
             aria-label={`Tower site ${site + 1}`} aria-pressed={placed}
-            onClick={() => onToggle(site)}>{placed ? '▲' : '+'}</button>
+            onClick={() => onToggle(site)}>
+              <span class="tower-marker" aria-hidden="true">{placed ? '▲' : '+'}</span>
+            </button>
         )
       })}
     </div>
@@ -129,6 +131,7 @@ function App() {
   const [status, setStatus] = useState('')
   const [round, setRound] = useState(createRound)
   const running = round.phase === 'running'
+  const settingUp = round.phase === 'setup'
 
   useEffect(() => {
     if (!running) return
@@ -162,17 +165,26 @@ function App() {
         <h1>3Guo Tower Defense</h1>
         {status && <p role="status">{status}</p>}
       </header>
-      <p>Tap marked sites to place up to three towers. The circles show firing range. Cover the bends, then start the wave.</p>
-      <p role="status">Lives: {round.lives} · Towers: {round.towers.length}/{towerBudget}
-        {round.phase === 'won' && ' · Gate defended!'}
-        {round.phase === 'lost' && ' · The gate fell.'}
-      </p>
+      <p role="status">Lives: {round.lives} · Towers: {round.towers.length}/{towerBudget}</p>
       <Battlefield round={round} onToggle={site => setRound(current => toggleTower(current, site))} />
       <div class="controls">
-        <button type="button" disabled={round.phase !== 'setup'}
-          onClick={() => setRound(current => ({ ...current, phase: 'running' }))}>Start wave</button>
-        <button type="button" onClick={() => setRound(createRound())}>Reset</button>
+        {settingUp ? (
+          <>
+            <button type="button"
+              onClick={() => setRound(current => ({ ...current, phase: 'running' }))}>Start wave</button>
+            <button type="button" disabled={round.towers.length === 0}
+              onClick={() => setRound(createRound())}>Clear towers</button>
+          </>
+        ) : (
+          <button type="button" onClick={() => setRound(retryRound)}>Retry round</button>
+        )}
       </div>
+      {settingUp && <p>Tap marked sites to place up to three towers. The circles show firing range. Cover the bends, then start the wave.</p>}
+      <p role="status" class="wave-status">
+        {running && `Enemies remaining: ${enemiesRemaining(round)} of ${enemyCount}`}
+        {round.phase === 'won' && 'Gate defended!'}
+        {round.phase === 'lost' && 'The gate fell.'}
+      </p>
     </main>
   )
 }
