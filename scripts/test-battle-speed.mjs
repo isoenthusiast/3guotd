@@ -59,6 +59,11 @@ try {
   }
 
   await checkDock()
+  await button('Empty tile, row 1, column 9').tap()
+  assert.match(await cards.first().innerText(), /Out of range/)
+  await checkDock()
+  await button('Empty tile, row 1, column 9').tap()
+  await button('Select marked site').tap()
   await speed(1).tap()
   await speed(2).tap()
   await speed(3).tap()

@@ -645,8 +645,9 @@ function App() {
                   <TowerPortrait kind={kind} />
                   <span><strong>Build {towerDetails[kind].name}</strong>
                     <span>{towerPrice} silver</span></span>
-                  <small><i class={`range-key ${kind}`} aria-hidden="true" />{coverage?.[kind].reachesRoad
-                    ? `${kind === 'archer' ? 'Hit' : 'Slow'} · ${coverage[kind].zones[0]}` : 'Road out of range'}</small>
+                  <small>{coverage?.[kind].reachesRoad
+                    ? <><i class={`range-key ${kind}`} aria-hidden="true" />{kind === 'archer' ? 'Hit' : 'Slow'} · {coverage[kind].zones[0]}</>
+                    : 'Out of range'}</small>
                 </button>
               ))}
             </section>

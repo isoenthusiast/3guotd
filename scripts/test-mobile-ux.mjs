@@ -96,7 +96,7 @@ async function checkPhone(width, height, previousBoardWidth, insets = { top: 0, 
     console.log(`Board at ${width} × ${height}: ${original.width.toFixed(1)} × ${original.height.toFixed(1)}, tile ${box.width.toFixed(1)} px.`)
     await button('Empty tile, row 1, column 9').tap()
     await checkFrame()
-    assert.match(await card('Archer').innerText(), /Road out of range/)
+    assert.match(await card('Archer').innerText(), /Out of range/)
     for (const kind of ['Archer', 'Drum', 'Archer']) {
       await page.locator('button.useful-site').first().tap()
       await checkFrame()
