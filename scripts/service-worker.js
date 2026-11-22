@@ -5,6 +5,15 @@ const index = new URL('./index.html', scope).href
 const appRoot = new URL('./', scope).href
 const assetUrls = new Set(assets.map(asset => new URL(asset, scope).href))
 
+self.addEventListener('message', event => {
+  if (event.data?.type !== 'OFFLINE_STATUS' || !event.ports[0]) return
+  event.waitUntil((async () => {
+    const cache = await caches.open(cacheName)
+    const matches = await Promise.all([...assetUrls].map(url => cache.match(url)))
+    event.ports[0].postMessage({ type: 'OFFLINE_STATUS', version, ready: matches.every(Boolean) })
+  })())
+})
+
 self.addEventListener('install', event => {
   const requests = [...assetUrls].map(url => new Request(url, { cache: 'reload' }))
   event.waitUntil(caches.open(cacheName).then(cache => cache.addAll(requests)))

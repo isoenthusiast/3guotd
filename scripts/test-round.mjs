@@ -384,7 +384,7 @@ try {
     getItem: key => local.get(key) ?? null,
     setItem: (key, value) => local.set(key, value),
   } })
-  const { loadGame, saveGame, loadSound, saveSound } = require(join(output, 'save-game.js'))
+  const { loadGame, saveGame, loadCheckpoint, saveCheckpoint, loadSound, saveSound } = require(join(output, 'save-game.js'))
   assert.equal(loadGame(), null)
   assert.equal(loadSound(), false)
   saveSound(true)
@@ -433,6 +433,31 @@ try {
   }
   assert.equal(nextMission({ ...campaign[0], id: 'unknown' }), undefined)
   console.log('Passed: legacy saves resume/retry with old rules, restart with current rules, and navigate by mission ID.')
+  const manualBytes = local.get('3guotd.saved-game.v1')
+  assert.equal(loadCheckpoint(), null)
+  assert.equal(saveCheckpoint(arrivals, 3), true)
+  assert.deepEqual(loadCheckpoint(), { round: arrivals, speed: 3 })
+  const originalSet = localStorage.setItem
+  let repeatedWrites = 0
+  localStorage.setItem = (...args) => { repeatedWrites++; originalSet(...args) }
+  assert.equal(saveCheckpoint(arrivals, 3), true)
+  assert.equal(repeatedWrites, 0, 'An unchanged validated checkpoint does not hit storage again')
+  localStorage.setItem = originalSet
+  const goodCheckpoint = local.get('3guotd.checkpoint.v1')
+  for (const bad of [{ ...arrivals, lives: -1 }, { ...arrivals, opening: null }, { ...arrivals, spawned: 999 }]) {
+    assert.equal(saveCheckpoint(bad, 3), false)
+    assert.equal(local.get('3guotd.checkpoint.v1'), goodCheckpoint, 'Invalid states cannot replace a valid checkpoint')
+  }
+  assert.equal(local.get('3guotd.saved-game.v1'), manualBytes, 'Automatic saves never overwrite the manual slot')
+  local.set('3guotd.checkpoint.v1', '{broken')
+  assert.equal(loadCheckpoint(), null)
+  local.set('3guotd.checkpoint.v1', manualBytes)
+  assert.ok(loadCheckpoint(), 'Old unversioned rules remain valid in a separate checkpoint')
+  const goodSetItem = localStorage.setItem
+  localStorage.setItem = () => { throw new Error('Quota exceeded') }
+  assert.equal(saveCheckpoint(arrivals, 3), false)
+  localStorage.setItem = goodSetItem
+  console.log('Passed: independent validated checkpoint, corrupt data, old saves, and storage failure.')
   const malformed = JSON.parse(local.get('3guotd.saved-game.v1'))
   malformed.round.phase = ['running']
   local.set('3guotd.saved-game.v1', JSON.stringify(malformed))

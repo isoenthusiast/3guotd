@@ -6,7 +6,7 @@ import type { PlaySpeed, Round } from './round'
 
 const saveKey = '3guotd.saved-game.v1'
 const soundKey = '3guotd.sound.v1'
-type SavedGame = { round: Round; speed: PlaySpeed }
+export type SavedGame = { round: Round; speed: PlaySpeed }
 
 type Data = Record<string, unknown>
 const record = (value: unknown): value is Data => value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -57,9 +57,8 @@ function decodeRound(value: unknown, mission: Round['mission']): Round | null {
   return round.spawned <= roundFormation(round).sequence.length ? round : null
 }
 
-export function loadGame(): SavedGame | null {
+function decodeSaved(data: unknown): SavedGame | null {
   try {
-    const data: unknown = JSON.parse(localStorage.getItem(saveKey) ?? 'null')
     if (!record(data) || (data.version !== 1 && data.version !== 2)) return null
     const missions = record(data.round) && data.round.rulesVersion === 2 ? campaign : legacyCampaign
     const mission = data.missionId === null ? null : missions.find(level => level.id === data.missionId)
@@ -78,10 +77,33 @@ export function loadGame(): SavedGame | null {
   }
 }
 
+function loadSlot(key: string): SavedGame | null {
+  try { return decodeSaved(JSON.parse(localStorage.getItem(key) ?? 'null')) }
+  catch { return null }
+}
+
+export function loadGame(): SavedGame | null { return loadSlot(saveKey) }
+
+const checkpointKey = '3guotd.checkpoint.v1'
+export function loadCheckpoint(): SavedGame | null { return loadSlot(checkpointKey) }
+
+export function saveCheckpoint(round: Round, speed: PlaySpeed): boolean {
+  // Validate a serialized candidate before replacing the last known-good checkpoint.
+  return saveSlot(checkpointKey, round, speed, true)
+}
+
 export function saveGame(round: Round, speed: PlaySpeed): boolean {
+  return saveSlot(saveKey, round, speed)
+}
+
+function saveSlot(key: string, round: Round, speed: PlaySpeed, validate = false): boolean {
   try {
     const { mission, ...state } = round
-    localStorage.setItem(saveKey, JSON.stringify({ version: 2, missionId: mission?.id ?? null, round: state, speed }))
+    const payload = { version: 2, missionId: mission?.id ?? null, round: state, speed }
+    const serialized = JSON.stringify(payload)
+    if (validate && !decodeSaved(JSON.parse(serialized))) return false
+    if (validate && localStorage.getItem(key) === serialized) return true
+    localStorage.setItem(key, serialized)
     return true
   } catch {
     return false

@@ -356,6 +356,33 @@ button:focus-visible { outline: 2px solid #ffedaf; outline-offset: 2px; }
 }
 .guide-content { overflow-y: auto; }
 .guide-content > :first-child { margin-top: 0; }
+
+/* Continuity surfaces scroll independently of the unchanged battlefield. */
+.run-summary { font-size: .8rem; line-height: 1.3; }
+.run-summary small, .session-actions small, .recovery-card small { display: block; font-size: .75rem; font-weight: normal; line-height: 1.25; }
+.menu-progress, .offline-details, .recovery-card { margin: .4rem 1rem; font-size: .8rem; overflow-wrap: anywhere; }
+.menu-progress summary, .offline-details summary, .story-scene summary, .mission-select summary {
+  box-sizing: border-box; min-height: 44px; padding-block: .65rem; cursor: pointer;
+}
+.menu-progress p, .offline-details p, .recovery-card p { margin-block: .4rem; }
+.recovery-card button { width: 100%; }
+.campaign-progress ol { list-style: none; padding: 0; display: grid; gap: .4rem; }
+.campaign-progress button { width: 100%; text-align: left; }
+.campaign-progress small { display: block; }
+.menu-confirm { overflow-wrap: anywhere; }
+.menu-confirm button { margin-block: .2rem; max-width: 100%; }
+.campaign-options { grid-template-columns: auto minmax(0, 1fr); }
+.setup-screen { min-width: 0; }
+.setup-screen .mission-briefing { min-width: 0; overflow-wrap: anywhere; padding-right: .15rem; }
+.setup-screen .mission-briefing:focus-visible { outline: 2px solid #60291f; outline-offset: -2px; }
+.setup-screen .menu-confirm { min-height: 0; overflow-y: auto; }
+@media (max-height: 650px) {
+  .title-screen header { padding: .45rem 1rem .25rem; }
+  .title-screen.has-run .menu-art { display: none; }
+  .title-screen .menu-actions, .title-screen .session-actions { margin-block: .3rem; }
+  .title-screen .run-summary { margin-block: .35rem; }
+  .title-screen .menu-progress, .title-screen .offline-details { margin-block: 0; }
+}
 @media (max-height: 550px) {
   .field-guide { padding-block: max(6px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-bottom)); }
   .field-guide p { font-size: .85rem; line-height: 1.25; margin-block: .4rem; }

@@ -12,7 +12,9 @@ import { roadCoverage } from './battlefield-scenery'
 import { loadBattlefieldArt } from './battlefield-art-assets'
 import { drawBattlefield, drawTower, tile } from './game-art'
 import { battles, campaign, isMissionUnlocked, nextMission } from './game/campaign'
-import { loadGame, loadSound, saveGame, saveSound } from './game/save-game'
+import { loadSound, saveSound } from './game/save-game'
+import { CampaignProgress, CampaignRecap, campaignDestination, recommendedMission, runLabel, useRecovery } from './continuity'
+import { OfflineDetails, useOfflineReadiness } from './offline-readiness'
 import { enableAudio, playCue } from './sound'
 import { terrainArt } from './terrain-art'
 import villageGate from './assets/village-gate.webp?inline'
@@ -163,10 +165,9 @@ function loadClears(): string[] {
 
 function App() {
   const reportDialog = useRef<HTMLDialogElement>(null)
-  const [offline, setOffline] = useState('')
+  const offline = useOfflineReadiness()
   const { screen, overlay: confirmation, navigate, back } = useGameNavigation()
   const [hasRun, setHasRun] = useState(false)
-  const [hasSave, setHasSave] = useState(() => loadGame() !== null)
   const [sound, setSound] = useState(loadSound)
   const [notice, setNotice] = useState('')
   useLayoutEffect(() => {
@@ -179,6 +180,8 @@ function App() {
   const [clears, setClears] = useState(loadClears)
   const [selected, setSelected] = useState<number | null>(null)
   const [speed, setSpeed] = useState<PlaySpeed>(1)
+  const recovery = useRecovery(round, speed, hasRun)
+  const hasSave = recovery.manual !== null
   const running = round.phase === 'running'
   const mission = round.mission
   const formation = roundFormation(round)
@@ -316,12 +319,11 @@ function App() {
 
   const unfinishedRun = hasRun && (round.phase === 'setup' || running)
 
-  function restoreGame() {
-    const saved = loadGame()
+  function restoreGame(automatic = false) {
+    const saved = automatic ? recovery.readCheckpoint() : recovery.readManual()
     if (!saved) {
       navigate('menu')
-      setHasSave(false)
-      setNotice('The saved game could not be restored.')
+      setNotice(automatic ? 'The automatic checkpoint could not be restored.' : 'The saved game could not be restored.')
       return
     }
     setSpeed(saved.speed)
@@ -361,19 +363,6 @@ function App() {
     else if (round.impacts.some(hit => hit.elapsed < 0.05 && !previous.impacts.includes(hit))) playCue('hit')
   }, [round, screen, sound, running])
 
-  useEffect(() => {
-    const platform = (window as Window & { Capacitor?: { isNativePlatform(): boolean } }).Capacitor
-    if (!import.meta.env.PROD || document.documentElement.hasAttribute('data-standalone')
-      || platform?.isNativePlatform() || !('serviceWorker' in navigator)) return
-    navigator.serviceWorker.register('./sw.js').catch(() => setOffline('Offline setup failed.'))
-    const ready = () => {
-      if (navigator.serviceWorker.controller) setOffline('Ready offline')
-    }
-    ready()
-    navigator.serviceWorker.addEventListener('controllerchange', ready)
-    return () => navigator.serviceWorker.removeEventListener('controllerchange', ready)
-  }, [])
-
   const speedPicker = (
     <div class="map-setting">
       <label class="visually-hidden" for="speed">Speed</label>
@@ -388,7 +377,7 @@ function App() {
 
   const header = <header>
     <h1>3Guo Tower Defense</h1>
-    {offline && <span class="offline">{offline}</span>}
+    <span class="offline">{offline.status}</span>
   </header>
 
   if (screen === 'menu') {
@@ -396,14 +385,14 @@ function App() {
       {header}
       <h2 class="visually-hidden">Main menu</h2>
       <img class="menu-art" src={villageGate} alt="" />
-      {hasRun && <p>{mission ? `${mission.title} · Level ${mission.level}` : 'Long battle'}
-        {` · Wave ${round.waveNumber} of ${round.totalWaves}`}</p>}
+      {hasRun && <p class="run-summary">Active run · {runLabel(round)}<small>Continue opens this board. Save game replaces the manual slot.</small></p>}
       <div class="menu-actions">
         {hasRun && <button type="button" class="primary" onClick={() => {
           if (sound) enableAudio()
           navigate('battle')
         }}>Continue</button>}
         <button type="button" class={hasRun ? undefined : 'primary'} onClick={() => {
+          setDraftMission(recommendedMission(clears))
           navigate('campaign')
         }}>Campaign</button>
         <button type="button" onClick={() => {
@@ -412,14 +401,15 @@ function App() {
       </div>
       <div class="session-actions">
         <button type="button" disabled={!hasRun} onClick={() => {
-          const saved = saveGame(round, speed)
-          if (saved) setHasSave(true)
-          setNotice(saved ? 'Game saved on this browser.' : 'This browser could not save the game.')
+          const saved = recovery.saveManual()
+          setNotice(saved ? 'Manual save updated on this browser. Automatic recovery is separate.' : 'This browser could not save the game.')
         }}>Save game</button>
         <button type="button" disabled={!hasSave} onClick={() => {
           if (unfinishedRun) navigate('menu', 'restore')
           else restoreGame()
-        }}>Restore saved game</button>
+        }} aria-label="Restore saved game">Restore saved game
+          <small>{recovery.manual ? `Manual · ${runLabel(recovery.manual.round)}` : 'Manual slot empty'}</small>
+        </button>
         {hasRun && confirmation !== 'restart' && <button type="button" onClick={() => navigate('menu', 'restart')}>
           {mission ? 'Restart level' : 'Restart battle'}
         </button>}
@@ -430,14 +420,31 @@ function App() {
           saveSound(enabled)
         }}>Sound {sound ? 'on' : 'off'}</button>
       </div>
+      {!hasRun && recovery.checkpoint && <div class="recovery-card">
+        <button type="button" aria-label="Recover checkpoint" onClick={() => restoreGame(true)}>Recover checkpoint
+          <small>Automatic · {runLabel(recovery.checkpoint.round)}</small>
+        </button>
+        <p>Recovered battles open paused. The manual save stays separate.</p>
+      </div>}
+      {recovery.checkpointFailed && <p role="status">Automatic recovery unavailable. Use Save game before leaving.</p>}
+      <details class="menu-progress"><summary>Campaign progress · {campaign.filter(level => clears.includes(level.id)).length}/30 cleared</summary>
+        <p>{campaignDestination(clears)}</p>
+        <CampaignRecap mission={recommendedMission(clears)} />
+      </details>
+      <OfflineDetails {...offline} />
+      <details class="offline-details"><summary>Recovery details</summary>
+        <p>Automatic recovery saves changed play every second and when you leave the page. Unchanged menu or paused states are not rewritten. Recover checkpoint opens paused.</p>
+        <p>Save game replaces only the manual slot. Restore saved game opens that manual board; Continue opens the active board.</p>
+      </details>
       {confirmation === 'restart' && <div class="menu-confirm">
         <p>Restart from wave one? Your saved game stays available.</p>
         <button type="button" class="primary" onClick={() => enterBattle(createRound(round.totalWaves, mission))}>Restart from wave one</button>
         <button type="button" onClick={back}>Cancel</button>
       </div>}
       {confirmation === 'restore' && <div class="menu-confirm">
-        <p>Replace your current run with the saved game?</p>
-        <button type="button" class="primary" onClick={restoreGame}>Replace with saved game</button>
+        <p>Replace the active run with the manual save? Automatic recovery will follow the restored run.</p>
+        {recovery.manual && <p>{runLabel(recovery.manual.round)}</p>}
+        <button type="button" class="primary" onClick={() => restoreGame()}>Replace with saved game</button>
         <button type="button" onClick={back}>Cancel</button>
       </div>}
       {notice && <p role="status">{notice}</p>}
@@ -449,7 +456,7 @@ function App() {
     return <main class="menu-screen setup-screen">
       {header}
       <button type="button" onClick={back}>Main menu</button>
-      {selectedMission ? <section class="mission-briefing" aria-label="Mission briefing">
+      {selectedMission ? <section class="mission-briefing" aria-label="Mission briefing" tabIndex={0}>
         <h2 class="visually-hidden">Campaign</h2>
         <h3>{selectedMission.title} · Level {selectedMission.level}</h3>
         <p class="mission-order">{selectedMission.objective} · Hold for {selectedMission.waves.length} waves</p>
@@ -458,6 +465,7 @@ function App() {
         <details class="story-scene"><summary>Story</summary>
           <p>{selectedMission.setting} · {selectedMission.briefing}</p>
         </details>
+        <CampaignRecap mission={selectedMission} />
         {selectedMission.leadIn && <details class="story-scene"><summary>Before the battle</summary><p>{selectedMission.leadIn}</p></details>}
 
         <p>{selectedMission.level === 5 ? 'Final threat · The commander waits for his escort to clear.'
@@ -489,9 +497,12 @@ function App() {
               </option>)}
           </select>
         </div>
+        <CampaignProgress clears={clears} selected={selectedMission} onSelect={setDraftMission} />
         </details>
-      </section> : <section class="mission-briefing" aria-label="Long battle setup">
+      </section> : <section class="mission-briefing" aria-label="Long battle setup" tabIndex={0}>
         <h2>Long battle</h2>
+        <p>A continuous defense with reinforcements and no campaign progress. Twenty waves is the shortest run; one hundred is five times as many waves. Time varies with speed, purchases and pauses.</p>
+        <p>Main menu pauses play. Continue returns to the active run. Automatic recovery keeps a checkpoint; Save game keeps a separate manual slot for later.</p>
         <div class="map-setting"><label for="waves">Waves</label>
           <select id="waves" value={draftWaves} onChange={event => {
             const count = waveOptions.find(option => option === Number(event.currentTarget.value))
@@ -502,7 +513,7 @@ function App() {
         </div>
       </section>}
       {confirmation === 'new' ? <div class="menu-confirm">
-        <p>Start this battle and replace your current run?</p>
+        <p>Start this battle and replace your active run and automatic checkpoint? Your manual save stays available.</p>
         <button class="primary" type="button"
           onClick={() => enterBattle(createRound(draftWaves, selectedMission))}>Replace and enter battle</button>
         <button type="button" onClick={back}>Cancel</button>
