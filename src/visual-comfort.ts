@@ -1,43 +1,39 @@
 export type VisualComfort = { reducedEffects: boolean; reducedMotion: boolean }
 const key = '3guotd.visual-comfort.v1'
+const deviceMotion = typeof matchMedia === 'undefined' ? null : matchMedia('(prefers-reduced-motion: reduce)')
 
 function storedComfort(): VisualComfort {
   let saved: Partial<VisualComfort> = {}
-  try { saved = JSON.parse(localStorage.getItem(key) ?? '{}') ?? {} } catch { /* Storage may be unavailable. */ }
+  try { saved = JSON.parse(localStorage.getItem(key) ?? '{}') ?? {} } catch { /* Optional storage. */ }
   return { reducedEffects: saved.reducedEffects === true, reducedMotion: saved.reducedMotion === true }
 }
 
-export function visualComfort(): VisualComfort {
-  const saved = sessionOverride ?? storedComfort()
-  return {
-    reducedEffects: saved.reducedEffects === true,
-    reducedMotion: saved.reducedMotion === true || (typeof matchMedia !== 'undefined'
-      && matchMedia('(prefers-reduced-motion: reduce)').matches),
-  }
+let saved = storedComfort()
+let effective: VisualComfort
+const listeners = new Set<() => void>()
+
+export function currentVisualComfort() { return effective }
+export function deviceReducesMotion() { return deviceMotion?.matches === true }
+
+function apply() {
+  effective = { ...saved, reducedMotion: saved.reducedMotion || deviceReducesMotion() }
+  if (typeof document !== 'undefined') document.documentElement.dataset.reducedMotion = String(effective.reducedMotion)
+  listeners.forEach(notify => notify())
 }
 
-/** Change only the requested preference; an OS preference must not become a
- * permanently saved override when the player toggles the other control. */
-export function toggleVisualComfort(key: keyof VisualComfort) {
-  const saved = sessionOverride ?? storedComfort()
-  saveVisualComfort({ ...saved, [key]: !saved[key] })
+export function observeVisualComfort(notify: () => void) {
+  listeners.add(notify)
+  return () => { listeners.delete(notify) }
 }
 
-export function saveVisualComfort(value: VisualComfort) {
-  try { localStorage.setItem(key, JSON.stringify(value)) } catch { /* Session control still works below. */ }
-  sessionOverride = value
-  syncVisualComfort()
+export function toggleVisualComfort(option: keyof VisualComfort) {
+  saved = { ...saved, [option]: !saved[option] }
+  try { localStorage.setItem(key, JSON.stringify(saved)) } catch { /* Keep the session choice. */ }
+  apply()
 }
 
-let sessionOverride: VisualComfort | undefined
-export function currentVisualComfort(): VisualComfort {
-  const value = sessionOverride ?? visualComfort()
-  return { ...value, reducedMotion: value.reducedMotion || (typeof matchMedia !== 'undefined'
-    && matchMedia('(prefers-reduced-motion: reduce)').matches) }
-}
-
-function syncVisualComfort() {
-  if (typeof document !== 'undefined') document.documentElement.dataset.reducedMotion = String(currentVisualComfort().reducedMotion)
-}
-syncVisualComfort()
-if (typeof matchMedia !== 'undefined') matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', syncVisualComfort)
+apply()
+deviceMotion?.addEventListener('change', apply)
+if (typeof window !== 'undefined') window.addEventListener('storage', event => {
+  if (event.key === null || event.key === key) { saved = storedComfort(); apply() }
+})

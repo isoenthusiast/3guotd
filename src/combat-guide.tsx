@@ -4,7 +4,7 @@ import type { AttackerKind, Round } from './game/round'
 import { drawAttacker } from './attacker-art'
 import { drawTower } from './game-art'
 import { loadBattlefieldArt } from './battlefield-art-assets'
-import { currentVisualComfort, toggleVisualComfort } from './visual-comfort'
+import { currentVisualComfort, deviceReducesMotion, observeVisualComfort, toggleVisualComfort } from './visual-comfort'
 
 function Illustration({ kind }: { kind: AttackerKind | 'pairing' }) {
   const canvas = useRef<HTMLCanvasElement>(null)
@@ -87,12 +87,10 @@ export function PairingGuide() {
 
 export function VisualComfortControls() {
   const [value, setValue] = useState(currentVisualComfort)
-  function toggle(key: 'reducedEffects' | 'reducedMotion') {
-    toggleVisualComfort(key); setValue(currentVisualComfort())
-  }
+  useEffect(() => observeVisualComfort(() => setValue(currentVisualComfort())), [])
   return <fieldset class="visual-comfort"><legend>Visual comfort</legend>
-    <button type="button" aria-label="Reduced effects" aria-pressed={value.reducedEffects} onClick={() => toggle('reducedEffects')}>Reduced effects</button>
-    <button type="button" aria-label="Reduced motion" aria-pressed={value.reducedMotion} onClick={() => toggle('reducedMotion')}>Reduced motion</button>
+    <button type="button" aria-label="Reduced effects" aria-pressed={value.reducedEffects} onClick={() => toggleVisualComfort('reducedEffects')}>Reduced effects</button>
+    <button type="button" aria-label="Reduced motion" disabled={deviceReducesMotion()} aria-pressed={value.reducedMotion} onClick={() => toggleVisualComfort('reducedMotion')}>Reduced motion</button>
     <p>Effects reduces overlapping trails, impact rings and Drum links. Motion holds stride poses and uses static cues.
       Attackers still move at normal speed; damage, rewards and preparation timing stay the same.
       Device reduced motion is always honored. Choices stay on this device when storage is available.</p>
