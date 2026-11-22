@@ -39,9 +39,10 @@ rendered soft and then stretched. The DOM around it (header, cards, status) is c
 mismatch reads as *the map is background art*, when the map is the game.
 
 Underneath that, the board is **too small to hit**. The build tile is **0.62–0.71 cm
-physically**, against the 1 cm minimum NN/g derive from fingertip dimensions. And the thing
-that says "you can build here" — the beige mound — measures **1.2 × 0.5 mm**. It is not a
-target; it is a texture. Only 40 of the 97 buildable cells carry one at all.
+physically**, against the 1 cm physical floor NN/g reports from Parhi, Karlson & Bederson's
+target-size study. And the thing that says "you can build here" — the beige mound — measures
+**1.2 × 0.5 mm**. It is not a target; it is a texture. Only 40 of the 97 buildable cells carry
+one at all.
 
 So the residual interface problem is three things, in this order:
 
