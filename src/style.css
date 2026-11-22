@@ -269,3 +269,22 @@ button:focus-visible { outline: 2px solid #ffedaf; outline-offset: 2px; }
 }
 .battle-header { border-bottom: 0; }
 .edge-control small { display: block; font-size: .67rem; color: #d3c3a1; }
+
+/* viewport-fit applies to the whole document, including screens reached from battle. */
+.menu-screen {
+  width: min(calc(100% - max(.625rem, env(safe-area-inset-left)) - max(.625rem, env(safe-area-inset-right))), 34rem);
+  margin-top: max(1rem, env(safe-area-inset-top));
+  margin-bottom: max(.75rem, env(safe-area-inset-bottom));
+}
+@media (max-width: 36rem) {
+  .menu-screen { margin-left: max(.625rem, env(safe-area-inset-left)); }
+}
+.title-screen.has-run .menu-art {
+  height: clamp(3rem, calc(100dvh - 26rem - env(safe-area-inset-top) - env(safe-area-inset-bottom)), 15rem);
+}
+.title-screen.has-run .menu-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+.title-screen.has-run .menu-actions button:first-child { grid-column: 1 / -1; }
+.title-screen .session-actions { display: grid; grid-template-columns: 1fr 1fr; }

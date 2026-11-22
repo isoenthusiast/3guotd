@@ -325,7 +325,7 @@ function App() {
   </header>
 
   if (screen === 'menu') {
-    return <main class="menu-screen title-screen">
+    return <main class={`menu-screen title-screen${hasRun ? ' has-run' : ''}`}>
       {header}
       <h2 class="visually-hidden">Main menu</h2>
       <img class="menu-art" src={villageGate} alt="" />

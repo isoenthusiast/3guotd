@@ -20,8 +20,16 @@ async function checkPhone(width, height, previousBoardWidth, insets = { top: 0, 
         && box.left >= safe.left && box.right <= innerWidth - safe.right + 0.01
     }, insets)
 
+    const checkMenu = async () => {
+      assert(await fits(page.locator('.title-screen h1')), 'Title clears the top safe area')
+      for (const control of await page.locator('.title-screen button:enabled').all()) {
+        assert(await fits(control), `Menu control clears the safe area: ${await control.innerText()}`)
+      }
+    }
+
     await page.goto(url)
     await page.getByText('Ready offline').waitFor()
+    await checkMenu()
     await context.setOffline(true)
     await page.reload()
     await button('Campaign').tap()
@@ -94,6 +102,7 @@ async function checkPhone(width, height, previousBoardWidth, insets = { top: 0, 
     await checkFrame()
     assert(await fits(button('Resume')))
     await button('Main menu').tap()
+    await checkMenu()
     await button('Save game').tap()
     await page.evaluate(() => {
       const key = '3guotd.saved-game.v1'
