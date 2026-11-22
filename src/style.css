@@ -418,3 +418,7 @@ button:focus-visible { outline: 2px solid #ffedaf; outline-offset: 2px; }
 
 
 .battle-speed { flex: 0 0 44px; color: #ffdc9a; font-variant-numeric: tabular-nums; }
+@media (max-width: 360px) {
+  .build-card { grid-template-columns: 16px minmax(0, 1fr); padding-block: 0; }
+  .build-card .tower-portrait { width: 16px; }
+}

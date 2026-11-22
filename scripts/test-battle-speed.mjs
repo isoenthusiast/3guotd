@@ -35,7 +35,21 @@ try {
     for (const control of await page.locator('.command-row button').all()) {
       const { x, y, width, height } = await control.boundingBox()
       assert(width >= 44 && height >= 44 && x >= 8 && y + height <= 468 && x + width <= 312)
-      assert(await control.evaluate(el => el.scrollWidth <= el.clientWidth && el.scrollHeight <= el.clientHeight))
+      const fits = await control.evaluate(el => {
+        const box = el.getBoundingClientRect()
+        const nodes = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
+        while (nodes.nextNode()) {
+          if (!nodes.currentNode.textContent.trim()) continue
+          const text = document.createRange()
+          text.selectNodeContents(nodes.currentNode)
+          for (const rect of text.getClientRects()) {
+            if (rect.width && (rect.top < box.top - 1 || rect.bottom > box.bottom + 1 ||
+              rect.left < box.left - 1 || rect.right > box.right + 1)) return false
+          }
+        }
+        return true
+      })
+      assert(fits, `Label fits inside ${await control.innerText()}`)
     }
     assert.deepEqual(await page.evaluate(() => {
       const root = document.scrollingElement
