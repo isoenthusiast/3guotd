@@ -370,18 +370,6 @@ function App() {
     else if (round.impacts.some(hit => hit.elapsed < 0.05 && !previous.impacts.includes(hit))) playCue('hit')
   }, [round, screen, sound, running])
 
-  const speedPicker = (
-    <div class="map-setting">
-      <label class="visually-hidden" for="speed">Speed</label>
-      <select id="speed" value={speed} onChange={event => {
-        const value = speedOptions.find(option => option === Number(event.currentTarget.value))
-        if (value) setSpeed(value)
-      }}>
-        {speedOptions.map(option => <option key={option} value={option}>{option}×</option>)}
-      </select>
-    </div>
-  )
-
   const header = <header>
     <h1>3Guo Tower Defense</h1>
     <span class="offline">{offline.status}</span>
@@ -574,7 +562,6 @@ function App() {
           <button type="button" onClick={() => navigate('enemies')}>Enemy Types</button>
           <button type="button" onClick={() => navigate('towers')}>Towers</button>
         </nav>
-        <div class="speed-order">Play speed {speedPicker}</div>
         {(report || showChronicle) && <button type="button" onClick={() => {
           if (running || preparingLevel) setPaused(true)
           navigate('orders', 'report')
@@ -620,7 +607,7 @@ function App() {
           </div>
           <div class="objective">{mission ? `${objectiveProgress(round)}/${mission.milestoneCount} ${mission.milestone}` : 'Defend the outpost gate'}</div>
         </div>
-        <button type="button" class="edge-control" aria-label="Battle orders" onClick={() => navigate('orders')}>Orders<small>Help · {speed}×</small></button>
+        <button type="button" class="edge-control" aria-label="Battle orders" onClick={() => navigate('orders')}>Orders<small>Help</small></button>
       </header>
       <div class="board-view">
         <Battlefield round={round} selected={activeSite} suggested={suggested} onSelect={site => selectTile(site === activeSite ? null : site)} />
@@ -665,6 +652,9 @@ function App() {
             </section>
           ) : suggested !== null && activeSite === null ? <button type="button" class="choose-site"
             onClick={() => selectTile(suggested)} aria-label="Select marked site">Select marked site<small>Archer · {towerPrice} silver</small></button> : <div class="command-location">{round.phase === 'lost' ? rewind : mission?.title ?? 'Shu frontier'}</div>}
+          {!finished && <button class="battle-speed" type="button" aria-label={`Play speed ${speed}×`}
+            onClick={() => setSpeed(value => speedOptions[(speedOptions.indexOf(value) + 1) % speedOptions.length])}>
+            {speed}×</button>}
           {running || preparingLevel ? <button class="battle-primary" type="button" onClick={() => setPaused(value => !value)}>
             {paused ? 'Resume' : 'Pause'}</button>
             : setup ? <button class="battle-primary" type="button" aria-label="Start wave" onClick={() => setRound(startRound)}>Start<small>{firstThreat}{lanes > 1 ? ` · E${nextEntry(round) + 1}` : ''}</small></button>

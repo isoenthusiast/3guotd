@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Improvement register · 3Guo Tower Defense</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: system-ui, sans-serif;
+      color: #272c26;
+      background: #efece2;
+      line-height: 1.55;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    header { background: #23392f; color: #fff1d6; border-bottom: 4px solid #ab7945; }
+    .frame { width: min(100% - 2rem, 48rem); margin-inline: auto; }
+    header .frame { padding-block: 1.75rem; }
+    header p { margin: 0 0 .25rem; color: #ead5ad; }
+    h1, h2, h3 { font-family: Georgia, serif; line-height: 1.16; }
+    h1 { font-size: clamp(1.8rem, 6vw, 2.8rem); margin: 0; }
+    h2 { font-size: 1.6rem; margin: 1.6rem 0 .7rem; }
+    h3 { font-size: 1.25rem; margin: 0; }
+    main { padding-block: .4rem 2rem; }
+    details, article { background: #fffdf7; border: 1px solid #d3c7ae; border-radius: .5rem; }
+    details { padding-inline: 1rem; }
+    summary { cursor: pointer; font-weight: 700; padding-block: .7rem; }
+    summary:focus-visible { outline: 2px solid #305d4a; outline-offset: 3px; }
+    ol { padding-inline-start: 1.4rem; }
+    li + li { margin-top: .6rem; }
+    article { padding: 1rem; margin-bottom: .8rem; }
+    .item-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .35rem 1rem; }
+    .id { font: .82rem system-ui, sans-serif; color: #5b5549; display: block; margin-bottom: .2rem; }
+    .status { padding: .1rem .55rem; background: #ebdfc4; color: #533c1d; border-radius: .35rem; font-size: .86rem; font-weight: 700; }
+    dl { margin: .8rem 0 0; }
+    dt { font-weight: 700; }
+    dd { margin: 0 0 .65rem; }
+    dd:last-child { margin-bottom: 0; }
+  </style>
+</head>
+<body>
+  <header><div class="frame">
+    <p>3Guo Tower Defense</p>
+    <h1>Improvement register</h1>
+  </div></header>
+  <main class="frame">
+    <p>Edward and Fengchu use this register to discuss proposed improvements and give KongMing a clear brief once a change is agreed.</p>
+    <details>
+      <summary>How to use it</summary>
+      <ol>
+        <li><strong>Proposed.</strong> Add one entry per improvement with a stable ID and a short title. Describe what the player should see or be able to do under <strong>Expected behavior</strong>. Under <strong>How to verify</strong>, state what to test and the result to look for.</li>
+        <li><strong>Agreed.</strong> After Edward approves the expected behavior, update the entry and mark it Agreed. KongMing picks it up at this point. Bring material changes back for agreement.</li>
+        <li><strong>Building.</strong> KongMing marks the entry when work starts and uses its verification check during the web playtest.</li>
+        <li><strong>Accepted.</strong> Mark the entry Accepted after SimaYi accepts the web change. Record the review ID or accepted commit when available.</li>
+      </ol>
+      <p>For an existing finding, include its GF ID and keep the evidence in the project’s audit ledger.</p>
+    </details>
+
+    <h2>Improvements</h2>
+    <article id="imp-01">
+      <div class="item-heading">
+        <h3><span class="id">IMP-01</span>Battle speed toggle</h3>
+        <span class="status">Building</span>
+      </div>
+      <dl>
+        <dt>Expected behavior</dt>
+        <dd>One button beside Pause shows the current speed. Each tap cycles 1× → 2× → 3× → 1× on the battle screen.</dd>
+        <dt>How to verify</dt>
+        <dd>On a short phone, cycle all speeds, confirm the simulation follows the displayed speed, and check that the board and purchase controls fit without scrolling.</dd>
+      </dl>
+    </article>
+    <article id="imp-02">
+      <div class="item-heading">
+        <h3><span class="id">IMP-02</span>Tower variety</h3>
+        <span class="status">Proposed</span>
+      </div>
+      <dl>
+        <dt>Expected behavior</dt>
+        <dd>Propose one tower with a distinct placement decision that works alongside Archer and Drum. Keep the current stack and reuse purchase, upgrade, and save logic.</dd>
+        <dt>How to verify</dt>
+        <dd>Review KongMing’s proposal for the tower’s tactical role, where it enters the campaign, and how a second tower would reuse the same systems. Agree on the prototype before implementation.</dd>
+      </dl>
+    </article>
+  </main>
+</body>
+</html>

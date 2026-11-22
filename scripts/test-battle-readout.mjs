@@ -78,9 +78,8 @@ try {
       await p.getByRole('button', { name: /Longer range/ }).tap()
       await p.getByRole('button', { name: /Faster fire/ }).tap()
     }
-    await button('Battle orders').tap()
-    await p.getByLabel('Speed', { exact: true }).selectOption('3')
-    await button('Back to battle').tap()
+    await button('Play speed 1×').tap()
+    await button('Play speed 2×').tap()
     await button('Start wave').tap()
     await p.clock.runFor(1500)
     const readout = p.locator('.battle-readout')
