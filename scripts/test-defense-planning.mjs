@@ -35,7 +35,25 @@ try {
   if (!baseline) {
     assert.match(await cards.innerText(), /Hit · (entry|middle|gate)/)
     assert.match(await status.innerText(), /[A-I]\d+ · Tap Build Archer/)
-    assert.match(await button('Start wave').innerText(), /first/)
+    assert.match(await button('Start wave').innerText(), /Infantry/)
+  }
+  if (!baseline) {
+    const clipped = await page.locator('.command-row button').evaluateAll(controls => controls.flatMap(control => {
+      const box = control.getBoundingClientRect()
+      const nodes = document.createTreeWalker(control, NodeFilter.SHOW_TEXT)
+      const errors = []
+      while (nodes.nextNode()) {
+        if (!nodes.currentNode.textContent.trim()) continue
+        const range = document.createRange()
+        range.selectNodeContents(nodes.currentNode)
+        for (const rect of range.getClientRects()) {
+          if (rect.width && (rect.top < box.top - 1 || rect.bottom > box.bottom + 1 ||
+            rect.left < box.left - 1 || rect.right > box.right + 1)) errors.push(nodes.currentNode.textContent)
+        }
+      }
+      return errors
+    }))
+    assert.deepEqual(clipped, [], 'Visible button labels fit inside their touch targets')
   }
   await activate(cards)
   await activate(page.getByRole('button', { name: /Faster fire/ }))

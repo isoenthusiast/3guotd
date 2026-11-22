@@ -370,3 +370,6 @@ button:focus-visible { outline: 2px solid #ffedaf; outline-offset: 2px; }
 }
 
 .orders-intel, .command-status > small { font-size: .78rem; }
+.build-card { grid-template-columns: 21px minmax(0, 1fr); gap: 1px 3px; }
+.build-card .tower-portrait { width: 21px; }
+

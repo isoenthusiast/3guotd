@@ -643,7 +643,7 @@ function App() {
                   <span><strong>Build {towerDetails[kind].name}</strong>
                     <span>{towerPrice} silver</span></span>
                   <small><i class={`range-key ${kind}`} aria-hidden="true" />{coverage?.[kind].reachesRoad
-                    ? `${kind === 'archer' ? 'Hit' : 'Slow'} · ${coverage[kind].zones.join('/')}` : 'Road out of range'}</small>
+                    ? `${kind === 'archer' ? 'Hit' : 'Slow'} · ${coverage[kind].zones[0]}` : 'Road out of range'}</small>
                 </button>
               ))}
             </section>
@@ -651,7 +651,7 @@ function App() {
             onClick={() => selectTile(suggested)} aria-label="Select marked site">Select marked site<small>Archer · {towerPrice} silver</small></button> : <div class="command-location">{round.phase === 'lost' ? rewind : mission?.title ?? 'Shu frontier'}</div>}
           {running || preparingLevel ? <button class="battle-primary" type="button" onClick={() => setPaused(value => !value)}>
             {paused ? 'Resume' : 'Pause'}</button>
-            : setup ? <button class="battle-primary" type="button" aria-label="Start wave" onClick={() => setRound(startRound)}>Start wave<small>{firstThreat} first{lanes > 1 ? ` · E${nextEntry(round) + 1}` : ''}</small></button>
+            : setup ? <button class="battle-primary" type="button" aria-label="Start wave" onClick={() => setRound(startRound)}>Start<small>{firstThreat}{lanes > 1 ? ` · E${nextEntry(round) + 1}` : ''}</small></button>
             : round.phase === 'won' && upcoming && upcoming.battleId !== mission?.battleId ? <button class="battle-primary" type="button" onClick={() => openMission(upcoming)}>Next battle</button>
             : round.phase === 'lost' ? <button class="battle-primary" type="button" onClick={retryWave}>Retry wave</button>
             : <button class="battle-primary" type="button" onClick={back}>Main menu</button>}
