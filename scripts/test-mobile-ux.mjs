@@ -33,6 +33,11 @@ async function checkPhone(width, height, previousBoardWidth, insets = { top: 0, 
     await context.setOffline(true)
     await page.reload()
     await button('Campaign').tap()
+    if (height <= 650) {
+      await page.getByText('Story', { exact: true }).tap()
+      await page.getByText('Choose level', { exact: true }).tap()
+      assert.equal(await page.evaluate(() => document.scrollingElement.scrollHeight - innerHeight), 0)
+    }
     assert(await fits(button('Enter battle')))
     await button('Enter battle').tap()
 
@@ -67,6 +72,12 @@ async function checkPhone(width, height, previousBoardWidth, insets = { top: 0, 
         .some(([x, y]) => document.elementFromPoint(x, y) !== cell)
     }).length)
     assert.equal(missed, 0)
+    const marked = page.locator('[data-suggested="true"]')
+    assert.equal(await marked.count(), 1)
+    await marked.tap()
+    assert(await fits(card('Archer')))
+    assert.match(await card('Archer').innerText(), /Build Archer/)
+    await checkFrame()
     for (const label of ['Empty tile, row 1, column 3', 'Empty tile, row 13, column 6']) {
       const nearLandmark = button(label)
       await nearLandmark.tap()
@@ -114,6 +125,13 @@ async function checkPhone(width, height, previousBoardWidth, insets = { top: 0, 
     await page.reload()
     await button('Restore saved game').tap()
     await button('Battle orders').tap()
+    await button('Enemy Types').tap()
+    await page.getByRole('rowheader', { name: 'Pursuit commander' }).waitFor()
+    await button('Towers').tap()
+    await page.getByText(/72% to 82%/).waitFor()
+    await button('Back to battle').tap()
+    await button('Resume').waitFor()
+    await button('Battle orders').tap()
     await page.getByLabel('Speed', { exact: true }).selectOption('3')
     await button('Report').tap()
     await page.getByText('Wave 1 summary').tap()
@@ -144,7 +162,72 @@ async function checkPhone(width, height, previousBoardWidth, insets = { top: 0, 
   }
 }
 
+async function checkPreparation() {
+  const context = await browser.newContext({ viewport: { width: 320, height: 480 }, isMobile: true, hasTouch: true })
+  try {
+    const page = await context.newPage()
+    const button = name => page.getByRole('button', { name, exact: true })
+    await page.goto(url)
+    await page.getByText('Ready offline').waitFor()
+    await context.setOffline(true)
+    await page.reload()
+    await page.clock.install()
+    await button('Campaign').tap()
+    await button('Enter battle').tap()
+    await button('Main menu').tap()
+    await button('Save game').tap()
+    await page.evaluate(() => {
+      const key = '3guotd.saved-game.v1'
+      const save = JSON.parse(localStorage.getItem(key))
+      save.round.phase = 'won'
+      save.round.waveNumber = save.round.totalWaves
+      save.speed = 3
+      localStorage.setItem(key, JSON.stringify(save))
+    })
+    await page.reload()
+    await button('Restore saved game').tap()
+    const clock = page.locator('.prep-clock')
+    await clock.getByText('10', { exact: true }).waitFor()
+    const target = await page.locator('.cells button').evaluateAll(cells => {
+      const ring = document.querySelector('.prep-clock').getBoundingClientRect()
+      const board = document.querySelector('.battlefield').getBoundingClientRect()
+      if (Math.abs(board.x + board.width / 2 - ring.x - ring.width / 2) > 1 ||
+          Math.abs(board.y + board.height / 2 - ring.y - ring.height / 2) > 1) return null
+      for (const cell of cells) {
+        const rect = cell.getBoundingClientRect()
+        const x = rect.x + rect.width / 2, y = rect.y + rect.height / 2
+        if (Math.hypot(x - ring.x - ring.width / 2, y - ring.y - ring.height / 2) < ring.width / 2 &&
+            document.elementFromPoint(x, y) === cell) return { x, y }
+      }
+      return null
+    })
+    assert(target, 'Centered timer leaves covered build sites tappable')
+    await page.touchscreen.tap(target.x, target.y)
+    await page.getByRole('button', { name: /Build Archer/ }).tap()
+    await button('Pause').tap()
+    const held = await clock.innerText()
+    await page.clock.runFor(12000)
+    assert.equal(await clock.innerText(), held)
+    await button('Battle orders').tap()
+    await button('Towers').tap()
+    await page.clock.runFor(12000)
+    await button('Back to battle').tap()
+    assert.equal(await clock.innerText(), held)
+    await button('Resume').tap()
+    await page.clock.runFor(8000)
+    assert(Number(await clock.innerText()) <= 2)
+    await page.clock.runFor(2150)
+    assert.equal(await clock.count(), 0)
+    await button('Pause').waitFor()
+    assert.equal(await page.getByRole('button', { name: /^Archer, row/ }).count(), 1)
+    console.log('Passed offline centered countdown, purchase through ring, pause/help and automatic combat at 3×.')
+  } finally {
+    await context.close()
+  }
+}
+
 try {
+  await checkPreparation()
   // CSS pixels measured on live ab1ab68.
   await checkPhone(320, 480, 218.765625)
   await checkPhone(320, 568, 232.8125)

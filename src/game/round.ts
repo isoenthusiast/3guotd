@@ -32,7 +32,7 @@ const wave = [
   'veteran', 'runner', 'veteran', 'veteranRunner',
 ] as const
 
-const attackers = {
+export const attackers = {
   infantry: { health: 4, speed: 1.6, reward: 7, runner: false, level: 1 },
   runner: { health: 3, speed: 2.4, reward: 7, runner: true, level: 1 },
   veteran: { health: 6, speed: 1.6, reward: 12, runner: false, level: 2 },

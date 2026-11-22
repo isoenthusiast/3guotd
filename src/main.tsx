@@ -2,12 +2,12 @@ import { render } from 'preact'
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { columns, rows, sitePosition } from './game/board'
 import {
-  attackerName, enemyMaxHealth, baseUpgradePrice, buildTower, canBuildAt, canSpend, closedSites, createRound, enemiesRemaining, objectiveProgress, removeTower,
+  attackers, levelPrepMs, attackerName, enemyMaxHealth, baseUpgradePrice, buildTower, canBuildAt, canSpend, closedSites, createRound, enemiesRemaining, objectiveProgress, removeTower,
   roundRoutes, prepareNextLevel,
   retryRound, speedOptions, startRound, tickRound, towerDetails, towerPrice, upgradePrice,
   upgradeTower, waveCueTime, roundFormation, waveOptions,
 } from './game/round'
-import type { Mission, PlaySpeed, Round, TowerKind, Upgrade } from './game/round'
+import type { AttackerKind, Mission, PlaySpeed, Round, TowerKind, Upgrade } from './game/round'
 import { roadCoverage } from './battlefield-scenery'
 import { loadBattlefieldArt } from './battlefield-art-assets'
 import { drawBattlefield, drawTower, tile } from './game-art'
@@ -73,7 +73,8 @@ function TowerPortrait({ kind, upgrade }: { kind: TowerKind; upgrade?: Upgrade }
   return <canvas ref={canvas} class="tower-portrait" width={80} height={80} aria-hidden="true" />
 }
 
-function Battlefield({ round, selected, onSelect }: {
+function Battlefield({ round, selected, suggested, onSelect }: {
+  suggested: number | null
   round: Round
   selected: number | null
   onSelect: (site: number | null) => void
@@ -108,7 +109,9 @@ function Battlefield({ round, selected, onSelect }: {
           const label = tower ? towerDetails[tower.kind].name : 'Empty tile'
           return (
             <button key={site} ref={button => { cells.current[site] = button }}
-              type="button" class={tower ? 'cell' : reachable[site] ? 'cell empty-cell useful-site' : 'cell empty-cell'} tabIndex={site === (selected ?? 0) ? 0 : -1}
+              type="button" class={tower ? 'cell' : reachable[site] ? 'cell empty-cell useful-site' : 'cell empty-cell'} data-suggested={site === suggested && selected === null ? 'true' : undefined}
+              aria-description={site === suggested ? 'Suggested first tower site' : undefined}
+              tabIndex={site === (selected ?? suggested ?? 0) ? 0 : -1}
               aria-label={`${label}, row ${y + 1}, column ${x + 1}`}
               aria-pressed={selected === site} onClick={() => onSelect(site)}
               onKeyDown={event => {
@@ -130,6 +133,14 @@ function Battlefield({ round, selected, onSelect }: {
           )
         })}
       </div>
+      {round.levelPrepRemainingMs !== undefined && <div class="prep-clock" aria-hidden="true">
+        <svg viewBox="0 0 100 100" focusable="false">
+          <circle class="clock-track" cx="50" cy="50" r="46" />
+          <circle class="clock-fill" cx="50" cy="50" r="46" pathLength="100" stroke-dasharray="100"
+            stroke-dashoffset={100 * (1 - round.levelPrepRemainingMs / levelPrepMs)} />
+        </svg>
+        <strong>{Math.ceil(round.levelPrepRemainingMs / 1000)}</strong>
+      </div>}
     </div>
   )
 }
@@ -151,7 +162,7 @@ function loadClears(): string[] {
 function App() {
   const reportDialog = useRef<HTMLDialogElement>(null)
   const [offline, setOffline] = useState('')
-  const [screen, setScreen] = useState<'menu' | 'campaign' | 'long' | 'battle' | 'orders'>('menu')
+  const [screen, setScreen] = useState<'menu' | 'campaign' | 'long' | 'battle' | 'orders' | 'enemies' | 'towers'>('menu')
   const [hasRun, setHasRun] = useState(false)
   const [hasSave, setHasSave] = useState(() => loadGame() !== null)
   const [sound, setSound] = useState(loadSound)
@@ -183,9 +194,25 @@ function App() {
   const spendingOpen = canSpend(round)
   const canRefund = setup && round.towers.length > 0
   const showActions = activeSite !== null && spendingOpen && (!tower || !tower.reach || !tower.power || canRefund)
+  const firstPlacement = (setup || running) && round.waveNumber === 1 && !preparingLevel && round.towers.length === 0
+  const suggested = useMemo(() => {
+    if (!firstPlacement) return null
+    let best: number | null = null
+    let mostRoad = 0
+    for (let site = 0; site < siteCount; site++) {
+      if (!canBuildAt(round, site)) continue
+      const { roadTiles } = roadCoverage(roundRoutes(round), site, 'archer')
+      if (roadTiles > mostRoad) { best = site; mostRoad = roadTiles }
+    }
+    return best
+  }, [firstPlacement, mission, round.rulesVersion])
+  const slowedCount = round.enemies.filter(enemy => enemy.slowed).length
+  const firstBuy = firstPlacement && activeSite !== null && roadCoverage(roundRoutes(round), activeSite, 'archer').reachesRoad
+  const openingHint = activeSite === null ? 'Tap the gold + on the map to place a tower.'
+    : firstBuy ? 'Tap Build Archer for your first defender.' : 'Choose a tile closer to the road for an Archer.'
   const report = finished ? { ...round.waveStats, waveNumber: round.waveNumber } : round.previousWave
-  let status = setup ? (tower ? towerDetails[tower.kind].name : activeSite !== null ? 'Choose a tower' :
-    round.towers.length ? 'Tap a tower to upgrade or a stake to build' : 'Tap a stake beside the road')
+  let status = setup ? (firstPlacement ? openingHint : tower ? `${towerDetails[tower.kind].name}${tower.reach && tower.power ? ' · Fully upgraded' : ' · Choose an upgrade'}`
+    : activeSite !== null ? 'Choose a tower' : 'Tap a tower to upgrade or a stake to build')
     : round.phase === 'won' ? (mission ? 'Level cleared!' : 'Gate defended!') : 'The gate fell.'
   if (running) {
     const first = formation.sequence[0]
@@ -198,6 +225,7 @@ function App() {
       ? `Wave ${round.waveNumber} starts · ${waveCue}`
       : `${enemiesRemaining(round)} of ${formation.sequence.length} attackers`
   }
+  if (running && firstPlacement && !paused) status = openingHint
   if (preparingLevel) {
     const seconds = Math.ceil(round.levelPrepRemainingMs! / 1000)
     status = `Level ${mission?.level} · Wave 1 in ${seconds}s${paused ? ' · Paused' : ''}`
@@ -456,6 +484,31 @@ function App() {
     setScreen('battle')
   }
 
+  if (screen === 'enemies' || screen === 'towers') {
+    const enemyPage = screen === 'enemies'
+    return <main class="battle-orders field-guide">
+      <header><h1>{enemyPage ? 'Enemy Types' : 'Towers'}</h1>
+        <button type="button" onClick={() => setScreen('battle')}>Back to battle</button></header>
+      <section key={screen} class="guide-content">
+      {enemyPage ? <>
+        <p>Base stats before wave and story bonuses. Silver is the kill reward.</p>
+        <table><thead><tr><th>Attacker</th><th>HP</th><th>Tiles/s</th><th>Silver</th></tr></thead>
+          <tbody>{(Object.keys(attackers) as AttackerKind[]).map(kind => <tr key={kind}>
+            <th scope="row">{attackerName(kind)}</th><td>{attackers[kind].health}</td>
+            <td>{attackers[kind].speed}</td><td>{attackers[kind].reward}</td></tr>)}</tbody></table>
+        <p>Slow runners and cavalry near Archers. Veterans take more hits. The commander waits until the soldiers ahead fall or escape.</p>
+      </> : <>
+        <h2>Archer · {towerPrice} silver</h2>
+        <p>Shoots one enemy at a time. Cover both sides of a bend. Upgrade range to reach farther or fire rate to land more shots.</p>
+        <h2>Drum · {towerPrice} silver</h2>
+        <p>Slows enemies inside its ring. Pair it with an Archer for extra shots. Blue lines mark slowed enemies. The Drum deals no damage.</p>
+        <p>Wider reach extends the ring. Stronger slow raises the speed reduction from {Math.round(100 * (1 - towerDetails.drum.speedFactor))}% to {Math.round(100 * (1 - towerDetails.drum.strongerSpeedFactor))}%. Where Drums overlap, the strongest slow applies.</p>
+      </>}
+      </section>
+      <button type="button" onClick={() => setScreen(enemyPage ? 'towers' : 'enemies')}>{enemyPage ? 'Towers' : 'Enemy Types'}</button>
+    </main>
+  }
+
   if (screen === 'orders') {
     return <main class="battle-orders">
       <header><h1>Battle orders</h1>
@@ -463,6 +516,10 @@ function App() {
       </header>
       <p>{mission?.title ?? 'Shu frontier'} · Wave {round.waveNumber} of {round.totalWaves}</p>
       <div class="orders-list">
+        <nav class="guide-links" aria-label="Field guide">
+          <button type="button" onClick={() => setScreen('enemies')}>Enemy Types</button>
+          <button type="button" onClick={() => setScreen('towers')}>Towers</button>
+        </nav>
         <div class="speed-order">Play speed {speedPicker}</div>
         {(report || showChronicle) && <button type="button" onClick={() => {
           if (running || preparingLevel) setPaused(true)
@@ -509,13 +566,14 @@ function App() {
         <button type="button" class="edge-control" aria-label="Battle orders" onClick={() => setScreen('orders')}>Orders<small>{speed}×</small></button>
       </header>
       <div class="board-view">
-        <Battlefield round={round} selected={activeSite} onSelect={site => selectTile(site === activeSite ? null : site)} />
+        <Battlefield round={round} selected={activeSite} suggested={suggested} onSelect={site => selectTile(site === activeSite ? null : site)} />
       </div>
       <footer class="command-bar">
         <div class="command-status">
           <div role="status">
             {hudStatus && <span>{hudStatus}</span>}
             {!finished && upcomingClosures && <span>Marked sites close next wave.</span>}
+            {slowedCount > 0 && <span class="drum-effect">Drum slowing {slowedCount}</span>}
             {needsSilver && <span class="action-note">Need {shortfall} more silver.</span>}
             {tower && !needsSilver && price > baseUpgradePrice && (!tower.reach || !tower.power) &&
               <span>Second upgrade · +{price - baseUpgradePrice} silver</span>}
@@ -534,17 +592,18 @@ function App() {
                   <small>{upgradeEffect(tower.kind, option)}</small>
                 </button>
               )) : towerKinds.map(kind => (
-                <button key={kind} type="button" class="purchase-card build-card" disabled={shortfall > 0}
+                <button key={kind} type="button" class={`purchase-card build-card${firstBuy && kind === 'archer' ? ' first-buy' : ''}`} disabled={shortfall > 0}
                   onClick={() => buy(current => buildTower(current, activeSite, kind))}>
                   <TowerPortrait kind={kind} />
-                  <span><strong><span class="visually-hidden">Build </span>{towerDetails[kind].name}</strong>
+                  <span><strong>Build {towerDetails[kind].name}</strong>
                     <span>{towerPrice} silver</span></span>
                   <small><i class={`range-key ${kind}`} aria-hidden="true" />{!roadCoverage(roundRoutes(round), activeSite, kind).reachesRoad
                     ? 'Road out of range' : kind === 'archer' ? 'Damage' : 'Slow'}</small>
                 </button>
               ))}
             </section>
-          ) : <div class="command-location">{mission?.title ?? 'Shu frontier'}</div>}
+          ) : suggested !== null && activeSite === null ? <button type="button" class="choose-site"
+            onClick={() => selectTile(suggested)}>Select marked site</button> : <div class="command-location">{mission?.title ?? 'Shu frontier'}</div>}
           {running || preparingLevel ? <button class="battle-primary" type="button" onClick={() => setPaused(value => !value)}>
             {paused ? 'Resume' : 'Pause'}</button>
             : setup ? <button class="battle-primary" type="button" onClick={() => setRound(startRound)}>Start wave</button>
