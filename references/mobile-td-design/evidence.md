@@ -124,9 +124,11 @@ player sizes a tower against.
 ## The Drum's cyan pulse
 
 `measure-drum-pulse.mjs` places a Drum, starts a wave, and samples the rendered canvas every
-half second for cyan pixels. On iPhone SE 2 and Pixel 7 alike, cyan is present in **24 of 40
-samples** and then drops to zero as the last slowed enemy dies — roughly **12 seconds** of
-continuous expanding ring per wave.
+half second for cyan pixels. On iPhone SE 2 and Pixel 7 alike, cyan is present in **24–25 of 40
+samples** over four runs — the last sample still showing cyan falls at 11.5–12.0 s — and then
+drops to zero as the last slowed enemy dies. The ring is on screen for roughly **12 seconds**
+per wave. The spread is real: it depends on when the last slowed enemy dies, which varies with
+the wave's spawn order.
 
 The cycle is not a guess. The source sets `pulse = (round.waveAge * 1.8) % 1`
 (`src/game-art.ts` -> `round.waveAge * 1.8`), so one expansion every **1/1.8 s = 0.56 s**, and

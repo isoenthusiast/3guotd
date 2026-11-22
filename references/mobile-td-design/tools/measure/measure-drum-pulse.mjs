@@ -22,10 +22,16 @@ const browser = await chromium.launch({
   args: ['--no-sandbox'],
 });
 
-const server = spawn('npx', ['vite', 'preview', '--port', '8493', '--host', '127.0.0.1'], {
+const PORT = 8492;
+const server = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--host', '127.0.0.1', '--strictPort'], {
   cwd: REPO,
   stdio: 'ignore',
+  detached: true,
 });
+// Kill the whole group: `npx` spawns vite as a child, and killing npx alone
+// leaves vite listening.
+const stopServer = () => { try { process.kill(-server.pid); } catch {} };
+process.on('exit', stopServer);
 await new Promise(r => setTimeout(r, 7000));
 
 for (const d of DEVICES) {
@@ -36,7 +42,7 @@ for (const d of DEVICES) {
     hasTouch: true,
   });
   const page = await ctx.newPage();
-  await page.goto('http://127.0.0.1:8493/', { waitUntil: 'networkidle' });
+  await page.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: 'networkidle' });
 
   // Navigate: Campaign -> first mission -> Enter battle
   const clickText = async (text) => {
@@ -91,13 +97,16 @@ for (const d of DEVICES) {
   }
 
   const anyPulse = samples.some(s => s > 40);
-  const firstIdx = samples.findIndex(s => s > 40);
-  const lastIdx = samples.lastIndexOf(s => s > 40);
+  const visible = samples.map((s, i) => (s > 40 ? i : -1)).filter(i => i >= 0);
+  const firstIdx = visible.length ? visible[0] : -1;
+  const lastIdx = visible.length ? visible[visible.length - 1] : -1;
   console.log(`${d.name}: drum placed=${placed} wave started=${started}`);
   console.log(`  cyan-pulse pixels sampled: ${samples.join(',')}`);
-  console.log(`  pulse visible: ${anyPulse}` + (anyPulse ? ` (first at sample ${firstIdx}, last at sample ${lastIdx})` : ''));
+  console.log(`  pulse visible: ${anyPulse}` + (anyPulse
+    ? ` — ${visible.length} of ${samples.length} half-second samples (first at sample ${firstIdx}, last at sample ${lastIdx}; ~${(lastIdx * 0.5).toFixed(1)} s)`
+    : ''));
   await ctx.close();
 }
 
-server.kill('SIGTERM');
+stopServer();
 await browser.close();

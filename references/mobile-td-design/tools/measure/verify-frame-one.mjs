@@ -14,7 +14,7 @@ const CHROME = process.env.CHROME_PATH || '/home/edward/.cache/ms-playwright/chr
 const PORT = 8493
 const BASE = `http://127.0.0.1:${PORT}/`
 
-const server = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--host', '127.0.0.1'], {
+const server = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--host', '127.0.0.1', '--strictPort'], {
   cwd: REPO,
   stdio: 'ignore',
   detached: true,

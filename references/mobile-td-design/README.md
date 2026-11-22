@@ -263,9 +263,10 @@ branch in the Drum's draw path.
 **Sees today.** The same pulse for everyone, on a device where the user has explicitly asked the
 system for less motion. The Drum's ring **scales outward from the tower every 0.56 s** — the
 pattern MDN names as a vestibular trigger. Measured in the running build on iPhone SE 2 and
-Pixel 7: cyan pixels present in **24 of 40 half-second samples**, dropping to zero as the last
-slowed enemy dies — roughly **12 seconds** of continuous expanding ring per wave, about **22
-expansions** at the 0.56 s cycle the source sets (`round.waveAge * 1.8` gives a 1/1.8 s period).
+Pixel 7: cyan pixels present in **24–25 of 40 half-second samples** across eight device-samples
+over four runs — the last sample still showing cyan falls at 11.5–12.0 s, so the ring is on
+screen for roughly **12 seconds** per wave, about **22 expansions** at the 0.56 s cycle the
+source sets (`round.waveAge * 1.8` gives a 1/1.8 s period).
 It is drawn from `round.waveAge` (`src/game-art.ts` -> `round.waveAge * 1.8`), so it is wall-clock driven
 and speed-independent.
 
