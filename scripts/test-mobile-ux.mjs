@@ -4,18 +4,21 @@ import { chromium } from 'playwright'
 const url = process.argv[2] ?? 'http://localhost:4173/'
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH })
 
-async function checkPhone(width, height, previousBoardWidth) {
+async function checkPhone(width, height, previousBoardWidth, insets = { top: 0, left: 0, bottom: 0, right: 0 }) {
   const context = await browser.newContext({ viewport: { width, height }, hasTouch: true, isMobile: true })
   try {
     const page = await context.newPage()
+    const session = await context.newCDPSession(page)
+    await session.send('Emulation.setSafeAreaInsetsOverride', { insets })
     const errors = []
     page.on('pageerror', error => errors.push(error.message))
     const button = name => page.getByRole('button', { name, exact: true })
     const card = kind => page.getByRole('button', { name: new RegExp(`Build ${kind}`) })
-    const fits = locator => locator.evaluate(element => {
+    const fits = locator => locator.evaluate((element, safe) => {
       const box = element.getBoundingClientRect()
-      return box.top >= 0 && box.bottom <= innerHeight + 1 && box.left >= 0 && box.right <= innerWidth + 1
-    })
+      return box.top >= safe.top && box.bottom <= innerHeight - safe.bottom + 0.01
+        && box.left >= safe.left && box.right <= innerWidth - safe.right + 0.01
+    }, insets)
 
     await page.goto(url)
     await page.getByText('Ready offline').waitFor()
@@ -139,6 +142,7 @@ try {
   await checkPhone(320, 640, 268.609375)
   await checkPhone(320, 740, 308)
   await checkPhone(390, 740, 346.140625)
+  await checkPhone(390, 740, 346.140625, { top: 44, bottom: 34, left: 8, right: 8 })
 } finally {
   await browser.close()
 }

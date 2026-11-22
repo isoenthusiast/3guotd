@@ -203,7 +203,7 @@ button:focus-visible { outline: 2px solid #ffedaf; outline-offset: 2px; }
 .command-bar {
   display: grid;
   grid-template-rows: 44px 54px;
-  border-top: 1px solid #766549;
+  box-shadow: inset 0 1px #766549;
   box-sizing: border-box;
 }
 .command-status, .command-row { display: flex; align-items: center; gap: 4px; }
