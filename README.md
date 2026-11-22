@@ -68,3 +68,9 @@ To check mobile interactions against a production preview, run `npx playwright i
 Back closes the current report or confirmation first. A field guide returns to Battle orders, then to the same battle. Leaving a battle for the main menu suspends play. Continue returns to it, and Save game keeps a copy across reloads. Both setup screens return to the main menu. At the main menu, the browser or operating system handles Back.
 
 With the production preview running, use `npm run test:back -- http://localhost:4173/` to verify offline navigation, battle state and root exit at 320 × 420.
+
+### Android playtest APK
+
+Install JDK 21, Android SDK Platform 35 and Build Tools 35.0.0. Run `npm ci`, set `ANDROID_HOME`, and run `scripts/build-android.sh /absolute/path/to/3guo.apk`. The build uses the local `dist/` bundle through Capacitor and requires no server or initial connection to play. The Android app has its own manual save and automatic checkpoint. Keep the same package ID and signing key and increment `playtestVersionCode` for each distributed update.
+
+Set `GUO_ANDROID_KEYSTORE` and `GUO_ANDROID_PASSWORD_FILE` to private files outside the checkout. The key alias is `threeguotd`. The default version is `0.1.0-android.1` (version code 2). Release only the signed APK whose digest and source commit SimaYi audited. Verify a fresh install with radios off and a signed update over an existing install with progress.

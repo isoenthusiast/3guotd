@@ -1,0 +1,7 @@
+{
+  "appId": "com.isoenthusiast.threeguotd",
+  "appName": "3Guo Tower Defense",
+  "webDir": "dist",
+  "server": { "hostname": "localhost", "androidScheme": "https" },
+  "android": { "adjustMarginsForEdgeToEdge": "force", "allowMixedContent": false, "webContentsDebuggingEnabled": false }
+}
