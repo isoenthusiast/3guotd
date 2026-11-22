@@ -129,6 +129,7 @@ async function checkPhone(width, height, previousBoardWidth, insets = { top: 0, 
     await page.getByRole('rowheader', { name: 'Pursuit commander' }).waitFor()
     await button('Towers').tap()
     await page.getByText(/72% to 82%/).waitFor()
+    await button('Back to orders').tap()
     await button('Back to battle').tap()
     await button('Resume').waitFor()
     await button('Battle orders').tap()
@@ -157,6 +158,59 @@ async function checkPhone(width, height, previousBoardWidth, insets = { top: 0, 
     await checkFrame()
     assert.deepEqual(errors, [])
     console.log(`Passed offline placement, purchase, refund, and stable board at ${width} × ${height}.`)
+  } finally {
+    await context.close()
+  }
+}
+
+async function checkGuideBack() {
+  const context = await browser.newContext({ viewport: { width: 320, height: 420 }, isMobile: true, hasTouch: true })
+  try {
+    const page = await context.newPage()
+    const session = await context.newCDPSession(page)
+    const insets = { top: 16, right: 8, bottom: 12, left: 8 }
+    await session.send('Emulation.setSafeAreaInsetsOverride', { insets })
+    const button = name => page.getByRole('button', { name, exact: true })
+    const back = async name => {
+      const control = button(name)
+      const box = await control.boundingBox()
+      assert(box && box.width >= 44 && box.height >= 44)
+      assert(box.x >= insets.left && box.x + box.width <= 320 - insets.right)
+      assert(box.y >= insets.top && box.y + box.height <= 420 - insets.bottom)
+      assert.equal(await page.evaluate(() => scrollY), 0)
+      await control.tap()
+    }
+    await page.goto(url)
+    await page.getByText('Ready offline').waitFor()
+    await context.setOffline(true)
+    await page.reload()
+    await page.clock.install({ time: new Date('2030-01-01T00:00:00Z') })
+    await page.clock.pauseAt(new Date('2030-01-01T00:00:10Z'))
+    await button('Campaign').tap()
+    await button('Enter battle').tap()
+    await button('Select marked site').tap()
+    await page.getByRole('button', { name: /Build Archer/ }).tap()
+    const selected = page.locator('.cell[aria-pressed="true"]')
+    const originalSite = await selected.getAttribute('aria-label')
+    assert.match(originalSite, /^Archer, row/)
+    await button('Start wave').tap()
+
+    for (const paused of [false, true]) {
+      if (paused) await button('Pause').tap()
+      for (const guide of ['Enemy Types', 'Towers']) {
+        await button('Battle orders').tap()
+        await button(guide).tap()
+        await page.clock.runFor(60000)
+        await back('Back to orders')
+        await page.getByRole('heading', { name: 'Battle orders' }).waitFor()
+        await back('Back to battle')
+        await button(paused ? 'Resume' : 'Pause').waitFor()
+        assert.equal(await selected.getAttribute('aria-label'), originalSite)
+        assert.equal(await page.locator('.resources strong').innerText(), '60 silver')
+        assert.equal(await page.locator('.resources span').last().innerText(), 'Wave 1/3')
+      }
+    }
+    console.log('Passed offline guide Back at 320 × 420 with safe insets, selected Archer, silver, wave and both pause states.')
   } finally {
     await context.close()
   }
@@ -211,6 +265,7 @@ async function checkPreparation() {
     await button('Battle orders').tap()
     await button('Towers').tap()
     await page.clock.runFor(12000)
+    await button('Back to orders').tap()
     await button('Back to battle').tap()
     assert.equal(await clock.innerText(), held)
     await button('Resume').tap()
@@ -227,6 +282,7 @@ async function checkPreparation() {
 }
 
 try {
+  await checkGuideBack()
   await checkPreparation()
   // CSS pixels measured on live ab1ab68.
   await checkPhone(320, 480, 218.765625)

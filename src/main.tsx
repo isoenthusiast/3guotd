@@ -488,7 +488,7 @@ function App() {
     const enemyPage = screen === 'enemies'
     return <main class="battle-orders field-guide">
       <header><h1>{enemyPage ? 'Enemy Types' : 'Towers'}</h1>
-        <button type="button" onClick={() => setScreen('battle')}>Back to battle</button></header>
+        <button type="button" onClick={() => setScreen('orders')}>Back to orders</button></header>
       <section key={screen} class="guide-content">
       {enemyPage ? <>
         <p>Base stats before wave and story bonuses. Silver is the kill reward.</p>
