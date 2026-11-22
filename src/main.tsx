@@ -262,6 +262,9 @@ function App() {
   const rewind = opening && `Wave start: ${opening.towers.length} tower${opening.towers.length === 1 ? '' : 's'} (upgrades kept), ${opening.silver} silver, ${opening.lives} lives.`
   if (round.phase === 'lost') status = `${round.waveStats.escaped} breached · ${round.waveStats.runnersEscaped} fast. ${round.waveStats.runnersEscaped ? 'Pair a Drum with an Archer.' : 'Cover more road with Archers.'}`
   const breach = round.gateHit && !paused && `${attackerName(round.gateHit.kind)} reached the gate`
+  const breachAnnouncement = breach && round.gateHit
+    ? `${breach}. ${round.gateHit.routeIndex !== undefined ? `Entry ${round.gateHit.routeIndex + 1}. ` : ''}${round.lives} lives remaining.`
+    : ''
   const hudStatus = breach ? (showWaveStart || finished ? `${status} · ${breach}` : breach) : status
 
   const keyboard = useRef(false)
@@ -632,8 +635,8 @@ function App() {
             {tower && !needsSilver && price > baseUpgradePrice && (!tower.reach || !tower.power) &&
               <span>Second upgrade · +{price - baseUpgradePrice} silver</span>}
           </div>
-          <span class="visually-hidden" role="status" aria-atomic="true">{round.phase === 'lost' ? 'Gate fell. Retry wave available.'
-            : breach || (preparingLevel ? 'Build or upgrade before the next level starts.' : `Wave ${round.waveNumber}. ${paused ? 'Paused.' : ''}`)}</span>
+          <span class="visually-hidden" role="status" aria-atomic="true">{round.phase === 'lost' ? `${breachAnnouncement} Gate fell. Retry wave available.`.trim()
+            : breachAnnouncement || (preparingLevel ? 'Build or upgrade before the next level starts.' : `Wave ${round.waveNumber}. ${paused ? 'Paused.' : ''}`)}</span>
           {setup && !preparingLevel && tower && !tower.reach && !tower.power && !needsSilver &&
             <small>Next branch {baseUpgradePrice + secondUpgradeSurcharge}</small>}
           {canRefund && tower && <button type="button" class="refund" aria-label="Remove & refund" aria-description={`Returns ${towerRefund(tower)} silver`}
