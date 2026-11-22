@@ -52,6 +52,34 @@ try {
     await p.getByText(`Drum slowing 2 · ${expected} in Archer range`, { exact: true }).waitFor()
     await p.close()
   }
+  for (const maxed of [false, true]) {
+    const p = await browser.newPage({ viewport: { width: 320, height: 480 }, hasTouch: true, isMobile: true })
+    const button = name => p.getByRole('button', { name, exact: true })
+    await p.goto(url)
+    await p.getByText('Ready offline', { exact: true }).waitFor()
+    await p.context().setOffline(true)
+    await p.reload()
+    await p.clock.install({ time: new Date('2030-01-01T00:00:00Z') })
+    await p.clock.pauseAt(new Date('2030-01-01T00:00:02Z'))
+    await button('Campaign').tap()
+    await button('Enter battle').tap()
+    if (maxed) {
+      await button('Select marked site').tap()
+      await p.getByRole('button', { name: /Build Archer/ }).tap()
+      await p.getByRole('button', { name: /Longer range/ }).tap()
+      await p.getByRole('button', { name: /Faster fire/ }).tap()
+    }
+    await button('Battle orders').tap()
+    await p.getByLabel('Speed', { exact: true }).selectOption('3')
+    await button('Back to battle').tap()
+    await button('Start wave').tap()
+    await p.clock.runFor(1500)
+    const readout = p.locator('.battle-readout')
+    assert.match(await readout.innerText(), /Wave 1 starts.*Infantry/)
+    await p.clock.runFor(750)
+    assert.match(await readout.innerText(), maxed ? /Longer range \+ Faster fire/ : /Tap the gold/)
+    await p.close()
+  }
   console.log('Paused prep stays inside the dock at 320 × 420/480; mixed, zero and full Archer overlap counts passed offline.')
 } finally {
   await browser.close()

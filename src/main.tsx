@@ -245,16 +245,17 @@ function App() {
       ? `Wave ${round.waveNumber} starts · ${waveCue}`
       : `${enemiesRemaining(round)} of ${formation.sequence.length} attackers`
   }
-  if (running && firstPlacement && !paused) status = openingHint
+  const alertActive = showWaveStart || (running && round.rebuildTime > 0)
+  if (running && firstPlacement && !paused && !alertActive) status = openingHint
   if (preparingLevel) {
     const seconds = Math.ceil(round.levelPrepRemainingMs! / 1000)
     status = `${paused ? 'Paused · ' : ''}Build or upgrade · Wave in ${seconds}s`
     if (activeSite === null) status += `. Towers kept; +${startingSilver} silver.`
   }
-  if (!preparingLevel && !finished && coverage && !firstPlacement && !paused && !showWaveStart) {
+  if (!preparingLevel && !finished && coverage && !firstPlacement && !paused && !alertActive) {
     status = `${selectedName} · Choose a tower${shortfall ? '' : ` · ${round.silver - towerPrice} silver left after buying`}`
   }
-  if (!preparingLevel && !finished && tower && tower.reach && tower.power && !paused) {
+  if (!preparingLevel && !finished && tower && tower.reach && tower.power && !paused && !alertActive) {
     status = `${towerDetails[tower.kind].name} · ${towerDetails[tower.kind].reach} + ${towerDetails[tower.kind].power}`
   }
   const opening = round.opening
