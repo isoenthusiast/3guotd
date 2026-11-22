@@ -250,7 +250,7 @@ function App() {
     status = `${towerDetails[tower.kind].name} · ${towerDetails[tower.kind].reach} + ${towerDetails[tower.kind].power}`
   }
   const opening = round.opening
-  const rewind = opening && `Wave start: ${opening.towers.length} towers with their upgrades, ${opening.silver} silver, ${opening.lives} lives.`
+  const rewind = opening && `Wave start: ${opening.towers.length} tower${opening.towers.length === 1 ? '' : 's'} (upgrades kept), ${opening.silver} silver, ${opening.lives} lives.`
   if (round.phase === 'lost') status = `${round.waveStats.escaped} breached · ${round.waveStats.runnersEscaped} fast. ${round.waveStats.runnersEscaped ? 'Pair a Drum with an Archer.' : 'Cover more road with Archers.'}`
   const breach = round.gateHit && !paused && `${attackerName(round.gateHit.kind)} reached the gate`
   const showWaveStart = running && round.waveAge < waveCueTime
@@ -623,7 +623,7 @@ function App() {
             : breach || (preparingLevel ? 'Build or upgrade before the next level starts.' : `Wave ${round.waveNumber}. ${paused ? 'Paused.' : ''}`)}</span>
           {setup && !preparingLevel && tower && !tower.reach && !tower.power && !needsSilver &&
             <small>Next branch {baseUpgradePrice + secondUpgradeSurcharge}</small>}
-          {canRefund && tower && <button type="button" class="refund" aria-label="Remove & refund"
+          {canRefund && tower && <button type="button" class="refund" aria-label="Remove & refund" aria-description={`Returns ${towerRefund(tower)} silver`}
             onClick={() => setRound(current => removeTower(current, tower.site))}>Refund {towerRefund(tower)}</button>}
         </div>
         <div class="command-row">
