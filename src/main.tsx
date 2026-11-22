@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/ho
 import { columns, rows, sitePosition } from './game/board'
 import {
   attackers, levelPrepMs, attackerName, enemyMaxHealth, baseUpgradePrice, buildTower, canBuildAt, canSpend, closedSites, createRound, enemiesRemaining, objectiveProgress, removeTower,
-  roundRoutes, prepareNextLevel,
+  roundRoutes, prepareNextLevel, nextEntry, towerRefund, inRange, routeForEnemy, enemyPosition, startingSilver, secondUpgradeSurcharge,
   retryRound, speedOptions, startRound, tickRound, towerDetails, towerPrice, upgradePrice,
   upgradeTower, waveCueTime, roundFormation, waveOptions,
 } from './game/round'
@@ -209,13 +209,22 @@ function App() {
     }
     return best
   }, [firstPlacement, mission, round.rulesVersion])
-  const slowedCount = round.enemies.filter(enemy => enemy.slowed).length
-  const firstBuy = firstPlacement && activeSite !== null && roadCoverage(roundRoutes(round), activeSite, 'archer').reachesRoad
-  const openingHint = activeSite === null ? 'Tap the gold + on the map to place a tower.'
-    : firstBuy ? 'Tap Build Archer for your first defender.' : 'Choose a tile closer to the road for an Archer.'
+  const slowed = round.enemies.filter(enemy => enemy.slowed)
+  const archerOverlap = slowed.some(enemy => round.towers.some(defense => defense.kind === 'archer'
+    && inRange(defense, enemyPosition(enemy.progress, routeForEnemy(round, enemy)))))
+  const coverage = useMemo(() => activeSite === null || tower ? null : {
+    archer: roadCoverage(roundRoutes(round), activeSite, 'archer'),
+    drum: roadCoverage(roundRoutes(round), activeSite, 'drum'),
+  }, [activeSite, tower, mission, round.rulesVersion])
+  const firstBuy = firstPlacement && coverage?.archer.reachesRoad
+  const selectedName = activeSite === null ? '' : String.fromCharCode(65 + activeSite % columns) + (1 + Math.floor(activeSite / columns))
+  const openingHint = activeSite === null ? 'Tap the gold + for an Archer site.'
+    : firstBuy ? `${selectedName} · Tap Build Archer to guard the gold road.` : 'Choose a site closer to the road.'
+  const firstThreat = attackerName(formation.sequence[0])
+  const lanes = roundRoutes(round).length
   const report = finished ? { ...round.waveStats, waveNumber: round.waveNumber } : round.previousWave
   let status = setup ? (firstPlacement ? openingHint : tower ? `${towerDetails[tower.kind].name}${tower.reach && tower.power ? ' · Fully upgraded' : ' · Choose an upgrade'}`
-    : activeSite !== null ? 'Choose a tower' : 'Tap a tower to upgrade or a stake to build')
+    : activeSite !== null ? 'Choose a tower' : 'Select a tower to upgrade or a stake to build')
     : round.phase === 'won' ? (mission ? 'Level cleared!' : 'Gate defended!') : 'The gate fell.'
   if (running) {
     const first = formation.sequence[0]
@@ -231,7 +240,13 @@ function App() {
   if (running && firstPlacement && !paused) status = openingHint
   if (preparingLevel) {
     const seconds = Math.ceil(round.levelPrepRemainingMs! / 1000)
-    status = `Level ${mission?.level} · Wave 1 in ${seconds}s${paused ? ' · Paused' : ''}`
+    status = `${paused ? 'Paused · ' : ''}Build or upgrade · Wave starts in ${seconds}s. Towers kept; +${startingSilver} silver.`
+  }
+  if (!preparingLevel && !finished && coverage && !firstPlacement && !paused) {
+    status = `${selectedName} · Choose a tower${shortfall ? '' : ` · ${round.silver - towerPrice} silver left after buying`}`
+  }
+  if (!preparingLevel && !finished && tower && tower.reach && tower.power && !paused) {
+    status = `${towerDetails[tower.kind].name} · ${towerDetails[tower.kind].reach} + ${towerDetails[tower.kind].power}`
   }
   const breach = round.gateHit && !paused && `${attackerName(round.gateHit.kind)} reached the gate`
   const showWaveStart = running && round.waveAge < waveCueTime
@@ -574,14 +589,16 @@ function App() {
         <div class="command-status">
           <div role="status">
             {hudStatus && <span>{hudStatus}</span>}
-            {!finished && upcomingClosures && <span>Marked sites close next wave.</span>}
-            {slowedCount > 0 && <span class="drum-effect">Drum slowing {slowedCount}</span>}
+            {!finished && upcomingClosures && <span>× closes next wave · tower refunded.</span>}
+            {slowed.length > 0 && <span class="drum-effect">Drum slowing {slowed.length} · {archerOverlap ? 'in Archer range' : 'outside Archer range'}</span>}
             {needsSilver && <span class="action-note">Need {shortfall} more silver.</span>}
             {tower && !needsSilver && price > baseUpgradePrice && (!tower.reach || !tower.power) &&
               <span>Second upgrade · +{price - baseUpgradePrice} silver</span>}
           </div>
+          {setup && !preparingLevel && tower && !tower.reach && !tower.power && !needsSilver &&
+            <small>Next branch {baseUpgradePrice + secondUpgradeSurcharge}</small>}
           {canRefund && tower && <button type="button" class="refund" aria-label="Remove & refund"
-            onClick={() => setRound(current => removeTower(current, tower.site))}>Refund</button>}
+            onClick={() => setRound(current => removeTower(current, tower.site))}>Refund {towerRefund(tower)}</button>}
         </div>
         <div class="command-row">
           {showActions && activeSite !== null && (!tower || !tower.reach || !tower.power) ? (
@@ -599,16 +616,16 @@ function App() {
                   <TowerPortrait kind={kind} />
                   <span><strong>Build {towerDetails[kind].name}</strong>
                     <span>{towerPrice} silver</span></span>
-                  <small><i class={`range-key ${kind}`} aria-hidden="true" />{!roadCoverage(roundRoutes(round), activeSite, kind).reachesRoad
-                    ? 'Road out of range' : kind === 'archer' ? 'Damage' : 'Slow'}</small>
+                  <small><i class={`range-key ${kind}`} aria-hidden="true" />{coverage?.[kind].reachesRoad
+                    ? `${kind === 'archer' ? 'Hit' : 'Slow'} · ${coverage[kind].zones.join('/')}` : 'Road out of range'}</small>
                 </button>
               ))}
             </section>
           ) : suggested !== null && activeSite === null ? <button type="button" class="choose-site"
-            onClick={() => selectTile(suggested)}>Select marked site</button> : <div class="command-location">{mission?.title ?? 'Shu frontier'}</div>}
+            onClick={() => selectTile(suggested)} aria-label="Select marked site">Select marked site<small>Archer · {towerPrice} silver</small></button> : <div class="command-location">{mission?.title ?? 'Shu frontier'}</div>}
           {running || preparingLevel ? <button class="battle-primary" type="button" onClick={() => setPaused(value => !value)}>
             {paused ? 'Resume' : 'Pause'}</button>
-            : setup ? <button class="battle-primary" type="button" onClick={() => setRound(startRound)}>Start wave</button>
+            : setup ? <button class="battle-primary" type="button" aria-label="Start wave" onClick={() => setRound(startRound)}>Start wave<small>{firstThreat} first{lanes > 1 ? ` · E${nextEntry(round) + 1}` : ''}</small></button>
             : round.phase === 'won' && upcoming && upcoming.battleId !== mission?.battleId ? <button class="battle-primary" type="button" onClick={() => openMission(upcoming)}>Next battle</button>
             : round.phase === 'lost' ? <button class="battle-primary" type="button" onClick={retryWave}>Retry wave</button>
             : <button class="battle-primary" type="button" onClick={back}>Main menu</button>}

@@ -12,12 +12,11 @@ export function roadCoverage(routes: readonly Route[], site: number, kind: Tower
   const [cx, cy] = sitePosition(site)
   const radius = towerRange(kind, reach)
   const segments: Segment[] = []
+  const zones = new Set<string>()
   const seen = new Set<string>()
   for (const route of routes) for (let i = 1; i < route.length; i++) {
     const a = route[i - 1], b = route[i]
     const key = [a.join(','), b.join(',')].sort().join(':')
-    if (seen.has(key)) continue
-    seen.add(key)
     const dx = b[0] - a[0], dy = b[1] - a[1]
     const length2 = dx * dx + dy * dy
     if (!length2) continue
@@ -28,10 +27,14 @@ export function roadCoverage(routes: readonly Route[], site: number, kind: Tower
     const half = Math.sqrt(discriminant / length2)
     const start = Math.max(0, projection - half), end = Math.min(1, projection + half)
     if (end <= start) continue
+    const along = (i - 1 + (start + end) / 2) / (route.length - 1)
+    zones.add(along < 1 / 3 ? 'entry' : along < 2 / 3 ? 'middle' : 'gate')
+    if (seen.has(key)) continue
+    seen.add(key)
     segments.push([[a[0] + dx * start, a[1] + dy * start], [a[0] + dx * end, a[1] + dy * end]])
   }
   const roadTiles = segments.reduce((sum, [a, b]) => sum + Math.hypot(b[0] - a[0], b[1] - a[1]), 0)
-  return { segments, roadTiles, reachesRoad: roadTiles > 0 }
+  return { segments, zones: [...zones], roadTiles, reachesRoad: roadTiles > 0 }
 }
 
 export function placementCoverage(round: Round, site: number) {

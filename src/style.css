@@ -361,3 +361,10 @@ button:focus-visible { outline: 2px solid #ffedaf; outline-offset: 2px; }
   .field-guide p { font-size: .85rem; line-height: 1.25; margin-block: .4rem; }
   .field-guide th, .field-guide td { padding: .2rem; }
 }
+
+.choose-site small, .battle-primary small {
+  display: block;
+  font-size: .68rem;
+  font-weight: normal;
+  line-height: 1.1;
+}

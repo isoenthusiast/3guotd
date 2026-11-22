@@ -205,6 +205,10 @@ export function canBuildAt(round: Round, site: number): boolean {
   return isBuildable(site, roundRoutes(round)) && !closedSites(round).includes(site)
 }
 
+export function nextEntry(round: Round, spawn = round.spawned): number {
+  return (round.waveNumber + spawn - 1) % roundRoutes(round).length
+}
+
 export function routeForEnemy(round: Round, enemy: Enemy): Route {
   return roundRoutes(round)[enemy.routeIndex ?? 0]
 }
@@ -246,7 +250,7 @@ export function upgradeTower(round: Round, site: number, branch: Upgrade): Round
   }
 }
 
-function towerRefund(tower: Tower): number {
+export function towerRefund(tower: Tower): number {
   return towerPrice + Number(tower.reach || tower.power) * baseUpgradePrice
     + Number(tower.reach && tower.power) * (baseUpgradePrice + secondUpgradeSurcharge)
 }
@@ -268,7 +272,7 @@ export function enemyPosition(progress: number, path: Route = route): Point {
   return [x + (nextX - x) * fraction, y + (nextY - y) * fraction]
 }
 
-function inRange(tower: Tower, [x, y]: Point): boolean {
+export function inRange(tower: Tower, [x, y]: Point): boolean {
   const [towerX, towerY] = sitePosition(tower.site)
   return Math.hypot(x - towerX, y - towerY) <= towerRange(tower.kind, tower.reach)
 }
@@ -341,7 +345,7 @@ export function advanceRound(round: Round, seconds: number, visualSeconds = seco
   const formation = roundFormation(round)
   if (spawned < formation.sequence.length && spawnTimer <= 0) {
     const kind = formation.sequence[spawned]
-    const routeIndex = (round.waveNumber + spawned - 1) % roundRoutes(round).length
+    const routeIndex = nextEntry(round, spawned)
     enemies.push({ id: spawned, kind, health: enemyMaxHealth(round, kind), progress: 0, slowed: false, routeIndex })
     spawned++
     spawnTimer += formation.interval ?? spawnInterval
