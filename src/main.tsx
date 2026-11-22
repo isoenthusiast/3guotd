@@ -96,6 +96,7 @@ function Battlefield({ round, selected, suggested, onSelect }: {
     return () => cancelAnimationFrame(frame)
   }, [round, selected, artReady])
 
+  const tabSite = selected ?? suggested ?? reachable.findIndex((_, site) => canBuildAt(round, site))
   return (
     <div class="battlefield">
       <canvas ref={canvas} width={columns * tile} height={rows * tile} role="img"
@@ -112,7 +113,7 @@ function Battlefield({ round, selected, suggested, onSelect }: {
             <button key={site} ref={button => { cells.current[site] = button }}
               type="button" class={tower ? 'cell' : reachable[site] ? 'cell empty-cell useful-site' : 'cell empty-cell'} data-suggested={site === suggested && selected === null ? 'true' : undefined}
               aria-description={site === suggested ? 'Suggested first tower site' : undefined}
-              tabIndex={site === (selected ?? suggested ?? 0) ? 0 : -1}
+              tabIndex={site === tabSite ? 0 : -1}
               aria-label={`${label}, row ${y + 1}, column ${x + 1}`}
               aria-pressed={selected === site} onClick={() => onSelect(site)}
               onKeyDown={event => {
@@ -242,15 +243,35 @@ function App() {
     const seconds = Math.ceil(round.levelPrepRemainingMs! / 1000)
     status = `${paused ? 'Paused · ' : ''}Build or upgrade · Wave starts in ${seconds}s. Towers kept; +${startingSilver} silver.`
   }
-  if (!preparingLevel && !finished && coverage && !firstPlacement && !paused) {
+  if (!preparingLevel && !finished && coverage && !firstPlacement && !paused && (!running || round.waveAge >= waveCueTime)) {
     status = `${selectedName} · Choose a tower${shortfall ? '' : ` · ${round.silver - towerPrice} silver left after buying`}`
   }
   if (!preparingLevel && !finished && tower && tower.reach && tower.power && !paused) {
     status = `${towerDetails[tower.kind].name} · ${towerDetails[tower.kind].reach} + ${towerDetails[tower.kind].power}`
   }
+  const opening = round.opening
+  const rewind = opening && `Wave start: ${opening.towers.length} towers with their upgrades, ${opening.silver} silver, ${opening.lives} lives.`
+  if (round.phase === 'lost') status = `${round.waveStats.escaped} breached · ${round.waveStats.runnersEscaped} fast. ${round.waveStats.runnersEscaped ? 'Pair a Drum with an Archer.' : 'Cover more road with Archers.'}`
   const breach = round.gateHit && !paused && `${attackerName(round.gateHit.kind)} reached the gate`
   const showWaveStart = running && round.waveAge < waveCueTime
   const hudStatus = breach ? (showWaveStart || finished ? `${status} · ${breach}` : breach) : status
+
+  const keyboard = useRef(false)
+  useEffect(() => {
+    const onKey = () => { keyboard.current = true }
+    const onPointer = () => { keyboard.current = false }
+    window.addEventListener('keydown', onKey, true)
+    window.addEventListener('pointerdown', onPointer, true)
+    return () => {
+      window.removeEventListener('keydown', onKey, true)
+      window.removeEventListener('pointerdown', onPointer, true)
+    }
+  }, [])
+  useLayoutEffect(() => {
+    if (!keyboard.current || document.activeElement !== document.body) return
+    const focus = screen === 'battle' ? '.cells [tabindex="0"]' : 'main button:not(:disabled)'
+    document.querySelector<HTMLElement>(focus)?.focus({ preventScroll: true })
+  }, [screen, confirmation, activeSite, tower?.kind, tower?.power, tower?.reach])
 
   function selectTile(site: number | null) {
     setSelected(site)
@@ -529,6 +550,9 @@ function App() {
         <button type="button" onClick={back}>Back to battle</button>
       </header>
       <p>{mission?.title ?? 'Shu frontier'} · Wave {round.waveNumber} of {round.totalWaves}</p>
+      <p class="orders-intel">Wave {round.waveNumber} · {formation.name}. {Array.from(new Set(formation.sequence)).map(attackerName).join(', ')}.
+        {lanes > 1 && round.spawned < formation.sequence.length && ` Next arrival: Entry ${nextEntry(round) + 1}.`}
+        {' '}{running || preparingLevel ? paused ? 'Returns paused.' : 'Returns to play.' : ''}</p>
       <div class="orders-list">
         <nav class="guide-links" aria-label="Field guide">
           <button type="button" onClick={() => navigate('enemies')}>Enemy Types</button>
@@ -538,8 +562,8 @@ function App() {
         {(report || showChronicle) && <button type="button" onClick={() => {
           if (running || preparingLevel) setPaused(true)
           navigate('orders', 'report')
-        }}>Report</button>}
-        {!setup && <button type="button" onClick={retryWave}>Retry wave</button>}
+        }} aria-label="Report">Report{(running || preparingLevel) && !paused && ' · pauses play'}</button>}
+        {!setup && <div><button type="button" onClick={retryWave}>Retry wave</button> <small>{rewind}</small></div>}
         {initialSetup && !round.continuedStory && round.towers.length > 0 && <button type="button"
           onClick={() => enterBattle(createRound(round.totalWaves, mission))}>Clear towers</button>}
         {finished && <button type="button" onClick={() => enterBattle(createRound(round.totalWaves, mission))}>
@@ -580,14 +604,14 @@ function App() {
           </div>
           <div class="objective">{mission ? `${objectiveProgress(round)}/${mission.milestoneCount} ${mission.milestone}` : 'Defend the outpost gate'}</div>
         </div>
-        <button type="button" class="edge-control" aria-label="Battle orders" onClick={() => navigate('orders')}>Orders<small>{speed}×</small></button>
+        <button type="button" class="edge-control" aria-label="Battle orders" onClick={() => navigate('orders')}>Orders<small>Help · {speed}×</small></button>
       </header>
       <div class="board-view">
         <Battlefield round={round} selected={activeSite} suggested={suggested} onSelect={site => selectTile(site === activeSite ? null : site)} />
       </div>
       <footer class="command-bar">
         <div class="command-status">
-          <div role="status">
+          <div class="battle-readout">
             {hudStatus && <span>{hudStatus}</span>}
             {!finished && upcomingClosures && <span>× closes next wave · tower refunded.</span>}
             {slowed.length > 0 && <span class="drum-effect">Drum slowing {slowed.length} · {archerOverlap ? 'in Archer range' : 'outside Archer range'}</span>}
@@ -595,6 +619,8 @@ function App() {
             {tower && !needsSilver && price > baseUpgradePrice && (!tower.reach || !tower.power) &&
               <span>Second upgrade · +{price - baseUpgradePrice} silver</span>}
           </div>
+          <span class="visually-hidden" role="status" aria-atomic="true">{round.phase === 'lost' ? 'Gate fell. Retry wave available.'
+            : breach || (preparingLevel ? 'Build or upgrade before the next level starts.' : `Wave ${round.waveNumber}. ${paused ? 'Paused.' : ''}`)}</span>
           {setup && !preparingLevel && tower && !tower.reach && !tower.power && !needsSilver &&
             <small>Next branch {baseUpgradePrice + secondUpgradeSurcharge}</small>}
           {canRefund && tower && <button type="button" class="refund" aria-label="Remove & refund"
@@ -622,7 +648,7 @@ function App() {
               ))}
             </section>
           ) : suggested !== null && activeSite === null ? <button type="button" class="choose-site"
-            onClick={() => selectTile(suggested)} aria-label="Select marked site">Select marked site<small>Archer · {towerPrice} silver</small></button> : <div class="command-location">{mission?.title ?? 'Shu frontier'}</div>}
+            onClick={() => selectTile(suggested)} aria-label="Select marked site">Select marked site<small>Archer · {towerPrice} silver</small></button> : <div class="command-location">{round.phase === 'lost' ? rewind : mission?.title ?? 'Shu frontier'}</div>}
           {running || preparingLevel ? <button class="battle-primary" type="button" onClick={() => setPaused(value => !value)}>
             {paused ? 'Resume' : 'Pause'}</button>
             : setup ? <button class="battle-primary" type="button" aria-label="Start wave" onClick={() => setRound(startRound)}>Start wave<small>{firstThreat} first{lanes > 1 ? ` · E${nextEntry(round) + 1}` : ''}</small></button>

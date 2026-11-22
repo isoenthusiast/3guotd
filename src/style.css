@@ -208,8 +208,8 @@ button:focus-visible { outline: 2px solid #ffedaf; outline-offset: 2px; }
 }
 .command-status, .command-row { display: flex; align-items: center; gap: 4px; }
 .command-status { justify-content: space-between; padding-inline: 4px; }
-.command-status [role=status] { font-size: .76rem; line-height: 1.12; color: #e1d7bd; }
-.command-status [role=status] span + span::before { content: ' · '; }
+.command-status .battle-readout { font-size: .76rem; line-height: 1.12; color: #e1d7bd; }
+.command-status .battle-readout span + span::before { content: ' · '; }
 .action-note { color: #ffdb96; }
 .refund { color: #ffdc9a; text-decoration: underline; text-underline-offset: 3px; }
 .command-row { align-items: stretch; }
@@ -368,3 +368,5 @@ button:focus-visible { outline: 2px solid #ffedaf; outline-offset: 2px; }
   font-weight: normal;
   line-height: 1.1;
 }
+
+.orders-intel, .command-status > small { font-size: .78rem; }
