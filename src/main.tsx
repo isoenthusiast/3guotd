@@ -211,8 +211,8 @@ function App() {
     return best
   }, [firstPlacement, mission, round.rulesVersion])
   const slowed = round.enemies.filter(enemy => enemy.slowed)
-  const archerOverlap = slowed.some(enemy => round.towers.some(defense => defense.kind === 'archer'
-    && inRange(defense, enemyPosition(enemy.progress, routeForEnemy(round, enemy)))))
+  const inArcherRange = slowed.filter(enemy => round.towers.some(defense => defense.kind === 'archer'
+    && inRange(defense, enemyPosition(enemy.progress, routeForEnemy(round, enemy))))).length
   const coverage = useMemo(() => activeSite === null || tower ? null : {
     archer: roadCoverage(roundRoutes(round), activeSite, 'archer'),
     drum: roadCoverage(roundRoutes(round), activeSite, 'drum'),
@@ -241,7 +241,8 @@ function App() {
   if (running && firstPlacement && !paused) status = openingHint
   if (preparingLevel) {
     const seconds = Math.ceil(round.levelPrepRemainingMs! / 1000)
-    status = `${paused ? 'Paused · ' : ''}Build or upgrade · Wave starts in ${seconds}s. Towers kept; +${startingSilver} silver.`
+    status = `${paused ? 'Paused · ' : ''}Build or upgrade · Wave in ${seconds}s`
+    if (activeSite === null) status += `. Towers kept; +${startingSilver} silver.`
   }
   if (!preparingLevel && !finished && coverage && !firstPlacement && !paused && (!running || round.waveAge >= waveCueTime)) {
     status = `${selectedName} · Choose a tower${shortfall ? '' : ` · ${round.silver - towerPrice} silver left after buying`}`
@@ -614,7 +615,7 @@ function App() {
           <div class="battle-readout">
             {hudStatus && <span>{hudStatus}</span>}
             {!finished && upcomingClosures && <span>× closes next wave · tower refunded.</span>}
-            {slowed.length > 0 && <span class="drum-effect">Drum slowing {slowed.length} · {archerOverlap ? 'in Archer range' : 'outside Archer range'}</span>}
+            {slowed.length > 0 && <span class="drum-effect">Drum slowing {slowed.length} · {inArcherRange} in Archer range</span>}
             {needsSilver && <span class="action-note">Need {shortfall} more silver.</span>}
             {tower && !needsSilver && price > baseUpgradePrice && (!tower.reach || !tower.power) &&
               <span>Second upgrade · +{price - baseUpgradePrice} silver</span>}
