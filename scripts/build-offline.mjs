@@ -10,13 +10,14 @@ const files = (await readdir(dist, { recursive: true, withFileTypes: true }))
   .sort((left, right) => left.href.localeCompare(right.href))
 
 const hash = createHash('sha256').update(template)
-const assets = []
+const integrity = {}
 for (const file of files) {
   const path = file.href.slice(dist.href.length)
-  hash.update(JSON.stringify(path)).update(await readFile(file))
-  assets.push(`./${path}`)
+  const bytes = await readFile(file)
+  hash.update(JSON.stringify(path)).update(bytes)
+  integrity[`./${path}`] = 'sha256-' + createHash('sha256').update(bytes).digest('base64')
 }
 
 const version = hash.digest('hex').slice(0, 16)
 await writeFile(new URL('sw.js', dist),
-  `const version = ${JSON.stringify(version)}\nconst assets = ${JSON.stringify(assets)}\n\n${template}`)
+  `const version = ${JSON.stringify(version)}\nconst integrity = ${JSON.stringify(integrity)}\n\n${template}`)

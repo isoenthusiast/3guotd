@@ -31,7 +31,7 @@ export function useOfflineReadiness() {
         channel.port1.close()
         channels.delete(channel.port1)
       }
-      worker.postMessage({ type: 'OFFLINE_STATUS' }, [channel.port2])
+      worker.postMessage({ type: 'OFFLINE_STATUS', online: navigator.onLine }, [channel.port2])
     }
     const watchUpdate = () => {
       const installing = registration?.installing

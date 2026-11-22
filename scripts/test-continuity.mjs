@@ -47,19 +47,19 @@ try {
     const name = (await caches.keys()).find(key => key.startsWith('3guotd:'))
     const cache = await caches.open(name)
     const request = (await cache.keys()).find(key => key.url.endsWith('.css'))
-    window.heldOfflineAsset = { cache, request, response: await cache.match(request) }
     await cache.delete(request)
+    await cache.delete((await cache.keys()).find(key => key.url.endsWith('icon-512.png')))
     navigator.serviceWorker.dispatchEvent(new Event('controllerchange'))
   })
   await page.getByText('Offline files incomplete · reconnect and reload', { exact: true }).waitFor()
-  await page.evaluate(async () => {
-    const { cache, request, response } = window.heldOfflineAsset
-    await cache.put(request, response)
-    delete window.heldOfflineAsset
-    navigator.serviceWorker.dispatchEvent(new Event('controllerchange'))
-  })
+  await context.setOffline(false)
+  await reload()
   await page.getByText('Ready offline', { exact: true }).waitFor()
-  console.log('Passed: missing cached file cannot claim Ready offline; complete cache restores readiness.')
+  await context.setOffline(true)
+  await reload()
+  await page.getByText('Ready offline', { exact: true }).waitFor()
+  assert.equal(await page.locator('.menu-actions').evaluate(el => getComputedStyle(el).display), 'flex')
+  console.log('Passed: cache loss reported offline; reconnect/reload repaired missing CSS and icon; second offline reload styled.')
 
   for (const fontSize of [24, 32]) {
     await page.evaluate(size => { document.documentElement.style.fontSize = `${size}px` }, fontSize)
