@@ -97,13 +97,18 @@ const emulate = (number) => {
 }
 say('wave  formationName')
 const distinctBases = new Set()
+const breakthroughWaves = []
 for (let n = 1; n <= 40; n++) {
   const f = emulate(n)
-  if (!f.breakthrough) distinctBases.add(f.name)
+  // The label carries a health suffix; the formation name is what precedes it.
+  if (!f.breakthrough) distinctBases.add(f.name.split(' · ')[0])
+  else breakthroughWaves.push(n)
   say(`${String(n).padStart(4)}  ${f.name}`)
 }
 say('')
-say(`distinct non-breakthrough formation names across 40 waves: ${distinctBases.size}`)
+say(`distinct formation names (suffix stripped): ${distinctBases.size} — ${[...distinctBases].join(', ')}`)
+say(`every fifth wave is a cavalry column: ${breakthroughWaves.join(', ')}`)
+say(`formation names cycle on a period of 3: waves 1-3 ${[1, 2, 3].map(n => emulate(n).name).join(' / ')}`)
 
 console.log(lines.join('\n'))
 writeFileSync(OUT_FILE, lines.join('\n') + '\n')

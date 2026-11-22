@@ -50,6 +50,7 @@ ANCHORS = [
     ("src/game/board.ts", "export const rows = 13"),
     ("src/game/round.ts", "const formations = ["),
     ("src/game/round.ts", "export function waveFormation(number: number): Formation"),
+    ("src/game/round.ts", "number % 5 === 0 ? 'Breakthrough' : base.name"),
     ("src/game/round.ts", "export function roundFormation(round: Round): Formation"),
     ("src/game/round.ts", "export function enemyMaxHealth(round: Round, kind: AttackerKind): number"),
     ("src/game/round.ts", "formations[(number - 1) % formations.length]"),

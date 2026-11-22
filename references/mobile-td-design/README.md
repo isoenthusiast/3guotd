@@ -331,8 +331,8 @@ story. Nothing tells them the enemy *mix* they already handled has returned unch
 **Why.** `waveFormation()` (`src/game/round.ts` -> `formations[(number - 1) % formations.length]`) picks the wave's
 enemy list by index into `formations`, and `formations` holds exactly **three** entries:
 Mixed patrol, Runner rush, Veteran column. Measured over a 40-wave run, the composition repeats
-on a cycle of three, with every fifth wave swapped to a uniform cavalry column (waves 5, 10, …,
-40) (`src/game/round.ts` -> `sequence: number % 5 === 0`). What changes across the run is the **health bonus** (capped at
+on a cycle of three, with every fifth wave swapped to a uniform cavalry column and relabelled
+"Breakthrough" (waves 5, 10, …, 40) (`src/game/round.ts` -> `sequence: number % 5 === 0`). What changes across the run is the **health bonus** (capped at
 +24), the spawn **interval** (1.25 s at wave 4, down to 0.69 s by wave 40, floored at 0.45 s),
 and the wave **name** — "Runner rush · +8 health", which is wave 23. The mission path cycles
 too: `threats[chapter][enemy % threats[chapter].length]` (`src/game/campaign.ts` -> `threats[chapter][enemy % threats[chapter].length]`) rotates a
@@ -340,7 +340,9 @@ four-enemy list per chapter.
 
 So across a 40-wave session the player meets **three enemy patterns, repeated**, getting
 numerically harder. The health number is in the wave name, but the *pattern* is never named as a
-pattern — and a player has no way to learn that wave 34 is the same shape as wave 4.
+pattern — and a player has no way to learn that wave 34 is the same shape as wave 4. The cavalry
+wave is worse: it arrives with a *different* name, so even a player who noticed the pattern
+repeating would read "Breakthrough" as new.
 
 **Why this is a UI finding and not a balance finding.** The scope is deliberately narrow: **not**
 "the waves should escalate differently" — that is a design decision for the owner — but "the

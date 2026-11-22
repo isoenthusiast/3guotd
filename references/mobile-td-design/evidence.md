@@ -145,7 +145,8 @@ it — so what is missing is the OS-level preference, not the pause.
 `waveFormation()` (`src/game/round.ts` -> `formations[(number - 1) % formations.length]`) picks the wave's
 enemy list by index into `formations`, and `formations` holds exactly **three** entries:
 Mixed patrol, Runner rush, Veteran column. Measured over a 40-wave run, the composition repeats
-on a cycle of three, with every fifth wave swapped to a uniform cavalry column (waves 5, 10, …,
+on a cycle of three, with every fifth wave swapped to a uniform cavalry column and relabelled
+"Breakthrough" (waves 5, 10, …,
 40) (`src/game/round.ts` -> `sequence: number % 5 === 0`). What changes across the run is the **health bonus** (capped at
 +24), the spawn **interval** (1.25 s at wave 4, down to 0.69 s by wave 40, floored at 0.45 s),
 and the wave **name** — "Runner rush · +8 health", which is wave 23.
@@ -195,6 +196,7 @@ pattern — and a player has no way to learn that wave 34 is the same shape as w
 | Wave composition cycles `formations[(number - 1) % formations.length]` | `src/game/round.ts` | `formations[(number - 1) % formations.length]` |
 | `formations` list (3 entries) | `src/game/round.ts` | `const formations = [` |
 | Every 5th wave becomes a uniform cavalry column | `src/game/round.ts` | `sequence: number % 5 === 0` |
+| Every 5th wave is relabelled "Breakthrough" | `src/game/round.ts` | `number % 5 === 0 ? 'Breakthrough' : base.name` |
 | Cavalry column fills all 12 slots | `src/game/round.ts` | `.fill('cavalry')` |
 | Wave health bonus capped at +24 | `src/game/round.ts` | `Math.min(24, stage * 2)` |
 | Spawn interval ramp | `src/game/round.ts` | `interval: Math.max(0.45, 1.25 - stage * 0.08)` |
