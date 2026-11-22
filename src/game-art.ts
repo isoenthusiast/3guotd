@@ -1,7 +1,8 @@
 import { columns, rows, sitePosition } from './game/board'
-import { canBuildAt, closedSites, enemyDetails, enemyPosition, impactTime, enemyMaxHealth, roundRoutes, routeForEnemy, shotFlightTime, towerRange } from './game/round'
+import { canBuildAt, closedSites, enemyPosition, impactTime, enemyMaxHealth, roundRoutes, routeForEnemy, shotFlightTime, towerRange } from './game/round'
 import type { Round, TowerKind } from './game/round'
 
+import { drawAttacker } from './attacker-art'
 import { paintArt } from './battlefield-art-assets'
 import { drawLandscape, drawObjective, drawRoadCoverage, drawRoadWear, objectiveAnimationPending } from './battlefield-scenery'
 export { loadBattlefieldArt } from './battlefield-art-assets'
@@ -241,83 +242,10 @@ export function drawBattlefield(
 
   const targets = new Map<number, [number, number]>()
   for (const enemy of round.enemies) {
-    const [x, y] = center(enemyPosition(enemy.progress, routeForEnemy(round, enemy)))
-    const detail = enemyDetails(enemy)
-    targets.set(enemy.id, [x, y])
-    const sprite = enemy.kind === 'veteran' ? 'infantry'
-      : enemy.kind === 'veteranRunner' ? 'runner' : enemy.kind === 'bowman' ? 'infantry' : enemy.kind
-    const width = enemy.kind === 'cavalry' ? 54 : enemy.kind === 'commander' ? 46 : 36
-    const height = enemy.kind === 'cavalry' ? 48 : 48
-    const bob = round.phase === 'running' ? Math.sin(enemy.progress * 12 + enemy.id) * 1.3 : 0
-    ctx.save()
     const path = routeForEnemy(round, enemy)
+    const [x, y] = center(enemyPosition(enemy.progress, path))
+    targets.set(enemy.id, [x, y])
     const i = Math.min(Math.floor(enemy.progress), path.length - 2)
-    const left = path[i + 1][0] < path[i][0]
-    ctx.translate(x, y + bob)
-    if (left) ctx.scale(-1, 1)
-    const painted = paintArt(ctx, sprite, -width / 2, 22 - height, width, height)
-    ctx.restore()
-    if (!painted) {
-    ctx.fillStyle = detail.runner ? '#72382e' : '#33353c'
-    ctx.beginPath()
-    ctx.ellipse(x, y + 6, enemy.kind === 'cavalry' ? 21 : detail.runner ? 10 : 16,
-      enemy.kind === 'commander' ? 20 : 16, 0, 0, 2 * Math.PI)
-    ctx.fill()
-    if (enemy.kind === 'cavalry') {
-      ctx.fillStyle = '#6b402e'
-      ctx.fillRect(x + 13, y - 8, 13, 11)
-      ctx.fillRect(x - 16, y + 12, 6, 12)
-      ctx.fillRect(x + 10, y + 12, 6, 12)
-    } else if (enemy.kind === 'infantry' || enemy.kind === 'veteran') {
-      ctx.fillStyle = '#906842'
-      ctx.strokeStyle = '#342c26'
-      ctx.lineWidth = 3
-      ctx.beginPath()
-      ctx.arc(x + 10, y + 8, 9, 0, Math.PI * 2)
-      ctx.fill()
-      ctx.stroke()
-    }
-    ctx.fillStyle = detail.level === 2 ? '#e5b168' : '#dcc5a0'
-    ctx.beginPath()
-    ctx.arc(x, y - 5, detail.runner ? 6 : 8, 0, 2 * Math.PI)
-    ctx.fill()
-    if (detail.level === 2) {
-      ctx.fillStyle = '#302d35'
-      ctx.beginPath()
-      ctx.moveTo(x - 11, y - 4)
-      ctx.lineTo(x - 8, y - 15)
-      ctx.lineTo(x + 8, y - 15)
-      ctx.lineTo(x + 11, y - 4)
-      ctx.closePath()
-      ctx.fill()
-      ctx.fillRect(x - 14, y - 6, 28, 4)
-    }
-    if (enemy.kind === 'bowman' || enemy.kind === 'commander') {
-      ctx.strokeStyle = '#f5d693'
-      ctx.lineWidth = 3
-      ctx.beginPath()
-      if (enemy.kind === 'bowman') {
-        ctx.arc(x + 11, y + 8, 10, -Math.PI / 2, Math.PI / 2)
-      } else {
-        ctx.moveTo(x - 20, y + 19)
-        ctx.lineTo(x - 20, y - 19)
-        ctx.lineTo(x - 4, y - 15)
-        ctx.lineTo(x - 20, y - 8)
-      }
-      ctx.stroke()
-    }
-    }
-    if (enemy.kind === 'bowman') {
-      // The approved sheet has four troop cutouts. A visible bow distinguishes
-      // the bowman without inventing an unapproved fifth illustrated character.
-      ctx.strokeStyle = '#f4d59c'; ctx.lineWidth = 2.5
-      ctx.beginPath(); ctx.arc(x + 12, y, 14, -Math.PI / 2, Math.PI / 2); ctx.stroke()
-      ctx.beginPath(); ctx.moveTo(x + 12, y - 14); ctx.lineTo(x + 12, y + 14); ctx.stroke()
-    }
-    if (detail.level === 2 && enemy.kind !== 'commander' && enemy.kind !== 'cavalry') {
-      ctx.fillStyle = '#b33f2a'
-      ctx.fillRect(x - 12, y - 12, 6, 12)
-    }
     if (enemy.slowed) {
       ctx.strokeStyle = '#c6f2f0'
       ctx.lineWidth = 4
@@ -325,6 +253,11 @@ export function drawBattlefield(
       ctx.ellipse(x, y + 18, 19, 7, 0, 0, 2 * Math.PI)
       ctx.stroke()
     }
+    ctx.save()
+    ctx.translate(x, y)
+    if (path[i + 1][0] < path[i][0]) ctx.scale(-1, 1)
+    drawAttacker(ctx, enemy.kind, enemy.progress)
+    ctx.restore()
   }
   for (const shot of round.shots) {
     const target = targets.get(shot.targetId)
