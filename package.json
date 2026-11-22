@@ -9,7 +9,8 @@
     "test": "node scripts/test-round.mjs",
     "build": "npm run check && vite build && node scripts/build-offline.mjs && node scripts/build-standalone.mjs",
     "preview": "vite preview",
-    "test:ux": "node scripts/test-mobile-ux.mjs"
+    "test:ux": "node scripts/test-mobile-ux.mjs",
+    "test:back": "node scripts/test-system-back.mjs"
   },
   "engines": {
     "node": "^20.19.0 || >=22.12.0"

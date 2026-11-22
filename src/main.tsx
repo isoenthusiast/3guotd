@@ -1,5 +1,5 @@
 import { render } from 'preact'
-import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { columns, rows, sitePosition } from './game/board'
 import {
   attackers, levelPrepMs, attackerName, enemyMaxHealth, baseUpgradePrice, buildTower, canBuildAt, canSpend, closedSites, createRound, enemiesRemaining, objectiveProgress, removeTower,
@@ -17,6 +17,7 @@ import { enableAudio, playCue } from './sound'
 import { terrainArt } from './terrain-art'
 import villageGate from './assets/village-gate.webp?inline'
 import villageWatch from './assets/village-watch.webp?inline'
+import { useGameNavigation } from './navigation'
 import './style.css'
 
 const siteCount = columns * rows
@@ -162,12 +163,14 @@ function loadClears(): string[] {
 function App() {
   const reportDialog = useRef<HTMLDialogElement>(null)
   const [offline, setOffline] = useState('')
-  const [screen, setScreen] = useState<'menu' | 'campaign' | 'long' | 'battle' | 'orders' | 'enemies' | 'towers'>('menu')
+  const { screen, overlay: confirmation, navigate, back } = useGameNavigation()
   const [hasRun, setHasRun] = useState(false)
   const [hasSave, setHasSave] = useState(() => loadGame() !== null)
   const [sound, setSound] = useState(loadSound)
   const [notice, setNotice] = useState('')
-  const [confirmation, setConfirmation] = useState<'restart' | 'restore' | 'new' | null>(null)
+  useLayoutEffect(() => {
+    if (confirmation === 'report') reportDialog.current?.showModal()
+  }, [confirmation])
   const [draftMission, setDraftMission] = useState<Mission>(campaign[0])
   const [draftWaves, setDraftWaves] = useState(20)
   const previousAudio = useRef<Round | null>(null)
@@ -257,22 +260,21 @@ function App() {
     setPaused(false)
   }, [screen, round.phase, mission, upcoming])
 
-  function showMenu() {
-    previousAudio.current = null
-    setNotice('')
-    setConfirmation(null)
-    setScreen('menu')
-  }
+  useEffect(() => {
+    if (screen === 'menu') {
+      previousAudio.current = null
+      setNotice('')
+    }
+  }, [screen])
 
   function enterBattle(next: Round, restore = false) {
-    setConfirmation(null)
     setRound(next)
     setHasRun(true)
     setPaused(restore && (next.phase === 'running' || next.levelPrepRemainingMs !== undefined))
     selectTile(null)
     previousAudio.current = null
     if (sound) enableAudio()
-    setScreen('battle')
+    navigate('battle')
   }
 
   const unfinishedRun = hasRun && (round.phase === 'setup' || running)
@@ -280,7 +282,7 @@ function App() {
   function restoreGame() {
     const saved = loadGame()
     if (!saved) {
-      setConfirmation(null)
+      navigate('menu')
       setHasSave(false)
       setNotice('The saved game could not be restored.')
       return
@@ -292,7 +294,7 @@ function App() {
   function openMission(next: Mission) {
     if (!isMissionUnlocked(next, clears) && !(round.phase === 'won' && upcoming === next)) return
     setDraftMission(next)
-    setScreen('campaign')
+    navigate('campaign')
   }
 
   function buy(event: (current: Round) => Round) {
@@ -362,16 +364,13 @@ function App() {
       <div class="menu-actions">
         {hasRun && <button type="button" class="primary" onClick={() => {
           if (sound) enableAudio()
-          setConfirmation(null)
-          setScreen('battle')
+          navigate('battle')
         }}>Continue</button>}
         <button type="button" class={hasRun ? undefined : 'primary'} onClick={() => {
-          setConfirmation(null)
-          setScreen('campaign')
+          navigate('campaign')
         }}>Campaign</button>
         <button type="button" onClick={() => {
-          setConfirmation(null)
-          setScreen('long')
+          navigate('long')
         }}>Long battle</button>
       </div>
       <div class="session-actions">
@@ -381,10 +380,10 @@ function App() {
           setNotice(saved ? 'Game saved on this browser.' : 'This browser could not save the game.')
         }}>Save game</button>
         <button type="button" disabled={!hasSave} onClick={() => {
-          if (unfinishedRun) setConfirmation('restore')
+          if (unfinishedRun) navigate('menu', 'restore')
           else restoreGame()
         }}>Restore saved game</button>
-        {hasRun && confirmation !== 'restart' && <button type="button" onClick={() => setConfirmation('restart')}>
+        {hasRun && confirmation !== 'restart' && <button type="button" onClick={() => navigate('menu', 'restart')}>
           {mission ? 'Restart level' : 'Restart battle'}
         </button>}
         <button type="button" aria-pressed={sound} onClick={() => {
@@ -397,12 +396,12 @@ function App() {
       {confirmation === 'restart' && <div class="menu-confirm">
         <p>Restart from wave one? Your saved game stays available.</p>
         <button type="button" class="primary" onClick={() => enterBattle(createRound(round.totalWaves, mission))}>Restart from wave one</button>
-        <button type="button" onClick={() => setConfirmation(null)}>Cancel</button>
+        <button type="button" onClick={back}>Cancel</button>
       </div>}
       {confirmation === 'restore' && <div class="menu-confirm">
         <p>Replace your current run with the saved game?</p>
         <button type="button" class="primary" onClick={restoreGame}>Replace with saved game</button>
-        <button type="button" onClick={() => setConfirmation(null)}>Cancel</button>
+        <button type="button" onClick={back}>Cancel</button>
       </div>}
       {notice && <p role="status">{notice}</p>}
     </main>
@@ -412,7 +411,7 @@ function App() {
     const selectedMission = screen === 'campaign' ? draftMission : null
     return <main class="menu-screen setup-screen">
       {header}
-      <button type="button" onClick={showMenu}>Main menu</button>
+      <button type="button" onClick={back}>Main menu</button>
       {selectedMission ? <section class="mission-briefing" aria-label="Mission briefing">
         <h2 class="visually-hidden">Campaign</h2>
         <h3>{selectedMission.title} · Level {selectedMission.level}</h3>
@@ -469,9 +468,9 @@ function App() {
         <p>Start this battle and replace your current run?</p>
         <button class="primary" type="button"
           onClick={() => enterBattle(createRound(draftWaves, selectedMission))}>Replace and enter battle</button>
-        <button type="button" onClick={() => setConfirmation(null)}>Cancel</button>
+        <button type="button" onClick={back}>Cancel</button>
       </div> : <button class="primary enter-battle" type="button" onClick={() => {
-        if (unfinishedRun) setConfirmation('new')
+        if (unfinishedRun) navigate(screen, 'new')
         else enterBattle(createRound(draftWaves, selectedMission))
       }}>Enter battle</button>}
     </main>
@@ -481,14 +480,14 @@ function App() {
     setPaused(false)
     setRound(retryRound)
     selectTile(null)
-    setScreen('battle')
+    navigate('battle')
   }
 
   if (screen === 'enemies' || screen === 'towers') {
     const enemyPage = screen === 'enemies'
     return <main class="battle-orders field-guide">
       <header><h1>{enemyPage ? 'Enemy Types' : 'Towers'}</h1>
-        <button type="button" onClick={() => setScreen('orders')}>Back to orders</button></header>
+        <button type="button" onClick={back}>Back to orders</button></header>
       <section key={screen} class="guide-content">
       {enemyPage ? <>
         <p>Base stats before wave and story bonuses. Silver is the kill reward.</p>
@@ -505,25 +504,25 @@ function App() {
         <p>Wider reach extends the ring. Stronger slow raises the speed reduction from {Math.round(100 * (1 - towerDetails.drum.speedFactor))}% to {Math.round(100 * (1 - towerDetails.drum.strongerSpeedFactor))}%. Where Drums overlap, the strongest slow applies.</p>
       </>}
       </section>
-      <button type="button" onClick={() => setScreen(enemyPage ? 'towers' : 'enemies')}>{enemyPage ? 'Towers' : 'Enemy Types'}</button>
+      <button type="button" onClick={() => navigate(enemyPage ? 'towers' : 'enemies')}>{enemyPage ? 'Towers' : 'Enemy Types'}</button>
     </main>
   }
 
   if (screen === 'orders') {
     return <main class="battle-orders">
       <header><h1>Battle orders</h1>
-        <button type="button" onClick={() => setScreen('battle')}>Back to battle</button>
+        <button type="button" onClick={back}>Back to battle</button>
       </header>
       <p>{mission?.title ?? 'Shu frontier'} · Wave {round.waveNumber} of {round.totalWaves}</p>
       <div class="orders-list">
         <nav class="guide-links" aria-label="Field guide">
-          <button type="button" onClick={() => setScreen('enemies')}>Enemy Types</button>
-          <button type="button" onClick={() => setScreen('towers')}>Towers</button>
+          <button type="button" onClick={() => navigate('enemies')}>Enemy Types</button>
+          <button type="button" onClick={() => navigate('towers')}>Towers</button>
         </nav>
         <div class="speed-order">Play speed {speedPicker}</div>
         {(report || showChronicle) && <button type="button" onClick={() => {
           if (running || preparingLevel) setPaused(true)
-          reportDialog.current?.showModal()
+          navigate('orders', 'report')
         }}>Report</button>}
         {!setup && <button type="button" onClick={retryWave}>Retry wave</button>}
         {initialSetup && !round.continuedStory && round.towers.length > 0 && <button type="button"
@@ -531,7 +530,10 @@ function App() {
         {finished && <button type="button" onClick={() => enterBattle(createRound(round.totalWaves, mission))}>
           {mission ? 'Restart level' : 'New battle'}</button>}
       </div>
-      {(report || showChronicle) && <dialog ref={reportDialog} class="battle-report" aria-label="Battle report">
+      {confirmation === 'report' && <dialog ref={reportDialog} onCancel={event => {
+        event.preventDefault()
+        back()
+      }} class="battle-report" aria-label="Battle report">
         {mission && finished && <p class="mission-outcome">{round.phase === 'lost' ? mission.defeat
           : mission.level === 5 ? mission.victory : `Level ${mission.level} cleared. Level ${mission.level + 1} unlocked.`}</p>}
         {showChronicle && <details class="wave-report" open={round.phase === 'won'}>
@@ -543,7 +545,7 @@ function App() {
           <p>{report.stopped} stopped · {report.escaped} reached the gate · {report.earned} silver earned</p>
           {report.runnersEscaped > 0 && <p>Runners that reached the gate: {report.runnersEscaped}</p>}
         </details>}
-        <form method="dialog"><button type="submit">Close report</button></form>
+        <button type="button" onClick={back}>Close report</button>
       </dialog>}
     </main>
   }
@@ -554,7 +556,7 @@ function App() {
     <main class="battle-screen">
       <h1 class="visually-hidden">{battleName}</h1>
       <header class="battle-header">
-        <button type="button" class="edge-control" aria-label="Main menu" onClick={showMenu}>Menu</button>
+        <button type="button" class="edge-control" aria-label="Main menu" onClick={back}>Menu</button>
         <div class="hud">
           <div class="resources">
             <strong><i class="coin" aria-hidden="true" />{round.silver} silver</strong>
@@ -563,7 +565,7 @@ function App() {
           </div>
           <div class="objective">{mission ? `${objectiveProgress(round)}/${mission.milestoneCount} ${mission.milestone}` : 'Defend the outpost gate'}</div>
         </div>
-        <button type="button" class="edge-control" aria-label="Battle orders" onClick={() => setScreen('orders')}>Orders<small>{speed}×</small></button>
+        <button type="button" class="edge-control" aria-label="Battle orders" onClick={() => navigate('orders')}>Orders<small>{speed}×</small></button>
       </header>
       <div class="board-view">
         <Battlefield round={round} selected={activeSite} suggested={suggested} onSelect={site => selectTile(site === activeSite ? null : site)} />
@@ -609,7 +611,7 @@ function App() {
             : setup ? <button class="battle-primary" type="button" onClick={() => setRound(startRound)}>Start wave</button>
             : round.phase === 'won' && upcoming && upcoming.battleId !== mission?.battleId ? <button class="battle-primary" type="button" onClick={() => openMission(upcoming)}>Next battle</button>
             : round.phase === 'lost' ? <button class="battle-primary" type="button" onClick={retryWave}>Retry wave</button>
-            : <button class="battle-primary" type="button" onClick={showMenu}>Main menu</button>}
+            : <button class="battle-primary" type="button" onClick={back}>Main menu</button>}
         </div>
       </footer>
     </main>
