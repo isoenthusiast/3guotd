@@ -50,6 +50,15 @@ So the residual interface problem is three things, in this order:
 2. **The build tile is below the physical touch minimum.** A layout problem, not a scale problem.
 3. **The build mound is not a cue.** 1.2 mm wide, on 57 of 97 buildable cells absent entirely.
 
+Underneath those three, the pacing research surfaced two further problems that are not about
+pixels at all, and both were found by reading the game's own numbers rather than by looking at
+it. The **Enemy Types** table tells the player the wrong health and speed — on a continued
+story at level 5 a Commander reads as 10 HP and arrives with 15, for every enemy type in the
+game (finding #7). And **nothing tells the player what the next wave contains**: the waves
+cycle through three compositions while the wave name advertises only a health bonus, so the
+game claims an escalation it does not deliver (findings #8 and #9). A player who cannot see
+what is coming cannot decide differently — which is the gap this whole document is about.
+
 ---
 
 ## What the player actually sees today
@@ -401,6 +410,96 @@ Two separate standards apply, and the game satisfies one and ignores the other:
 - This is cheap to get wrong and cheap to fix: one `matchMedia` call and one branch in the
   Drum's draw path (`src/game-art.ts:211–234`).
 
+### 7. The "Enemy Types" reference table shows base stats the player never fights
+
+The Field Guide's **Enemy Types** screen (`src/main.tsx:494`) is the one place a player can look
+up what an enemy is. It is a table of `attackers[kind].health` and `attackers[kind].speed` —
+the **base** numbers, before any wave or story bonus. It even says so: *"Base stats before wave
+and story bonuses."*
+
+But the numbers that reach the board are escalated. Health is
+`ceil((base + healthBonus) × (1 + storySteps × 0.12))` (`src/game/round.ts:170`) and speed is
+`base × (1 + storySteps × 0.08)` (`src/game/round.ts:301`). Measured against the source, on a
+continued story at level 5 the table and the battlefield disagree for **every enemy type**:
+
+| Enemy | Table HP | Actual HP | Table speed | Actual speed |
+|---|---|---|---|---|
+| Infantry | 4 | 6 | 1.60 | 2.11 |
+| Runner | 3 | 5 | 2.40 | 3.17 |
+| Veteran | 6 | 9 | 1.60 | 2.11 |
+| Bowman | 4 | 6 | 1.32 | 1.74 |
+| Cavalry | 4 | 6 | 2.70 | 3.56 |
+| Commander | 10 | 15 | 1.18 | 1.56 |
+| Veteran runner | 4 | 6 | 2.40 | 3.17 |
+
+At level 3 the health gap is already 25–33% and the speed gap 16%. At level 5 a Commander
+reads as 10 HP in the guide and arrives with 15 — a 50% lie, and the health number is exactly
+what a player sizes a tower against.
+
+- **Player sees:** a reference table that is honest about being a base, and a battlefield that
+  never matches it. A player who checked the guide before buying a tower bought the wrong one.
+- **Interface change:** render the table from the same functions the simulation uses —
+  `enemyMaxHealth(round, kind)` and the escalated speed — for the level the player is on. The
+  caption becomes *"Stats at level 3. Higher levels add 12% health and 8% speed per step."*
+  One call site; the numbers become true.
+- This is a **truthfulness** defect, not a legibility one. It is invisible to every other
+  finding here, because nothing about the table's appearance is wrong.
+
+### 8. Waves escalate in number but cycle in composition — and the game never says so
+
+`waveFormation()` (`src/game/round.ts:83`) picks the wave's enemy list by
+`formations[(number - 1) % formations.length]`, and `formations` holds exactly **three**
+entries: Mixed patrol, Runner rush, Veteran column. Measured over a 40-wave run, the
+composition repeats on a cycle of three, with every fifth wave swapped to a uniform cavalry
+column. What changes across the run is the **health bonus** (capped at +24), the spawn
+**interval** (1.25 s down to 0.45 s), and the wave **name** — `"Runner rush · +8 health"`.
+
+The mission path cycles too: `threats[chapter][enemy % threats[chapter].length]`
+(`src/game/campaign.ts:141`) rotates a four-enemy list per chapter.
+
+So across a 40-wave session the player meets **three enemy patterns, repeated**, getting
+numerically harder. The health number is in the wave name, but the *pattern* is never named as
+a pattern — and a player has no way to learn that wave 34 is the same shape as wave 4.
+
+This is the interface face of a balance question, so it is deliberately narrow: **not** "the
+waves should escalate differently" (that is a design decision for the owner), but "the
+interface currently claims escalation where it delivers repetition."
+
+- **Player sees:** `"Veteran column · +12 health"`, and reads *+12 health* as the whole story.
+  Nothing tells them the enemy *mix* they already handled has returned unchanged.
+- **Interface change:** if the intent is repetition-with-a-numbers-ratchet, say so — the wave
+  name already carries a suffix, so `"Veteran column · +12 health · veteran pack again"` is
+  cheap. If the intent is genuine escalation, that is a `formations` change in
+  `src/game/round.ts`, and the interface then needs to preview the change (finding #9).
+- **Why this is a UI finding and not a balance finding:** a player cannot make a different
+  decision based on information they do not have. Right now the only wave information is a
+  health delta, so the only decision available is "more of the same, harder".
+
+### 9. Nothing tells the player what the next wave contains
+
+Doucet, on the Defender's Quest wave-prep pass, is explicit about what a TD player needs
+before committing silver: *"The player should have a similar treatment for enemy waves -- what
+type of enemy will spawn, how many, at what strength level, at what spawn locations."*
+
+3guotd shows none of it. The status line during a wave names the **current** formation
+(`src/main.tsx:221`), and the campaign screen names the **first** wave of a mission
+(`src/main.tsx:428`, *"Next threat · {name}"*) — both before the wave exists. Between waves the
+player gets the formation name only at the moment the wave starts, as the cue line
+(*"Wave N starts · {waveCue}"*), which for a continued story names only the **first** enemy's
+name and HP (`src/main.tsx:220`).
+
+- **Player sees:** a decision to place or upgrade a tower with no idea what is coming, and no
+  way to check. By the time the enemy type is named, the wave has already started.
+- **Interface change:** a one-line next-wave preview in the prep header — composition, count,
+  and health — using `roundFormation(round)` for the *next* wave, which is the same call that
+  already builds the wave. This pairs with finding #7: the preview should carry the escalated
+  health from `enemyMaxHealth()`, not the base.
+- Doucet pairs this with the readout idea: *"A player should be able to click on any defender
+  or enemy at any time and get a full readout of its current health and stats."* 3guotd has the
+  stats screen but no tap-on-enemy readout, and the enemy table it does have is the one from
+  finding #7. Fixing #7 makes that screen usable; adding a tap readout makes it reachable
+  mid-wave.
+
 ---
 
 ## What the research says about the general patterns, in brief
@@ -453,6 +552,82 @@ itself* and greys the packet when it cannot be afforded, with the sun total show
 (`discover-17`, `discover-19`). 3guotd's card already names the price; it does not yet carry the
 shortfall (finding #4).
 
+**Wave preparation is a first-class UI problem.** Doucet's Defender's Quest pass (`pacing-20`)
+is the clearest statement of it: *"The player should have a similar treatment for enemy waves
+-- what type of enemy will spawn, how many, at what strength level, at what spawn locations."*
+That is finding #9, and the absence of it is why the game's waves read as repetition.
+
+**Difficulty should be visible, not inferred.** Kim, CHI PLAY 2026 (`pacing-27`), argues that
+difficulty is a *system* the player must be able to see, and that personalization which cannot
+be perceived is indistinguishable from unfairness — *"the invisibility of current
+personalization is itself a source of player distrust."* Hunicke, GDC 2005 (`pacing-25`),
+reaches the same place from the other side: *"they will feel \"cheated\" if games are adjusted
+during or across play sessions."* 3guotd escalates every continued-story level by +12% health
+and +8% speed (`src/game/round.ts:170`, `:301`) and tells the player nothing — the only visible
+signal is a `+N health` suffix on the wave name, which describes the wave, not the escalation.
+
+**The prep window should be a decision, not a countdown.** Kingdom Rush's early-calling
+mechanic (`pacing-17`) pays the player for starting a wave early: *"The benefit of doing so is
+free Gold equal to the number of seconds left before the wave would have come in naturally."*
+3guotd's ten-second window is a countdown the player waits out, with a "Start wave" button
+that does not reward the risk. This is the same interface gap as finding #9 seen from the
+other side.
+
+**First sessions are short and attrition is fast.** DeltaDNA's 5,000-game platform (`pacing-05`):
+*"90% of games have a median first session length of less than 20 minutes."* Appsee's mobile
+study (`pacing-06`): *"Almost 24 percent of players drop off after one session with a game."*
+Both bear directly on the playtest protocol below, and both are vendor research rather than
+peer-reviewed work — they size the risk, they do not set the standard.
+
+---
+
+## How to run the uncoached playtest this research asks for
+
+The four live findings cannot be closed from a document. They close only when an uncoached
+player holds a phone. This section is the protocol — what to watch, what to record, and what
+not to do — so the session is not run on impressions.
+
+**How many people.** NN/g's answer for a qualitative study is 5: *"With **5 users**, you
+almost always get close to user testing's maximum benefit-cost ratio."* Five first-time
+players is enough to see whether the first-placement cue, the purchase tray, the Drum's
+contribution and the prep window are legible. For a mobile game, that is the number to start
+from — not a target to exceed, and not a reason to test ten.
+
+**What to observe, per finding.** These are the moments the preventive methods name, written
+as things you can see on a screen rather than as questions:
+
+- **GF-020 (first placement).** Watch the player's finger on the first turn: does it go to a
+  build site unprompted, or does it hunt the board first? Record how long it takes them to
+  find the first buildable site and whether they read the status line at all.
+- **GF-023 (purchase cards).** Watch for the card, not the board. When silver is short,
+  does the player look at the card or at the status line below the board? A player who reads
+  the status line for the shortfall has found the pattern you want to move onto the card.
+- **GF-025 (Drum's contribution).** After the wave, ask nothing — just note whether the
+  player can point at the screen and say what the Drum did. If they cannot attribute it
+  unprompted, the cyan pulse is not carrying the attribution.
+- **GF-053 (prep window).** On the **first** mission, watch what the player does during the
+  ten seconds: do they place a tower, do they look for a clock, do they start the wave
+  early? Watch the first prep window specifically — a continued-story player has already been
+  trained by the clock, which is exactly what you are trying to test.
+
+**What not to do.** Do not say *"tap a build site"* or *"what does the blue circle mean?"* —
+leading questions teach the answer and destroy the evidence. Do not explain the Drum, the
+prep clock or the silver economy when the player asks mid-session; note that they asked and
+answer only after the session. Do not rescue a stuck player before 60 seconds of silence;
+stuck is a finding.
+
+**What to record.** For each participant: time to first placement; whether the purchase tray
+was found before or after the first silver spend; the first moment the player looked for the
+wave's contents; and whether they could attribute the Drum's slow unprompted. Five rows, four
+columns, and the four findings answered or not answered.
+
+**One caution from the pacing research.** First sessions are short and attrition is fast: 90%
+of games in a 5,000-game platform had a median first session under 20 minutes, and roughly a
+quarter of mobile players drop off after a single session. So test the **first mission only**
+— one level, one phone, one sitting — and make the window generous. A session that ends
+before the player has placed a tower tells you about onboarding; a session that ends after ten
+waves tells you about pacing. Do not run the 40-wave mode as a first session.
+
 ---
 
 ## Recommended order of work
@@ -470,9 +645,16 @@ Ordered by payoff per unit of effort, and each is independently verifiable.
 | 7 | **Enemy differentiation by shape and silhouette**, not hue alone | GF-026 pattern | GF-026's fix gave veterans a distinctive helmet silhouette — the same principle, applied to the whole enemy set. Prerequisite for #1 to actually pay off; the art proposal already calls for distinct silhouettes. |
 | 8 | **Correct the "44 px build tiles" claim** in `references/tower-defense-ux/README.md` | doc drift | One-line truth fix. The audit has been reasoning from a wrong number. |
 | 9 | **Honour `prefers-reduced-motion`** — draw the Drum's slow as a steady ring instead of an expanding pulse | reduced-motion | One `matchMedia` call and one branch. Cheap, and it pairs with #1: a pulse in a 2×-upscaled canvas is a soft pulse. |
+| 10 | **Render the Enemy Types table from the live numbers** (`enemyMaxHealth()` + escalated speed) | truthfulness | The guide tells the player the wrong HP and speed on every continued-story level — a Commander reads 10 and arrives with 15. One call site, and the numbers become true. |
+| 11 | **Add a next-wave preview to the prep header** (composition, count, health) | decision quality | The player currently places towers blind. `roundFormation()` already computes the next wave; this is a display change, not new logic. |
+| 12 | **Say what the wave is, not just how hard it is** — either name the repeated pattern or escalate it | decision quality | Waves cycle through three compositions while the name advertises only a health delta. Balance is the owner's call; the interface currently claims escalation it does not deliver. |
 
 Items 1–2 are the ones I would do first: #1 is the root cause of the board legibility, and #2 is
 the only one of the four findings that the current build has *not* yet addressed in code.
+
+Items 10–11 are worth pulling forward regardless of their place in the list: #10 is a
+correctness defect in the only reference the player has, and #11 gives the player something to
+decide *with*. They are also cheap — both reuse functions that already exist.
 
 ---
 
@@ -482,7 +664,13 @@ the only one of the four findings that the current build has *not* yet addressed
   GF-023, GF-025 and GF-053 all name human observation in their preventive methods, and this
   research cannot close them — only an uncoached phone playtest can. It can tell you what to
   look for when you run it.
-- **Balance and economy.** Out of scope. GF-028 is verified and is not reopened here.
+- **Balance and economy.** Out of scope. GF-028 is verified and is not reopened here. Finding #8
+  touches balance — whether waves should escalate in composition rather than cycle — but it
+  stops at the interface: what the game currently claims versus what it delivers. The design
+  decision is the owner's.
+- **Whether the reference numbers should be the escalated ones.** Finding #7 establishes that
+  the Enemy Types table and the battlefield disagree. Which number the table should show is a
+  call for the owner; the defect is the disagreement, not the choice of baseline.
 - **Art direction.** The late-Han visual proposal already governs the art; this research only
   identifies where the art fails to *read* on a phone, and defers to the proposal for what it
   should look like.
@@ -515,6 +703,9 @@ read-only against the project:
   device PPI, and compares to the 1 cm minimum.
 - `measure-cue-duration.mjs`, `waveage.mjs` — cue wall-clock timing and `waveAge` speed
   independence.
+- `measure-enemy-table.mjs` — compares the Enemy Types guide's table values against the
+  escalated values the simulation actually uses, per level; and emulates a 40-wave run to show
+  the composition cycle and the health/interval ramp.
 - `validate-citations.py`, `validate-quotes.py` — check every source reference and every
   verbatim quotation in this document against the capture pack.
 - `validate-code-refs.py` — check every `file:line` code reference in this document against the
@@ -554,5 +745,17 @@ Browser: `/home/edward/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome`
 | `"Drum slowing N"` readout | `src/main.tsx` | 576 |
 | Towers guide: *"Blue lines mark slowed enemies. The Drum deals no damage."* | `src/main.tsx` | 504 |
 | Page grid `44px minmax(0,1fr) 98px`; command bar `44px 54px` | `src/style.css` | 2–5; 17–20 |
+| Enemy Types table renders base `attackers[kind].health` / `.speed` | `src/main.tsx` | 494–498 |
+| Caption *"Base stats before wave and story bonuses."* | `src/main.tsx` | 494 |
+| In-play health `ceil((base + healthBonus) × (1 + storySteps × 0.12))` | `src/game/round.ts` | 170 |
+| In-play speed `base × (1 + storySteps × 0.08)` | `src/game/round.ts` | 301 |
+| `storySteps` = `mission.level - 1` on the continued-story path, else 0 | `src/game/round.ts` | 165–167 |
+| Wave composition cycles `formations[(number - 1) % formations.length]`; 3 formations | `src/game/round.ts` | 75–94 |
+| Every 5th wave becomes a uniform cavalry column | `src/game/round.ts` | 89–90 |
+| Wave health bonus capped at +24; spawn interval 1.25 s → 0.45 s | `src/game/round.ts` | 88, 91–92 |
+| Mission waves rotate `threats[chapter][enemy % threats[chapter].length]` (4 per chapter) | `src/game/campaign.ts` | 141 |
+| Current wave's formation name shown in the status line | `src/main.tsx` | 221 |
+| Campaign screen names only the **first** wave (*"Next threat · {name}"*) | `src/main.tsx` | 428 |
+| Wave-start cue names only the first enemy, on continued story | `src/main.tsx` | 220 |
 
 All line numbers are against commit `d40a108`.
