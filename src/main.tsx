@@ -230,6 +230,9 @@ function App() {
   let status = setup ? (firstPlacement ? openingHint : tower ? `${towerDetails[tower.kind].name}${tower.reach && tower.power ? ' · Fully upgraded' : ' · Choose an upgrade'}`
     : activeSite !== null ? 'Choose a tower' : 'Select a tower to upgrade or a stake to build')
     : round.phase === 'won' ? (mission ? 'Level cleared!' : 'Gate defended!') : 'The gate fell.'
+  // waveAge measures viewing time even at 3×. Give fast play two seconds to read
+  // the formation without slowing attackers or delaying the next wave.
+  const showWaveStart = running && round.waveAge < (speed === 3 ? 2 : waveCueTime)
   if (running) {
     const first = formation.sequence[0]
     const waveCue = round.continuedStory
@@ -237,7 +240,7 @@ function App() {
       : formation.name
     status = paused ? 'Paused' : round.rebuildTime > 0
       ? `Rebuild · ${Math.ceil(round.rebuildTime)}s before attackers arrive`
-      : round.waveAge < waveCueTime
+      : showWaveStart
       ? `Wave ${round.waveNumber} starts · ${waveCue}`
       : `${enemiesRemaining(round)} of ${formation.sequence.length} attackers`
   }
@@ -247,7 +250,7 @@ function App() {
     status = `${paused ? 'Paused · ' : ''}Build or upgrade · Wave in ${seconds}s`
     if (activeSite === null) status += `. Towers kept; +${startingSilver} silver.`
   }
-  if (!preparingLevel && !finished && coverage && !firstPlacement && !paused && (!running || round.waveAge >= waveCueTime)) {
+  if (!preparingLevel && !finished && coverage && !firstPlacement && !paused && !showWaveStart) {
     status = `${selectedName} · Choose a tower${shortfall ? '' : ` · ${round.silver - towerPrice} silver left after buying`}`
   }
   if (!preparingLevel && !finished && tower && tower.reach && tower.power && !paused) {
@@ -257,7 +260,6 @@ function App() {
   const rewind = opening && `Wave start: ${opening.towers.length} tower${opening.towers.length === 1 ? '' : 's'} (upgrades kept), ${opening.silver} silver, ${opening.lives} lives.`
   if (round.phase === 'lost') status = `${round.waveStats.escaped} breached · ${round.waveStats.runnersEscaped} fast. ${round.waveStats.runnersEscaped ? 'Pair a Drum with an Archer.' : 'Cover more road with Archers.'}`
   const breach = round.gateHit && !paused && `${attackerName(round.gateHit.kind)} reached the gate`
-  const showWaveStart = running && round.waveAge < waveCueTime
   const hudStatus = breach ? (showWaveStart || finished ? `${status} · ${breach}` : breach) : status
 
   const keyboard = useRef(false)
