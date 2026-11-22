@@ -451,8 +451,9 @@ what a player sizes a tower against.
 `formations[(number - 1) % formations.length]`, and `formations` holds exactly **three**
 entries: Mixed patrol, Runner rush, Veteran column. Measured over a 40-wave run, the
 composition repeats on a cycle of three, with every fifth wave swapped to a uniform cavalry
-column. What changes across the run is the **health bonus** (capped at +24), the spawn
-**interval** (1.25 s down to 0.45 s), and the wave **name** — `"Runner rush · +8 health"`.
+column (waves 5, 10, … 40). What changes across the run is the **health bonus** (capped at
++24), the spawn **interval** (1.25 s at wave 4, down to 0.69 s by wave 40, floored at 0.45 s),
+and the wave **name** — `"Runner rush · +8 health"`, which is wave 23.
 
 The mission path cycles too: `threats[chapter][enemy % threats[chapter].length]`
 (`src/game/campaign.ts:141`) rotates a four-enemy list per chapter.
