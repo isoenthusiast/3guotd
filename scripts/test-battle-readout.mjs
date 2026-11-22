@@ -5,13 +5,13 @@ const url = process.argv[2] ?? 'http://localhost:4173/'
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH })
 const tower = (kind, site) => ({ kind, site, reach: false, power: false, cooldown: 0 })
 
-async function load(page, missionId, phase, towers, enemies = []) {
+async function load(page, missionId, phase, towers, enemies = [], gateHit = null) {
   const waveStats = { stopped: 0, escaped: 0, runnersEscaped: 0, earned: 0 }
   const round = {
     rulesVersion: 2, phase, waveNumber: missionId ? 3 : 1, totalWaves: missionId ? 3 : 20,
     towers, silver: 0, lives: 3, spawned: enemies.length, spawnTimer: 10, enemies,
     opening: { towers, silver: 0, lives: 3 }, shots: [], impacts: [], waveAge: 3,
-    rebuildTime: 0, waveStats, previousWave: null, gateHit: null,
+    rebuildTime: 0, waveStats, previousWave: null, gateHit,
   }
   await page.goto(url)
   await page.getByText('Ready offline', { exact: true }).waitFor()
@@ -50,6 +50,15 @@ try {
     await load(p, null, 'running', towers, enemies)
     await p.getByRole('button', { name: 'Resume', exact: true }).tap()
     await p.getByText(`Drum slowing 2 · ${expected} in Archer range`, { exact: true }).waitFor()
+    await p.close()
+  }
+  for (const routeIndex of [0, 1, undefined]) {
+    const p = await browser.newPage({ viewport: { width: 320, height: 480 }, hasTouch: true, isMobile: true })
+    await load(p, 'jing:1', 'running', [], [], { kind: 'cavalry', elapsed: 0, routeIndex })
+    await p.getByRole('button', { name: 'Resume', exact: true }).tap()
+    const label = p.getByRole('status')
+    const entry = routeIndex === undefined ? '' : `Entry ${routeIndex + 1}. `
+    await label.getByText(`Cavalry reached the gate. ${entry}3 lives remaining.`, { exact: true }).waitFor()
     await p.close()
   }
   for (const maxed of [false, true]) {
