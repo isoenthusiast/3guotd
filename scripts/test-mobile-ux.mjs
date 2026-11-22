@@ -27,12 +27,19 @@ async function checkPhone(width, height, previousBoardWidth) {
 
     const board = page.locator('.battlefield')
     const original = await board.boundingBox()
-    // Worst case is the old 19-step Wuzhang road. Every shorter road also gains four steps.
+    // Both releases use the same 9 × 13 grid and the same routes.
     const longestRoadPixels = 23 * original.width / 9
-    assert(longestRoadPixels > 19 * previousBoardWidth / 8, 'Route must grow in rendered CSS pixels')
+    assert(original.width + 0.01 >= previousBoardWidth, 'Map must retain its live touchable width')
+    assert(longestRoadPixels + 0.03 >= 23 * previousBoardWidth / 9, 'Wuzhang route must retain its rendered length')
     const checkFrame = async () => {
       const current = await board.boundingBox()
       assert(await fits(board))
+      const controls = page.locator('.battle-header button, .command-bar button')
+      for (const control of await controls.all()) {
+        const box = await control.boundingBox()
+        assert(box.width >= 44 && box.height >= 44 && await fits(control), 'Core controls fit at 44 × 44 or larger')
+        assert(box.y + box.height <= current.y || box.y >= current.y + current.height, 'Controls must clear the map')
+      }
       const overflow = await page.evaluate(() => {
         const root = document.scrollingElement
         return [root.scrollWidth - innerWidth, root.scrollHeight - innerHeight, scrollX, scrollY]
@@ -42,6 +49,13 @@ async function checkPhone(width, height, previousBoardWidth) {
         assert(Math.abs(current[prop] - original[prop]) < 1, `Board ${prop} moved during purchase at ${width} × ${height}`)
       }
     }
+    // Probe inside opposing corners of every buildable cell to catch clipped or covered targets.
+    const missed = await page.locator('.cells button').evaluateAll(cells => cells.filter(cell => {
+      const box = cell.getBoundingClientRect()
+      return [[box.left + 2, box.top + 2], [box.right - 2, box.bottom - 2]]
+        .some(([x, y]) => document.elementFromPoint(x, y) !== cell)
+    }).length)
+    assert.equal(missed, 0)
     for (const label of ['Empty tile, row 1, column 3', 'Empty tile, row 13, column 6']) {
       const nearLandmark = button(label)
       await nearLandmark.tap()
@@ -87,11 +101,29 @@ async function checkPhone(width, height, previousBoardWidth) {
     })
     await page.reload()
     await button('Restore saved game').tap()
+    await button('Battle orders').tap()
+    await page.getByLabel('Speed', { exact: true }).selectOption('3')
     await button('Report').tap()
     await page.getByText('Wave 1 summary').tap()
     assert(await fits(button('Close report')))
     await button('Close report').tap()
+    await button('Back to battle').tap()
+    await button('Resume').waitFor()
     await page.locator('button.useful-site').first().tap()
+    await checkFrame()
+    await button('Battle orders').tap()
+    assert.equal(await page.getByLabel('Speed', { exact: true }).inputValue(), '3')
+    await button('Retry wave').tap()
+    await button('Start wave').waitFor()
+    await page.getByRole('button', { name: /^Archer, row/ }).first().tap()
+    await page.getByRole('button', { name: /Faster fire/ }).tap()
+    await checkFrame()
+    await button('Start wave').tap()
+    await button('Battle orders').tap()
+    await button('Retry wave').tap()
+    await page.getByRole('button', { name: /^Archer, row/ }).first().tap()
+    assert.equal(await page.getByRole('button', { name: /Faster fire/ }).count(), 0)
+    assert.match(await page.getByRole('button', { name: /Longer range/ }).innerText(), /27 silver/)
     await checkFrame()
     assert.deepEqual(errors, [])
     console.log(`Passed offline placement, purchase, refund, and stable board at ${width} × ${height}.`)
@@ -101,12 +133,12 @@ async function checkPhone(width, height, previousBoardWidth) {
 }
 
 try {
-  // Board widths measured on the preceding 8 × 12 release.
-  await checkPhone(320, 480, 210.66)
-  await checkPhone(320, 568, 229.33)
-  await checkPhone(320, 640, 277.33)
+  // CSS pixels measured on live ab1ab68.
+  await checkPhone(320, 480, 218.765625)
+  await checkPhone(320, 568, 232.8125)
+  await checkPhone(320, 640, 268.609375)
   await checkPhone(320, 740, 308)
-  await checkPhone(390, 740, 344)
+  await checkPhone(390, 740, 346.140625)
 } finally {
   await browser.close()
 }

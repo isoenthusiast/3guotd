@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { columns, rows, sitePosition } from './game/board'
 import {
   attackerName, enemyMaxHealth, baseUpgradePrice, buildTower, canBuildAt, canSpend, closedSites, createRound, enemiesRemaining, objectiveProgress, removeTower,
-  secondUpgradeSurcharge, roundRoutes, prepareNextLevel,
+  roundRoutes, prepareNextLevel,
   retryRound, speedOptions, startRound, tickRound, towerDetails, towerPrice, upgradePrice,
   upgradeTower, waveCueTime, roundFormation, waveOptions,
 } from './game/round'
@@ -151,7 +151,7 @@ function loadClears(): string[] {
 function App() {
   const reportDialog = useRef<HTMLDialogElement>(null)
   const [offline, setOffline] = useState('')
-  const [screen, setScreen] = useState<'menu' | 'campaign' | 'long' | 'battle'>('menu')
+  const [screen, setScreen] = useState<'menu' | 'campaign' | 'long' | 'battle' | 'orders'>('menu')
   const [hasRun, setHasRun] = useState(false)
   const [hasSave, setHasSave] = useState(() => loadGame() !== null)
   const [sound, setSound] = useState(loadSound)
@@ -184,7 +184,8 @@ function App() {
   const canRefund = setup && round.towers.length > 0
   const showActions = activeSite !== null && spendingOpen && (!tower || !tower.reach || !tower.power || canRefund)
   const report = finished ? { ...round.waveStats, waveNumber: round.waveNumber } : round.previousWave
-  let status = setup ? (round.towers.length ? '' : 'Tap a stake beside the road')
+  let status = setup ? (tower ? towerDetails[tower.kind].name : activeSite !== null ? 'Choose a tower' :
+    round.towers.length ? 'Tap a tower to upgrade or a stake to build' : 'Tap a stake beside the road')
     : round.phase === 'won' ? (mission ? 'Level cleared!' : 'Gate defended!') : 'The gate fell.'
   if (running) {
     const first = formation.sequence[0]
@@ -448,89 +449,30 @@ function App() {
     </main>
   }
 
-  return (
-    <main class={`battle-screen ${showActions ? (canRefund && tower ? 'with-refund' : 'with-actions') : ''}${showActions && shortfall > 0 ? ' with-shortfall' : ''}`.trim()}>
-      <h1 class="visually-hidden">3Guo Tower Defense</h1>
-      <div class="hud">
-        <strong aria-label={`Silver: ${round.silver}`}><span class="coin" aria-hidden="true" />{round.silver} silver</strong>
-        <span>{round.lives} lives</span>
-        <span>Wave {round.waveNumber} of {round.totalWaves}</span>
-        <span role="status">{hudStatus}</span>
-        {mission && <span>{objectiveProgress(round)}/{mission.milestoneCount} {mission.milestone}</span>}
-      </div>
-      <div class="map-controls">
-        <button type="button" class="pause-control" aria-label="Main menu" onClick={showMenu}>Menu</button>
-        {speedPicker}
-        {(report || showChronicle) && <button type="button" class="pause-control" onClick={() => {
+  function retryWave() {
+    setPaused(false)
+    setRound(retryRound)
+    selectTile(null)
+    setScreen('battle')
+  }
+
+  if (screen === 'orders') {
+    return <main class="battle-orders">
+      <header><h1>Battle orders</h1>
+        <button type="button" onClick={() => setScreen('battle')}>Back to battle</button>
+      </header>
+      <p>{mission?.title ?? 'Shu frontier'} · Wave {round.waveNumber} of {round.totalWaves}</p>
+      <div class="orders-list">
+        <div class="speed-order">Play speed {speedPicker}</div>
+        {(report || showChronicle) && <button type="button" onClick={() => {
           if (running || preparingLevel) setPaused(true)
           reportDialog.current?.showModal()
         }}>Report</button>}
-        {(running || preparingLevel) && <button type="button" class="pause-control" onClick={() => setPaused(value => !value)}>
-          {paused ? 'Resume' : 'Pause'}
-        </button>}
-        <div class="round-controls">
-          {setup ? (
-            <>
-              {!preparingLevel && <button type="button" class="primary"
-                onClick={() => setRound(startRound)}>Start wave</button>}
-              {initialSetup && !round.continuedStory && round.towers.length > 0 && !(canRefund && tower) && <button type="button"
-                onClick={() => { setRound(createRound(round.totalWaves, mission)); selectTile(null) }}>Clear towers</button>}
-              {canRefund && tower && <button type="button"
-                onClick={() => setRound(current => removeTower(current, tower.site))}>Remove &amp; refund</button>}
-            </>
-          ) : (
-            <button type="button" onClick={() => {
-              setPaused(false)
-              setRound(retryRound)
-              selectTile(null)
-            }}>Retry wave</button>
-          )}
-          {round.phase === 'won' && upcoming && upcoming.battleId !== mission?.battleId && <button class="primary" type="button"
-            onClick={() => openMission(upcoming)}>Next battle</button>}
-          {finished && <button type="button"
-            onClick={() => enterBattle(createRound(round.totalWaves, mission))}>{mission ? 'Restart level' : 'New battle'}</button>}
-        </div>
-      </div>
-      {!finished && upcomingClosures && <p class="closure-note">Marked sites close next wave.</p>}
-      <div class="board-view">
-        <Battlefield round={round} selected={activeSite} onSelect={site => selectTile(site === activeSite ? null : site)} />
-      </div>
-      <div class="command-bar">
-        {showActions && activeSite !== null && (
-          <section class="actions" aria-label="Tower actions">
-            <div class="action-grid">
-              {tower ? (
-                <>
-                  {upgradeBranches.filter(option => !tower[option]).map(option => (
-                    <button key={option} type="button" class="purchase-card" disabled={shortfall > 0}
-                      onClick={() => buy(current => upgradeTower(current, tower.site, option))}>
-                      <TowerPortrait kind={tower.kind} upgrade={option} />
-                      <span>
-                        <strong>{towerDetails[tower.kind][option]}</strong>
-                        <span class="card-price">{price} silver</span>
-                        <small>{upgradeEffect(tower.kind, option)}
-                          {price > baseUpgradePrice && ` · +${secondUpgradeSurcharge} for second upgrade`}</small>
-                      </span>
-                    </button>
-                  ))}
-                </>
-              ) : towerKinds.map(kind => (
-                <button key={kind} type="button" class="purchase-card" disabled={shortfall > 0}
-                  onClick={() => buy(current => buildTower(current, activeSite, kind))}>
-                  <TowerPortrait kind={kind} />
-                  <span>
-                    <strong>Build {towerDetails[kind].name}</strong>
-                    <span class="card-price">{towerPrice} silver</span>
-                    <small><i class={`range-key ${kind}`} aria-hidden="true" />
-                      {!roadCoverage(roundRoutes(round), activeSite, kind).reachesRoad ? 'Road out of range' : kind === 'archer' ? 'Damage' : 'Slow'}</small>
-                  </span>
-                </button>
-              ))}
-            </div>
-            {(!tower || !tower.reach || !tower.power) && shortfall > 0
-              && <p class="action-note">Need {shortfall} more silver.</p>}
-          </section>
-        )}
+        {!setup && <button type="button" onClick={retryWave}>Retry wave</button>}
+        {initialSetup && !round.continuedStory && round.towers.length > 0 && <button type="button"
+          onClick={() => enterBattle(createRound(round.totalWaves, mission))}>Clear towers</button>}
+        {finished && <button type="button" onClick={() => enterBattle(createRound(round.totalWaves, mission))}>
+          {mission ? 'Restart level' : 'New battle'}</button>}
       </div>
       {(report || showChronicle) && <dialog ref={reportDialog} class="battle-report" aria-label="Battle report">
         {mission && finished && <p class="mission-outcome">{round.phase === 'lost' ? mission.defeat
@@ -546,6 +488,71 @@ function App() {
         </details>}
         <form method="dialog"><button type="submit">Close report</button></form>
       </dialog>}
+    </main>
+  }
+
+  const needsSilver = showActions && (!tower || !tower.reach || !tower.power) && shortfall > 0
+  const battleName = mission ? `${mission.title} · Level ${mission.level}` : 'Shu frontier'
+  return (
+    <main class="battle-screen">
+      <h1 class="visually-hidden">{battleName}</h1>
+      <header class="battle-header">
+        <button type="button" class="edge-control" aria-label="Main menu" onClick={showMenu}>Menu</button>
+        <div class="hud">
+          <div class="resources">
+            <strong><i class="coin" aria-hidden="true" />{round.silver} silver</strong>
+            <span>{round.lives} lives</span>
+            <span>Wave {round.waveNumber}/{round.totalWaves}</span>
+          </div>
+          <div class="objective">{mission ? `${objectiveProgress(round)}/${mission.milestoneCount} ${mission.milestone}` : 'Defend the outpost gate'}</div>
+        </div>
+        <button type="button" class="edge-control" aria-label="Battle orders" onClick={() => setScreen('orders')}>Orders<small>{speed}×</small></button>
+      </header>
+      <div class="board-view">
+        <Battlefield round={round} selected={activeSite} onSelect={site => selectTile(site === activeSite ? null : site)} />
+      </div>
+      <footer class="command-bar">
+        <div class="command-status">
+          <div role="status">
+            {hudStatus && <span>{hudStatus}</span>}
+            {!finished && upcomingClosures && <span>Marked sites close next wave.</span>}
+            {needsSilver && <span class="action-note">Need {shortfall} more silver.</span>}
+            {tower && !needsSilver && price > baseUpgradePrice && (!tower.reach || !tower.power) &&
+              <span>Second upgrade · +{price - baseUpgradePrice} silver</span>}
+          </div>
+          {canRefund && tower && <button type="button" class="refund" aria-label="Remove & refund"
+            onClick={() => setRound(current => removeTower(current, tower.site))}>Refund</button>}
+        </div>
+        <div class="command-row">
+          {showActions && activeSite !== null && (!tower || !tower.reach || !tower.power) ? (
+            <section class="actions" aria-label="Tower actions">
+              {tower ? upgradeBranches.filter(option => !tower[option]).map(option => (
+                <button key={option} type="button" class="purchase-card" disabled={shortfall > 0}
+                  title={upgradeEffect(tower.kind, option)} onClick={() => buy(current => upgradeTower(current, tower.site, option))}>
+                  <strong>{towerDetails[tower.kind][option]}</strong>
+                  <span>{price} silver</span>
+                  <small>{upgradeEffect(tower.kind, option)}</small>
+                </button>
+              )) : towerKinds.map(kind => (
+                <button key={kind} type="button" class="purchase-card build-card" disabled={shortfall > 0}
+                  onClick={() => buy(current => buildTower(current, activeSite, kind))}>
+                  <TowerPortrait kind={kind} />
+                  <span><strong><span class="visually-hidden">Build </span>{towerDetails[kind].name}</strong>
+                    <span>{towerPrice} silver</span></span>
+                  <small><i class={`range-key ${kind}`} aria-hidden="true" />{!roadCoverage(roundRoutes(round), activeSite, kind).reachesRoad
+                    ? 'Road out of range' : kind === 'archer' ? 'Damage' : 'Slow'}</small>
+                </button>
+              ))}
+            </section>
+          ) : <div class="command-location">{mission?.title ?? 'Shu frontier'}</div>}
+          {running || preparingLevel ? <button class="battle-primary" type="button" onClick={() => setPaused(value => !value)}>
+            {paused ? 'Resume' : 'Pause'}</button>
+            : setup ? <button class="battle-primary" type="button" onClick={() => setRound(startRound)}>Start wave</button>
+            : round.phase === 'won' && upcoming && upcoming.battleId !== mission?.battleId ? <button class="battle-primary" type="button" onClick={() => openMission(upcoming)}>Next battle</button>
+            : round.phase === 'lost' ? <button class="battle-primary" type="button" onClick={retryWave}>Retry wave</button>
+            : <button class="battle-primary" type="button" onClick={showMenu}>Main menu</button>}
+        </div>
+      </footer>
     </main>
   )
 }
