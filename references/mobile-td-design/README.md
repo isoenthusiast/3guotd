@@ -67,6 +67,11 @@ Measured in headless Chromium against the current `dist/` build. Tiles are in CS
 Upscale factor is measured, not derived: `(canvas CSS width × devicePixelRatio) ÷ backing-store
 width`. Every tested device upscales; the worst is the iPhone 15 at **2.01×**.
 
+The **44 px** threshold in the last column is Apple's **44 × 44 pt** minimum (`ui-15`), applied
+as the nominal pixel bar. NN/g's article (`ui-01`) supplies a *physical* floor — 1 cm × 1 cm —
+and explicitly says pixel values do not communicate it; it states no 44-pixel minimum of its own,
+so the two rules are never interchangeable.
+
 **The board is 117 cells: 9 columns × 13 rows.** Of those, **97 are buildable** (40 of which are
 `.useful-site` — buildable *and* adjacent enough for an Archer to cover the road — and 57 are
 `.empty-cell`, buildable but useless for the current tower) and 20 are non-buildable spans.
