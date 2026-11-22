@@ -1,0 +1,24 @@
+# Tower defense UI and UX references
+
+Reality Escape’s [What Makes Tower Defence Games Good?](https://www.youtube.com/watch?v=f6KTtb1r1lg), published 19 April 2019. The screenshots are frames from the video, captured at the linked timestamps. The narration notes use YouTube’s auto-generated English captions. The [3Guo TD comparison frame](3guotd-current-390px.jpg) is from the live build at a 390 × 740 px viewport.
+
+## What the references show
+
+| Frame | What is visible | Lesson for 3Guo TD |
+|---|---|---|
+| [Onslaught 2, 7:23](07m23s-onslaught.jpg) | A selected tower has a range circle. Build choices and upgrade costs sit along the bottom edge of the battlefield. | Keep the bottom action bar. While previewing a range upgrade, show the extra road it reaches so the player can see what the silver buys. [Video at 7:23](https://www.youtube.com/watch?v=f6KTtb1r1lg&t=443s) |
+| [Onslaught 2 combo chart, 7:41](07m41s-onslaught-combos.jpg) | A separate chart explains which towers combine to produce different effects. | Make Archer–Drum cooperation visible in the fight. When an attacker enters a Drum’s area, show the slowdown where it happens so the player can see why an Archer gets another shot. [Video at 7:41](https://www.youtube.com/watch?v=f6KTtb1r1lg&t=461s) |
+| [GemCraft, 9:10](09m10s-gemcraft.jpg) | Play and speed controls share a toolbar. A contextual tooltip explains the selected object, and numbered waves appear along the edge. | Put Pause next to the existing speed controls. Keep short explanations in the bottom bar so they leave the road visible on a phone. [Video at 9:10](https://www.youtube.com/watch?v=f6KTtb1r1lg&t=550s) |
+| [Plants vs. Zombies, 10:34](10m34s-plants-vs-zombies.jpg) | The tray shows each plant’s price, and some cards are dimmed. Headgear and equipment distinguish threats on the board. | Show the reason a purchase is unavailable in words, such as **Need 12 more silver**. Make regulars, runners, and veterans recognizable through silhouettes and equipment as well as color. [Video at 10:34](https://www.youtube.com/watch?v=f6KTtb1r1lg&t=634s) |
+| [Bloons TD 5, 12:15](12m15s-bloons-td5.jpg) | The selected tower has an outline and a coverage circle. Its bottom panel distinguishes available, bought, and not-yet-unlocked upgrades. | Show each branch’s price, effect, and state together. When the second branch costs more, show the surcharge beside that price. Save room for future campaign unlocks without filling the current bar with locked cards. [Video at 12:15](https://www.youtube.com/watch?v=f6KTtb1r1lg&t=735s) |
+
+The narrator emphasizes teaching mechanics one at a time, creating reasons to experiment with tower combinations, and giving players time to watch their setup work. These are useful tests for our current two-tower roster. A first-time player can learn the Archer from its projectile, the Drum from the slowdown, and the combination from seeing an extra shot land. [Introduction to mechanics, 2:16](https://www.youtube.com/watch?v=f6KTtb1r1lg&t=136s) · [Tower combinations, 7:27](https://www.youtube.com/watch?v=f6KTtb1r1lg&t=447s)
+
+## Recommended UI improvements
+
+1. **Make costs and effects clear in the existing action bar.** The current phone view shows role and base cost when building. Give upgrades the same clarity with a short effect preview and a price that explains the second-branch surcharge. If silver is short, say by how much. Preserve tap-to-select and explicit confirmation.
+2. **Make the gate easy to find while building.** The selected-tile screenshot shows only part of the portrait road, with the gate outside the view. Keep the 44 px build tiles and the full-map toggle. A compact route guide with **Entry** and **Gate** markers and a highlight for the visible segment could give the zoomed view context. Validate vertical space at 320 px before adding another persistent control. [Current build view at 390 px](3guotd-current-390px.jpg)
+3. **Let players pause to think during combat.** Put Pause/Resume beside speed and keep buy and upgrade actions available while paused. Use the same action bar for a short tower-role or upgrade explanation. This lets someone read a price or learn an effect without giving up the benefit of mid-wave purchases.
+4. **Help players understand why a wave went wrong.** Keep health pips, silver popups, and projectile feedback. Add a compact end-of-wave summary for attackers stopped, leaks, and silver earned. A runner that slipped through should be identifiable in the result so the player has a concrete reason to move a Drum on retry.
+
+The best first change is **clearer prices and upgrade previews**. It improves the decisions players already make during every wave and fits the existing portrait layout. The game footage is a reference for interaction patterns. 3Guo TD’s interface, artwork, and setting remain original.
