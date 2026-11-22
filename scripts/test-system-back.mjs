@@ -30,16 +30,17 @@ try {
   await button('Start wave').tap()
   await button('Pause').tap()
   let length
-  for (let visit = 0; visit < 3; visit++) {
+  for (let visit = 0; visit < 4; visit++) {
     await button('Battle orders').tap()
-    await button('Towers').tap()
-    await button('Enemy Types').tap()
+    const guides = visit < 2 ? ['Towers', 'Enemy Types'] : ['Enemy Types', 'Towers']
+    for (const guide of guides) await button(guide).tap()
     const entries = await page.evaluate(() => history.length)
     if (visit === 0) length = entries
     assert.equal(entries, length, 'Reopening or switching guides must reuse history slots')
-    if (visit === 1) await button('Back to orders').tap()
+    if (visit % 2 === 1) await button('Back to orders').tap()
     else await back()
-    await button('Enemy Types').waitFor()
+    await page.getByRole('heading', { name: 'Battle orders', exact: true }).waitFor()
+    assert.equal(await button('Back to orders').count(), 0)
     await back()
     await button('Resume').waitFor()
     assert.equal(await selected.getAttribute('aria-label'), archer)
