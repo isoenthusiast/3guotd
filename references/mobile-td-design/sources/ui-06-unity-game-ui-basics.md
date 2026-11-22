@@ -1,0 +1,286 @@
+URL: https://unity.com/blog/video-game-ui-ux-basics
+TITLE: Video Game UI Basics: How Menus, HUDs, and Feedback Help Players - Unity
+RETRIEVED: 2026-11-22
+METHOD: curl
+
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+- Video Game UI Basics: How Menus, HUDs, and Feedback Help Players
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+Games
+Industry
+Resources
+Community
+Learning
+Support
+Pricing
+Develop
+Unity Engine Build 2D and 3D games for any platform
+Collaboration Collaborate and iterate quickly with your team
+Download Unity
+Plans and pricing
+Deploy
+Multiplatform Discover 25+ platforms Unity supports
+LiveOps Post-launch insights and live game ops
+Grow
+User acquisition Get discovered and acquire mobile users
+In-App Purchase Manage IAP across stores and D2C
+Monetization Connect players with the right games
+Advertise with Unity Monetize with Unity
+Use cases
+Mobile Games Build & grow mobile hits with Unity
+Indie Games Ship big games with small teams
+XR Games Launch XR games across platforms
+Multiplayer Games Simplify multiplayer game development
+Use cases
+3D collaboration Build and review 3D projects in real time
+Immersive training Train in immersive environments
+Robotics Deploy robotics systems faster
+Human Machine Interfaces (HMI) Develop interactive 3D embedded systems
+Industries
+Manufacturing Achieve operational excellence
+Retail Transform in-store experiences into online ones
+Automotive Boost innovation and in-car experiences
+See all industries
+Technical library
+Documentation Official user manuals and API references
+Developer tools Release versions and issue tracker
+Roadmap Review upcoming features
+Glossary Library of technical terms
+Insights
+Case studies Real-world success stories
+Best practice guides Expert tips and tricks
+Demos Demos, samples, and building blocks
+All resources
+What's new
+Blog Updates, information, and technical tips
+News News, stories, and press center
+Community Hub
+Discussions Discuss, problem-solve, and connect
+Events Global and local events
+Community stories
+Made with Unity Showcasing Unity creators
+Livestreams Join devs, creators, and insiders
+Unity Awards Celebrating Unity creators worldwide
+For every level
+Unity Learn Master Unity skills for free
+Professional training Level up your team with Unity trainers
+New to Unity
+Getting started Kickstart your learning
+Unity Essential Pathways New to Unity? Start your journey
+How-to Guides Actionable tips and best practices
+Education
+For students Kickstart your career
+For educators Supercharge your teaching
+Education Grant License Bring Unity’s power to your institution
+Certifications Prove your Unity mastery
+Support options
+Get help Helping you succeed with Unity
+Success plans Reach your goals faster with expert support
+FAQ Answers to common questions
+Contact us Connect with our team
+Build with Unity Get started
+Video game UX and UI basics: How games talk to players
+Oct 23, 2026 | 5 Min
+Unity Team - Unity Technologies
+Game design User interface
+Game design User interface
+A beginner’s guide to video game UI and UX: what a HUD is, the four places interface can live, a simple design process, and accessibility basics every game needs.
+Every game is constantly talking to you. A health bar shrinks when you take a hit. A button glows when you can press it. A sound plays when you pick something up. Most of the time you don’t notice any of this, and that’s the point: Good interface design helps you play without getting in the way.
+This guide covers video game UI and UX basics for first-time creators : what the interface is made of, the different places it can live, a simple process for designing it, and the accessibility basics that help more people enjoy your game.
+UI vs UX: What’s the difference?
+Game user interface (UI) design is the planning and creation of everything players use to understand and control a game: menus, buttons, the heads-up display (HUD), icons, prompts, maps, and feedback effects. User experience (UX) is the bigger picture: how easy, clear, and comfortable the whole game feels to use.
+The test for both is simple. Good UI lets players focus on playing. Bad UI gets in the way, confuses them, or frustrates them.
+A typical, non-diegetic game UI. On the left side, an orange, pill-shaped figure stands on the ground against a backdrop of rolling hills and sunny skies with three clouds. There are two floating platforms. The first is floating in front of the orange pill character; it has three small coins floating above it. To the right is a slightly elevated floating platform with a treasure chest prompting the player to press “E” to open it. At the top of the image, from left to right, are: a health system represented by three hearts (two are full and one is empty); a timer; a counter showing 1,250 coins collected; and a pause icon indicating the game is paused. At the bottom of the image in the center is a UI element showing available items including three carrots, a purple potion, and a golden key. Image generated by Unity Spark (Unity Ultra), October 22, 2026.
+The building blocks of a video game interface
+Most game interfaces are made of a few familiar pieces:
+The HUD: The information that sits on screen while you play, like health, score, a timer, or a mini-map. Key elements usually sit near the edges of the screen so the center stays clear for the action.
+Menus: The screens you use before and between play – starting a game, changing settings, managing items.
+Prompts: Short hints that tell players what button to press or what they can interact with. Showing prompts saves players from having to memorize everything.
+Feedback: The sounds, animations, and effects that confirm something happened. Every button press needs a visible and audible reaction within a fraction of a second.
+Four places your interface can live
+Game designers often describe interface by where it exists in relation to the game world. A widely used framework splits it into four types:
+Non-diegetic UI
+This type of Interface sits outside the game world and is visible only to the player. Most classic HUD elements, like a health bar in the corner, fit here.
+Example of a non-diegetic UI for an inventory system rendered in a simple flat style. The left side of the inventory contains 28 slots, organized in four rows of seven. Row 1 contains potions (five red potions, three blue potions, two green potions, and eight teardrop-shaped potions). Row 2 contains weapons (a sword, an axe, and a shield). Row 3 contains materials (12 leaves, eight feathers, two amethysts, four red leaves, and nine metallic cubes). Row 4 contains quest items (one key and one scroll). On the right, a healing draught is highlighted, with options to use, drop, or equip it. Key information is also displayed about the healing draught (it restores 50 health over 3 seconds and can be sold for 25 gold coins). Image generated by Unity Spark (Unity Ultra), October 22, 2026.
+Diegetic UI
+This type of Interface exists inside the game world , so the characters could see or hear it, too – for example, a health display built into a character’s suit or a map the character actually holds.
+Pixel art image demonstrating a diegetic UI. First-person perspective of an in-game map held by a player character wearing a green jacket with furry cuffs and a pair of red mittens. On their left arm, the player wears a bracer with a HUD showing their total health points, represented as a heart and a red bar. In their right hand they hold a lantern with an orange bar indicating the quantity of fuel remaining. Image generated by Unity Spark (Unity Ultra), October 22, 2026.
+Spatial UI
+Spatial UI elements appears in the game’s 3D space but aren’t part of the world itself, like outlines around teammates or icons floating over characters' heads.
+Meta UI
+Meta UI elements are effects that communicate through the screen itself, rather than through an object in the game world, like blood spatter or a red flash at the edges when the player takes damage.
+Video clip with examples of spatial and meta UI. Two abstract, pill-shaped characters stand on either side of an elevator door. The left figure (ROOK) is rendered in blue with a blue diamond over its head indicating that it is friendly. The right character is red with a warning sign and a partially depleted health bar indicating that it is an enemy. The doorway is marked “REACTOR” and is 140m from the player. The entire scene is surrounded by a flashing red effect indicating that the player is in danger. Video generated by Unity Spark (Unity Ultra), October 22, 2026.
+Most games mix several types of UI. Going fully diegetic is especially hard: Putting every piece of information into the world can make a game harder to play, so some compromise is usually needed. If you want an interface that lives in the world, plan for it from the start rather than adding it at the end.
+A 7-step process for designing a video game UI
+You don’t need to be a designer to plan a clear interface. Here’s a seven-step process to simply design your video game’s UI.
+List inputs and outputs: Write down everything the player must do (move, jump, pause, choose items) and everything the game must tell them (health, score, objective, danger). Decide which devices you’ll support – touch, controller, or keyboard.
+Prioritize: Rank the outputs by importance and how often they change. Critical, constantly changing information goes where it’s easy to see. Rarely used options go in menus.
+Use affordances: Choose shapes, icons, and behaviors that suggest what something does – a raised button looks pressable. Stick to familiar conventions where you can.
+Give instant feedback: Every input needs a visible and audible reaction right away.
+Reduce: Remove anything unnecessary. Can a number become a simple bar? Can some information appear only when it matters, like an ammo counter that shows up when you’re running low?
+Prototype: Sketch quick mock-ups, on paper or onscreen.
+Playtest: Watch people use your interface, note where they hesitate, and repeat.
+General principles for clear video game interfaces
+A set of widely used usability guidelines translates neatly to games. A few of the most useful:
+Show what’s happening: Let players know whether the game is saved, what’s loading, and how much health they have.
+Use symbols people already know: A heart for health, a map icon for the map.
+Let players go back: Allow them to cancel, undo mistakes, and skip scenes they’ve already seen.
+Stay consistent: The same button should confirm everywhere, and each icon should keep one meaning.
+Prevent mistakes: Ask “Are you sure?” before deleting a save, and gray out actions that aren’t possible.
+Keep it clean: Show only what matters right now.
+A few layout tips help, too:
+Keep the center of the screen clear for gameplay.
+Make text readable from the player’s viewing distance – a TV across the room needs bigger text than a phone.
+On phones, use large touch targets; on consoles, make sure every menu works with a controller.
+Accessibility basics for video game design
+Accessible interface design helps more people play your game, and many of the most effective steps are simple. Game Accessibility Guidelines lists these among its basic, widely applicable recommendations:
+Let players remap controls.
+Use an easily readable default font size and simple, clear language.
+Provide high contrast between text or interface and the background.
+Don’t convey essential information by color alone.
+Don’t convey essential information by sound alone.
+Provide subtitles for important speech, with separate volume controls for effects, speech, and music.
+Make sure every part of the interface works with the same input method as the gameplay.
+Make on-screen buttons large and well spaced, especially on touch screens.
+Offer a choice of difficulty levels, and save players’ settings.
+Using color, shape, and sound together is a good habit in general, because it means information isn’t lost if one of those signals is missed.
+A standard, customizable settings menu open to the Accessibility options screen. It includes: three different text size options; a subtitles toggle; sliders for controlling individual volume levels for music, sound effects, and speech; a high contrast toggle; and an option to remap controls. Image generated by Unity Spark (Unity Ultra), October 22, 2026.
+Good UI vs bad UI in video games
+Here’s how small choices add up:
+Good UI in video games
+A health bar that flashes and beeps when low
+Bad UI in video games
+Health shown only as a small number in a corner
+Good UI in video games
+An inventory sorted by type, with clear icons and names
+Bad UI in video games
+A long, unsorted list in tiny text
+Good UI in video games
+A pause menu that opens instantly and stops the game
+Bad UI in video games
+Pause that takes seconds or doesn’t stop the action
+Good UI in video games
+Button prompts that match the controller in use
+Bad UI in video games
+Keyboard prompts shown to a controller player
+Good UI in video games
+Settings that let players remap controls and resize text
+Bad UI in video games
+Fixed controls and text that can’t be changed
+Good UI in video games
+Bad UI in video games
+A health bar that flashes and beeps when low
+Health shown only as a small number in a corner
+An inventory sorted by type, with clear icons and names
+A long, unsorted list in tiny text
+A pause menu that opens instantly and stops the game
+Pause that takes seconds or doesn’t stop the action
+Button prompts that match the controller in use
+Keyboard prompts shown to a controller player
+Settings that let players remap controls and resize text
+Fixed controls and text that can’t be changed
+Image showing a poorly designed UI. An orange pill-shaped figure stands on the ground against a backdrop of rolling hills and sunny skies with three clouds. Various UI elements are clustered and overlapping in the center of the screen, blocking the player’s view. The text is small and hard to read, as are the menu items in the lower right corner. Image generated by Unity Spark (Unity Ultra), October 22, 2026.
+Your game user interface design interface checklist
+Before you share your game, ask:
+Can players always see the information they need most?
+Does every action get instant feedback?
+Is anything on screen that doesn’t need to be?
+Is important information shown in more than one way – not just color or sound?
+Can someone new figure out the controls without help?
+Have you watched someone else play it?
+Let players focus on playing
+The best interfaces feel invisible. They tell players exactly what they need to know , when they need to know it, and then get out of the way. Start with what players must do and see, keep it simple, and test it with real people.
+Ready to build your first game UI? You don't need to be a developer. Try Unity Spark, Unity's browser-based, AI game creation platform that allows you to describe your game, refine it in a real web editor, and publish it for others to play.
+Learn more about Unity Spark
+Join the waitlist
+Header image note: Abstract representation of a blank game design document superimposed on a blue and orange blurred background. Image generated by Claude Opus 5.5, October 7, 2026.
+Language
+English
+日本語
+Français
+Português
+中文
+Español
+Русский
+한국어
+Tiếng Việt
+Social
+Currency
+USD
+Purchase
+Products
+Unity Ads
+Unity Asset Store
+Resellers
+Education
+Students
+Educators
+Institutions
+Certification
+Learn
+Skills Development Program
+Download
+Unity Hub
+Download Archive
+Beta Program
+Unity Labs
+Labs
+Publications
+Resources
+Learn platform
+Community
+Documentation
+Unity QA
+FAQ
+Services Status
+Case Studies
+Made with Unity
+Unity
+Our Company
+Newsletter
+Blog
+Events
+Careers
+Help
+Press
+Partners
+Investors
+Affiliates
+Security
+Impact
+Social Impact
+Inclusion & Diversity
+Contact us
+Copyright © 2026 Unity Technologies
+Legal
+Privacy Policy
+Cookies
+Do Not Sell or Share My Personal Information
+"Unity", Unity logos, and other Unity trademarks are trademarks or registered trademarks of Unity Technologies or its affiliates in the U.S. and elsewhere ( more info here ). Other names or brands are trademarks of their respective owners.
