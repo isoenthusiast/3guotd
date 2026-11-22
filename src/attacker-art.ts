@@ -20,14 +20,15 @@ function leg(ctx: CanvasRenderingContext2D, hip: number, knee: number, kneeY: nu
   ctx.stroke()
 }
 
-export function drawAttacker(ctx: CanvasRenderingContext2D, kind: AttackerKind, progress: number) {
+export function drawAttacker(ctx: CanvasRenderingContext2D, kind: AttackerKind, progress: number,
+  options: { reducedMotion?: boolean } = {}) {
   const mounted = kind === 'cavalry'
   const runner = kind === 'runner' || kind === 'veteranRunner'
-  const sprite = mounted ? 'cavalry' : runner ? 'runner' : kind === 'commander' ? 'commander' : 'infantry'
+  const sprite = mounted ? 'cavalry' : runner ? 'runner' : kind === 'commander' ? 'commander' : kind === 'bowman' ? 'bowman' : 'infantry'
   const width = mounted ? 54 : kind === 'commander' ? 46 : 36
   // A full cycle is a distance along the road. Slows, fast play and Pause
   // therefore affect the feet and body together, including across turns.
-  const phase = progress * 2 * Math.PI / (mounted ? 1.45 : 0.95)
+  const phase = (options.reducedMotion ? 0 : progress) * 2 * Math.PI / (mounted ? 1.45 : 0.95)
   const swing = Math.sin(phase)
   const lift = mounted ? 3 * Math.max(0, Math.cos(phase)) : 2 * Math.abs(swing)
   ctx.save()
@@ -59,17 +60,17 @@ export function drawAttacker(ctx: CanvasRenderingContext2D, kind: AttackerKind, 
   ctx.translate(0, -lift)
   ctx.rotate(mounted ? 0.055 * swing : 0.038 * swing)
   const img = artImage(sprite)
-  const fraction = mounted ? 0.69 : 0.74
+  const fraction = kind === 'bowman' ? 1 : mounted ? 0.69 : 0.74
   if (img) {
     ctx.drawImage(img, 0, 0, img.width, img.height * fraction,
-      -width / 2, -26, width, 48 * fraction)
+      -width / 2, -26, width, kind === 'bowman' ? 30 : 48 * fraction)
   } else {
     ctx.fillStyle = mounted ? '#825234' : '#615041'
     ctx.fillRect(-width / 3, -10, width * 2 / 3, 17)
     ctx.fillStyle = '#ad895f'
     ctx.fillRect(mounted ? 12 : -6, -20, 12, 13)
   }
-  if (kind === 'bowman') {
+  if (kind === 'bowman' && !img) {
     ctx.strokeStyle = '#f4d59c'
     ctx.lineWidth = 2.5
     ctx.beginPath()
@@ -78,6 +79,19 @@ export function drawAttacker(ctx: CanvasRenderingContext2D, kind: AttackerKind, 
     ctx.stroke()
   }
   if (kind === 'veteran' || kind === 'veteranRunner') {
+    // Broad stepped pauldrons and a crested helmet survive grayscale and tiny
+    // phone scale; the existing cinnabar rank ribbon remains a secondary cue.
+    ctx.fillStyle = '#373b38'
+    ctx.strokeStyle = '#d5c49a'
+    ctx.lineWidth = 1.5
+    for (const side of [-1, 1]) {
+      ctx.beginPath()
+      ctx.moveTo(side * 7, -16); ctx.lineTo(side * 19, -12)
+      ctx.lineTo(side * 21, -4); ctx.lineTo(side * 10, -6)
+      ctx.closePath(); ctx.fill(); ctx.stroke()
+    }
+    ctx.beginPath(); ctx.moveTo(-7, -22); ctx.lineTo(-5, -30)
+    ctx.lineTo(5, -30); ctx.lineTo(8, -22); ctx.closePath(); ctx.fill(); ctx.stroke()
     ctx.fillStyle = '#b33f2a'
     ctx.fillRect(-12, -12, 6, 12)
   }

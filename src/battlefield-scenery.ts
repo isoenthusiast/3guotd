@@ -53,6 +53,7 @@ export function drawRoadCoverage(ctx: CanvasRenderingContext2D, round: Round, si
     if (kind && tower !== kind) continue
     ctx.strokeStyle = tower === 'archer' ? '#ffdc87' : '#7bd9dc'
     ctx.lineWidth = tower === 'archer' ? 13 : 25
+    ctx.setLineDash(tower === 'drum' ? [8, 6] : [])
     ctx.beginPath()
     for (const [a, b] of coverage[tower].segments) {
       ctx.moveTo((a[0] + .5) * tile, (a[1] + .5) * tile)
@@ -138,7 +139,7 @@ export function objectiveAnimationPending(ctx: CanvasRenderingContext2D, time: n
 
 /** Scenery follows objectiveProgress; never changes the round or implies a delivery on loss. */
 export function drawObjective(ctx: CanvasRenderingContext2D, round: Round, time: number,
-  gateX: number, gateY: number) {
+  gateX: number, gateY: number, reducedMotion = false) {
   const mission = round.mission
   const ferry = mission?.battleId === 'jing'
   const cart = mission?.battleId === 'wuzhang'
@@ -153,7 +154,7 @@ export function drawObjective(ctx: CanvasRenderingContext2D, round: Round, time:
     state.completed = completed
     state.changed = time
   }
-  const progress = Math.max(0, Math.min(1, (time - state.changed) / 3))
+  const progress = reducedMotion ? 1 : Math.max(0, Math.min(1, (time - state.changed) / 3))
   ctx.save()
   if (ferry) {
     ctx.fillStyle = '#765b3b'
@@ -167,7 +168,7 @@ export function drawObjective(ctx: CanvasRenderingContext2D, round: Round, time:
     const distance = Math.max(0, columns * tile - gateX + 100)
     if (progress < 1) paintArt(ctx, 'ferry', gateX - 45 + distance * progress, gateY - 12, 110, 61)
     if (completed < mission!.milestoneCount && (progress === 1 || progress > .45)) {
-      paintArt(ctx, 'ferry', gateX - 45, gateY - 12 + Math.sin(time * 2) * 1.5, 110, 61)
+      paintArt(ctx, 'ferry', gateX - 45, gateY - 12 + (reducedMotion ? 0 : Math.sin(time * 2) * 1.5), 110, 61)
     }
   } else {
     paintArt(ctx, 'cottage', gateX - 62, gateY - 64, 104, 98)

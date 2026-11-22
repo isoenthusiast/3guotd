@@ -336,6 +336,23 @@ button:focus-visible { outline: 2px solid #ffedaf; outline-offset: 2px; }
 .field-guide th, .field-guide td { padding: .3rem; text-align: right; border-bottom: 1px solid #56634e; }
 .field-guide th:first-child { text-align: left; }
 .field-guide p { font-size: .9rem; line-height: 1.4; }
+.enemy-example { width: 42px; height: 38px; display: block; margin: 0 auto; }
+.illustrated-enemies th:first-child { width: 37%; }
+.illustrated-enemies th span { display: block; }
+.illustrated-enemies td { overflow-wrap: anywhere; }
+.enemy-cues div { margin: .55rem 0; }
+.enemy-cues dt { font-weight: bold; color: #ffdc8e; }
+.enemy-cues dd { margin-left: 0; font-size: .9rem; }
+.pairing-guide { margin: .5rem 0; }
+.pairing-example { width: 100%; max-width: 280px; height: auto; display: block; }
+.pairing-guide figcaption { font-size: .9rem; line-height: 1.4; }
+.visual-comfort { margin: .75rem 0; border: 1px solid #a49b7c; min-width: 0; }
+.visual-comfort button { min-height: 44px; margin: .2rem; }
+.visual-comfort button[aria-pressed="true"]::before { content: '✓ '; }
+[data-reduced-motion="true"] .prep-clock svg { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .prep-clock svg { display: none; }
+}
 @media (max-height: 650px) {
   .setup-screen {
     display: grid;

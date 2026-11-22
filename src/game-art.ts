@@ -1,15 +1,27 @@
 import { columns, rows, sitePosition } from './game/board'
-import { canBuildAt, closedSites, enemyPosition, impactTime, enemyMaxHealth, roundRoutes, routeForEnemy, shotFlightTime, towerRange } from './game/round'
+import { attackerName, canBuildAt, closedSites, enemyPosition, impactTime, enemyMaxHealth, objectiveProgress, roundRoutes, routeForEnemy, shotFlightTime, towerRange } from './game/round'
 import type { Round, TowerKind } from './game/round'
 
 import { drawAttacker } from './attacker-art'
+import { currentVisualComfort } from './visual-comfort'
+import { rewardCues } from './combat-cues'
 import { paintArt } from './battlefield-art-assets'
 import { drawLandscape, drawObjective, drawRoadCoverage, drawRoadWear, objectiveAnimationPending } from './battlefield-scenery'
 export { loadBattlefieldArt } from './battlefield-art-assets'
 export { placementCoverage, roadCoverage } from './battlefield-scenery'
 
 export const tile = 64
-export type BattlefieldArtOptions = { timeSeconds?: number; previewKind?: TowerKind }
+export type BattlefieldArtOptions = { timeSeconds?: number; previewKind?: TowerKind; reducedEffects?: boolean; reducedMotion?: boolean }
+
+function cue(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, font = 22) {
+  ctx.save()
+  ctx.font = `bold ${font}px system-ui`
+  const width = ctx.measureText(text).width
+  x = Math.max(width / 2 + 7, Math.min(columns * tile - width / 2 - 7, x))
+  ctx.fillStyle = '#20291fed'; ctx.fillRect(x - width / 2 - 6, y - font, width + 12, font + 7)
+  ctx.textAlign = 'center'; ctx.fillStyle = '#fff2cf'; ctx.fillText(text, x, y)
+  ctx.restore()
+}
 
 function center([x, y]: readonly [number, number]): [number, number] {
   return [(x + 0.5) * tile, (y + 0.5) * tile]
@@ -87,6 +99,9 @@ export function drawBattlefield(
   ctx: CanvasRenderingContext2D, round: Round, selected: number | null,
   options: BattlefieldArtOptions = {},
 ) {
+  const comfort = currentVisualComfort()
+  const reducedMotion = options.reducedMotion ?? comfort.reducedMotion
+  const reducedEffects = options.reducedEffects ?? comfort.reducedEffects
   const time = options.timeSeconds ?? (typeof performance === 'undefined' ? round.waveAge : performance.now() / 1000)
   const routes = roundRoutes(round)
   drawLandscape(ctx, round)
@@ -123,8 +138,13 @@ export function drawBattlefield(
     ctx.moveTo(x + 15, y - 15)
     ctx.lineTo(x - 15, y + 15)
     ctx.stroke()
+    ctx.save()
+    ctx.setLineDash(closed.includes(site) ? [] : [6, 5])
+    ctx.strokeRect(x - 26, y - 26, 52, 52)
+    ctx.restore()
+    cue(ctx, closed.includes(site) ? 'Closed' : 'Soon', x, y + 24, 15)
   }
-  const objective = drawObjective(ctx, round, time, gateX, gateY)
+  const objective = drawObjective(ctx, round, time, gateX, gateY, reducedMotion)
   if (!objective && !paintArt(ctx, 'gate', gateX - 58, gateY - 55, 116, 80)) {
     ctx.fillStyle = '#a98351'
     ctx.fillRect(gateX - 31, gateY - 5, 62, 26)
@@ -135,6 +155,13 @@ export function drawBattlefield(
     ctx.strokeStyle = '#ffa487'
     ctx.lineWidth = 6
     ctx.strokeRect(gateX - 27, gateY - 26, 54, 54)
+    const lane = round.gateHit.routeIndex === undefined ? 'lane unrecorded' : `Entry ${round.gateHit.routeIndex + 1}`
+    cue(ctx, `${attackerName(round.gateHit.kind)} breach · ${lane}`,
+      columns * tile / 2, gateY - 83)
+  }
+  if (round.mission && objectiveProgress(round) > 0) {
+    cue(ctx, `${objectiveProgress(round)}/${round.mission.milestoneCount} ${round.mission.milestone}`,
+      columns * tile / 2, gateY - 111, 20)
   }
 
   for (const path of routes) {
@@ -188,6 +215,8 @@ export function drawBattlefield(
   const active = round.towers.find(tower => tower.site === selected)
   if (active) {
     const [x, y] = center(sitePosition(active.site))
+    ctx.save()
+    if (active.kind === 'drum') ctx.setLineDash([9, 5])
     ctx.beginPath()
     ctx.arc(x, y, towerRange(active.kind, active.reach) * tile, 0, 2 * Math.PI)
     ctx.fillStyle = '#fff0af21'
@@ -195,6 +224,7 @@ export function drawBattlefield(
     ctx.lineWidth = 3
     ctx.fill()
     ctx.stroke()
+    ctx.restore()
     if (!active.reach) {
       ctx.save()
       ctx.setLineDash([9, 5])
@@ -216,14 +246,14 @@ export function drawBattlefield(
         const [ex, ey] = center(enemyPosition(enemy.progress, routeForEnemy(round, enemy)))
         return enemy.slowed && Math.hypot(ex - x, ey - y) <= towerRange(tower.kind, tower.reach) * tile
       })
-      if (affected.length) {
+      if (affected.length && !reducedEffects) {
         const pulse = (round.waveAge * 1.8) % 1
         ctx.save()
         ctx.strokeStyle = '#b7f1e9'
         ctx.lineWidth = 3
-        ctx.globalAlpha = .65 * (1 - pulse)
+        ctx.globalAlpha = reducedMotion ? .5 : .65 * (1 - pulse)
         ctx.beginPath()
-        ctx.arc(x, y, 22 + pulse * towerRange(tower.kind, tower.reach) * tile, 0, 2 * Math.PI)
+        ctx.arc(x, y, reducedMotion ? 30 : 22 + pulse * towerRange(tower.kind, tower.reach) * tile, 0, 2 * Math.PI)
         ctx.stroke()
         ctx.globalAlpha = .55
         ctx.setLineDash([3, 8])
@@ -249,15 +279,25 @@ export function drawBattlefield(
     if (enemy.slowed) {
       ctx.strokeStyle = '#c6f2f0'
       ctx.lineWidth = 4
-      ctx.beginPath()
-      ctx.ellipse(x, y + 18, 19, 7, 0, 0, 2 * Math.PI)
-      ctx.stroke()
+      if (!reducedEffects) {
+        ctx.beginPath(); ctx.ellipse(x, y + 18, 19, 7, 0, 0, 2 * Math.PI); ctx.stroke()
+      }
+      // Double underline remains recognizable without color or expanding rings.
+      ctx.strokeStyle = '#27382c'; ctx.lineWidth = 7
+      ctx.beginPath(); ctx.moveTo(x - 12, y + 24); ctx.lineTo(x + 12, y + 24); ctx.stroke()
+      ctx.strokeStyle = '#dcf6ec'; ctx.lineWidth = 2
+      ctx.beginPath(); ctx.moveTo(x - 12, y + 22); ctx.lineTo(x + 12, y + 22)
+      ctx.moveTo(x - 8, y + 26); ctx.lineTo(x + 8, y + 26); ctx.stroke()
     }
     ctx.save()
     ctx.translate(x, y)
     if (path[i + 1][0] < path[i][0]) ctx.scale(-1, 1)
-    drawAttacker(ctx, enemy.kind, enemy.progress)
+    drawAttacker(ctx, enemy.kind, enemy.progress, { reducedMotion })
     ctx.restore()
+    if (enemy.kind === 'commander') {
+      const waiting = round.enemies.some(other => other.id < enemy.id)
+      cue(ctx, waiting ? 'WAIT · escort' : 'GO · escort clear', x, y < tile ? y + 52 : y - 47, 22)
+    }
   }
   for (const shot of round.shots) {
     const target = targets.get(shot.targetId)
@@ -268,39 +308,45 @@ export function drawBattlefield(
     const dy = target[1] - y
     const tail = Math.max(0, progress - 0.24)
     ctx.strokeStyle = '#ffe5a3'
-    ctx.lineWidth = 7
-    ctx.beginPath()
-    ctx.moveTo(x + dx * tail, y + dy * tail)
-    ctx.lineTo(x + dx * progress, y + dy * progress)
-    ctx.stroke()
+    ctx.lineWidth = reducedEffects ? 2 : 7
+    if (!reducedEffects && !reducedMotion) {
+      ctx.beginPath()
+      ctx.moveTo(x + dx * tail, y + dy * tail)
+      ctx.lineTo(x + dx * progress, y + dy * progress)
+      ctx.stroke()
+    }
     ctx.fillStyle = '#fff7d0'
     ctx.beginPath()
-    ctx.arc(x + dx * progress, y + dy * progress, 6, 0, 2 * Math.PI)
+    ctx.arc(x + dx * progress, y + dy * progress, reducedEffects ? 3 : 6, 0, 2 * Math.PI)
     ctx.fill()
   }
   for (const hit of round.impacts) {
     const [x, y] = center(hit.at)
     const progress = hit.elapsed / impactTime
-    if (progress < 1) {
+    if (progress < 1 && !reducedEffects) {
       ctx.globalAlpha = 1 - progress
       ctx.strokeStyle = '#fff2c7'
       ctx.lineWidth = 5
       ctx.beginPath()
-      ctx.arc(x, y, 10 + progress * 22, 0, 2 * Math.PI)
+      if (reducedMotion) ctx.rect(x - 8, y - 8, 16, 16)
+      else ctx.arc(x, y, 10 + progress * 22, 0, 2 * Math.PI)
       ctx.stroke()
       ctx.globalAlpha = 1
     }
-    if (hit.silver) {
-      ctx.font = 'bold 26px system-ui'
-      ctx.textAlign = 'center'
-      ctx.lineWidth = 5
-      ctx.strokeStyle = '#31251d'
-      ctx.fillStyle = '#ffe4a1'
-      const labelX = Math.max(33, Math.min(columns * tile - 33, x))
-      const labelY = y - 17 - hit.elapsed * 30
-      ctx.strokeText(`+${hit.silver}`, labelX, labelY)
-      ctx.fillText(`+${hit.silver}`, labelX, labelY)
-    }
+  }
+  for (const reward of rewardCues(round)) {
+    const [x, y] = center([reward.x, reward.y])
+    ctx.font = 'bold 26px system-ui'
+    ctx.textAlign = 'center'
+    ctx.lineWidth = 5
+    ctx.strokeStyle = '#31251d'
+    ctx.fillStyle = '#ffe4a1'
+    const label = `+${reward.silver} silver`
+    const half = ctx.measureText(label).width / 2 + 4
+    const labelX = Math.max(half, Math.min(columns * tile - half, x))
+    const labelY = y - 17 - (reducedMotion ? 0 : reward.elapsed * 30)
+    ctx.strokeText(label, labelX, labelY)
+    ctx.fillText(label, labelX, labelY)
   }
   for (const enemy of round.enemies) {
     const [x, y] = targets.get(enemy.id)!
@@ -320,5 +366,5 @@ export function drawBattlefield(
       }
     }
   }
-  return objective && round.phase !== 'lost' && objectiveAnimationPending(ctx, time)
+  return !reducedMotion && objective && round.phase !== 'lost' && objectiveAnimationPending(ctx, time)
 }

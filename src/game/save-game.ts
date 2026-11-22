@@ -50,7 +50,8 @@ function decodeRound(value: unknown, mission: Round['mission']): Round | null {
 
   if (opening !== null && !(record(opening) && towers(opening.towers) && integer(opening.silver) && integer(opening.lives))) return null
   if (value.phase === 'running' && opening === null) return null
-  if (gateHit !== null && !(record(gateHit) && attacker(gateHit.kind) && amount(gateHit.elapsed))) return null
+  if (gateHit !== null && !(record(gateHit) && attacker(gateHit.kind) && amount(gateHit.elapsed)
+    && (gateHit.routeIndex === undefined || (integer(gateHit.routeIndex) && gateHit.routeIndex < routeCount)))) return null
   if (previousWave !== null && !(record(previousWave) && stats(previousWave) && integer(previousWave.waveNumber))) return null
 
   const round = { ...value, mission } as Round

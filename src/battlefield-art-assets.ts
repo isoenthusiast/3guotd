@@ -6,11 +6,12 @@ import infantry from './assets/battlefield/infantry.webp?inline'
 import runner from './assets/battlefield/runner.webp?inline'
 import cavalry from './assets/battlefield/cavalry.webp?inline'
 import commander from './assets/battlefield/commander.webp?inline'
+import bowman from './assets/battlefield/bowman-torso.webp?inline'
 import cottage from './assets/battlefield/cottage.webp?inline'
 import ferry from './assets/battlefield/ferry.svg?inline'
 import cart from './assets/battlefield/cart.svg?inline'
 
-const sources = { ...terrainArt, archer, drum, gate, infantry, runner, cavalry, commander, cottage, ferry, cart }
+const sources = { ...terrainArt, archer, drum, gate, infantry, runner, cavalry, commander, bowman, cottage, ferry, cart }
 export type ArtName = keyof typeof sources
 const images = new Map<ArtName, HTMLImageElement>()
 let loading: Promise<void> | undefined

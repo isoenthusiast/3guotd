@@ -2,12 +2,12 @@ import { render } from 'preact'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { columns, rows, sitePosition } from './game/board'
 import {
-  attackers, levelPrepMs, attackerName, enemyMaxHealth, baseUpgradePrice, buildTower, canBuildAt, canSpend, closedSites, createRound, enemiesRemaining, objectiveProgress, removeTower,
+  levelPrepMs, attackerName, enemyMaxHealth, baseUpgradePrice, buildTower, canBuildAt, canSpend, closedSites, createRound, enemiesRemaining, objectiveProgress, removeTower,
   roundRoutes, prepareNextLevel, nextEntry, towerRefund, inRange, routeForEnemy, enemyPosition, startingSilver, secondUpgradeSurcharge,
   retryRound, speedOptions, startRound, tickRound, towerDetails, towerPrice, upgradePrice,
   upgradeTower, waveCueTime, roundFormation, waveOptions,
 } from './game/round'
-import type { AttackerKind, Mission, PlaySpeed, Round, TowerKind, Upgrade } from './game/round'
+import type { Mission, PlaySpeed, Round, TowerKind, Upgrade } from './game/round'
 import { roadCoverage } from './battlefield-scenery'
 import { loadBattlefieldArt } from './battlefield-art-assets'
 import { drawBattlefield, drawTower, tile } from './game-art'
@@ -20,6 +20,7 @@ import { terrainArt } from './terrain-art'
 import villageGate from './assets/village-gate.webp?inline'
 import villageWatch from './assets/village-watch.webp?inline'
 import { useGameNavigation } from './navigation'
+import { EnemyGuide, PairingGuide, VisualComfortControls } from './combat-guide'
 import './style.css'
 
 const siteCount = columns * rows
@@ -540,19 +541,16 @@ function App() {
         <button type="button" onClick={back}>Back to orders</button></header>
       <section key={screen} class="guide-content">
       {enemyPage ? <>
-        <p>Base stats before wave and story bonuses. Silver is the kill reward.</p>
-        <table><thead><tr><th>Attacker</th><th>HP</th><th>Tiles/s</th><th>Silver</th></tr></thead>
-          <tbody>{(Object.keys(attackers) as AttackerKind[]).map(kind => <tr key={kind}>
-            <th scope="row">{attackerName(kind)}</th><td>{attackers[kind].health}</td>
-            <td>{attackers[kind].speed}</td><td>{attackers[kind].reward}</td></tr>)}</tbody></table>
-        <p>Slow runners and cavalry near Archers. Veterans take more hits. The commander waits until the soldiers ahead fall or escape.</p>
+        <EnemyGuide round={round} />
       </> : <>
         <h2>Archer · {towerPrice} silver</h2>
         <p>Shoots one enemy at a time. Cover both sides of a bend. Upgrade range to reach farther or fire rate to land more shots.</p>
         <h2>Drum · {towerPrice} silver</h2>
         <p>Slows enemies inside its ring. Pair it with an Archer for extra shots. Blue lines mark slowed enemies. The Drum deals no damage.</p>
         <p>Wider reach extends the ring. Stronger slow raises the speed reduction from {Math.round(100 * (1 - towerDetails.drum.speedFactor))}% to {Math.round(100 * (1 - towerDetails.drum.strongerSpeedFactor))}%. Where Drums overlap, the strongest slow applies.</p>
+        <PairingGuide />
       </>}
+      <VisualComfortControls />
       </section>
       <button type="button" onClick={() => navigate(enemyPage ? 'towers' : 'enemies')}>{enemyPage ? 'Towers' : 'Enemy Types'}</button>
     </main>

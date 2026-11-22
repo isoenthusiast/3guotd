@@ -385,6 +385,36 @@ try {
     setItem: (key, value) => local.set(key, value),
   } })
   const { loadGame, saveGame, loadCheckpoint, saveCheckpoint, loadSound, saveSound } = require(join(output, 'save-game.js'))
+  for (const speed of [1, 3]) for (const routeIndex of [0, 1]) {
+    const atGate = {
+      ...startRound(docks), spawnTimer: 999,
+      enemies: [
+        { id: 0, kind: 'runner', progress: docks.mission.routes[routeIndex].length - 1.01, health: 3, slowed: false, routeIndex },
+        { id: 1, kind: 'infantry', progress: 0, health: 4, slowed: false, routeIndex: 0 },
+      ],
+    }
+    const hit = tickRound(atGate, speed)
+    assert.equal(hit.lives, 2)
+    assert.equal(hit.gateHit.kind, 'runner')
+    assert.equal(hit.gateHit.routeIndex, routeIndex, `Fresh breach keeps lane at ${speed}×`)
+    saveGame(hit, speed)
+    assert.deepEqual(loadGame(), { round: hit, speed }, 'Lane survives save/restore')
+    let visible = hit
+    for (let i = 0; i < 12; i++) visible = tickRound(visible, speed)
+    assert.equal(visible.gateHit.routeIndex, routeIndex, 'Breach cue remains visible at either speed')
+  }
+  const legacyCue = { ...startRound(docks), gateHit: { kind: 'runner', elapsed: .3 } }
+  saveGame(legacyCue, 1)
+  assert.deepEqual(loadGame().round.gateHit, legacyCue.gateHit, 'Legacy cues without a lane still decode')
+  for (const routeIndex of [-1, .5, '1', null, 2, 999]) {
+    saveGame({ ...legacyCue, gateHit: { ...legacyCue.gateHit, routeIndex } }, 1)
+    assert.equal(loadGame(), null, `Reject malformed/out-of-range breach lane: ${routeIndex}`)
+  }
+  // A one-route save cannot claim a second entrance.
+  saveGame({ ...startRound(initial), gateHit: { kind: 'runner', elapsed: 0, routeIndex: 1 } }, 1)
+  assert.equal(loadGame(), null)
+  local.delete('3guotd.saved-game.v1')
+  console.log('Passed: split-route breach identity, cue duration, optional legacy lanes and decoder bounds at 1×/3×.')
   assert.equal(loadGame(), null)
   assert.equal(loadSound(), false)
   saveSound(true)

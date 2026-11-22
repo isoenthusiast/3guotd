@@ -103,7 +103,7 @@ type Enemy = { id: number; kind: AttackerKind; progress: number; health: number;
 export type Tower = { site: number; kind: TowerKind; reach: boolean; power: boolean; cooldown: number }
 type Shot = { from: Point; targetId: number; elapsed: number }
 type Impact = { at: Point; elapsed: number; silver: number }
-type GateHit = { kind: Enemy['kind']; elapsed: number }
+type GateHit = { kind: Enemy['kind']; elapsed: number; routeIndex?: number }
 type WaveStats = { stopped: number; escaped: number; runnersEscaped: number; earned: number }
 type WaveReport = WaveStats & { waveNumber: number }
 const emptyStats: WaveStats = { stopped: 0, escaped: 0, runnersEscaped: 0, earned: 0 }
@@ -338,7 +338,7 @@ export function advanceRound(round: Round, seconds: number, visualSeconds = seco
       lives--
       waveStats.escaped++
       if (enemyDetails(enemy).runner) waveStats.runnersEscaped++
-      gateHit = { kind: enemy.kind, elapsed: 0 }
+      gateHit = { kind: enemy.kind, elapsed: 0, routeIndex: enemy.routeIndex ?? 0 }
     }
     return false
   })
