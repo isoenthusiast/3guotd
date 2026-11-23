@@ -9,12 +9,13 @@ try {
   const results = await page.evaluate(async () => {
     const { drawBattlefield, loadBattlefieldArt } = await import('/src/game-art.ts')
     const { campaign } = await import('/src/game/campaign.ts')
-    const { createRound, startRound, tickRound, buildTower, enemyPosition, routeForEnemy } = await import('/src/game/round.ts')
+    const { createRound, startRound, tickRound, buildTower } = await import('/src/game/round.ts')
     await loadBattlefieldArt()
     document.body.innerHTML = '<canvas width="576" height="832" style="width:225px"></canvas>'
     const ctx = document.querySelector('canvas').getContext('2d')
     const strokes = []
     const health = []
+    const bars = []
     const stroke = ctx.stroke.bind(ctx)
     const fillRect = ctx.fillRect.bind(ctx)
     ctx.stroke = (...args) => {
@@ -26,6 +27,7 @@ try {
     }
     ctx.fillRect = (...args) => {
       if (ctx.fillStyle === '#e8f69b') health.push([strokes.length, ...args])
+      if (ctx.fillStyle === '#262827' && args[2] === 50 && args[3] === 12) bars.push([args[0] + 25, args[1] + 6])
       return fillRect(...args)
     }
     const cases = [
@@ -48,19 +50,15 @@ try {
       } else for (let frame = 0; frame < 7; frame++) round = tickRound(round, 1)
       return { kind, towers: round.towers.length, hits: round.impacts.map(hit => [hit.cue, hit.targetId]),
         losses: round.enemies.map(enemy => hp[enemy.id] - enemy.health),
-        expectedPositions: round.impacts.map(hit => {
-          const enemy = round.enemies.find(enemy => enemy.id === hit.targetId)
-          const [x, y] = kind === 'volley' && enemy
-            ? enemyPosition(enemy.progress, routeForEnemy(round, enemy)) : hit.at
-          return [32 + 64 * x, 42 + 64 * y]
-        }),
+        expectedPositions: round.impacts.map(({ at: [x, y] }) => [32 + 64 * x, 42 + 64 * y]),
         renders: [false, true].map(reducedMotion => {
           strokes.length = 0
           health.length = 0
+          bars.length = 0
           drawBattlefield(ctx, round, null, { timeSeconds: 0, reducedMotion, reducedEffects: reducedMotion })
           return { cues: strokes.filter(([strokeColor]) => strokeColor === color).map(([, x, y]) => [x, y]),
             slow: strokes.some(([strokeColor]) => strokeColor === '#dcf6ec'),
-            healthAboveEffects: health.length > 0 && health.every(([before]) => before === strokes.length) }
+            bars: [...bars], healthAboveEffects: health.length > 0 && health.every(([before]) => before === strokes.length) }
         }),
       }
     })
@@ -72,9 +70,14 @@ try {
   assert.deepEqual(bolt.losses, [0, 3, 0])
   for (const trial of [volley, bolt]) {
     for (const render of trial.renders) {
-      assert.equal(render.cues.length, trial.expectedPositions.length)
+      const points = trial.kind === 'volley' ? trial.hits.map(([, id]) => render.bars[id]) : trial.expectedPositions
+      assert.equal(render.cues.length, points.length)
+      if (trial.kind === 'volley') {
+        for (const [x, y] of points) assert.equal(points.filter(([otherX, otherY]) =>
+          Math.abs(x - otherX) < 50 && Math.abs(y - otherY) < 12).length, 1)
+      }
       render.cues.forEach(([x, y], i) => {
-        const [expectedX, expectedY] = trial.expectedPositions[i]
+        const [expectedX, expectedY] = points[i]
         assert(Math.hypot(x - expectedX, y - expectedY) < 0.01)
       })
       assert(render.healthAboveEffects)

@@ -398,17 +398,50 @@ export function drawBattlefield(
     ctx.arc(x + dx * progress, y + dy * progress, reducedEffects ? 3 : 6, 0, 2 * Math.PI)
     ctx.fill()
   }
+  const barWidth = 46
+  const healthBars = new Map<number, [number, number]>()
+  const volleyTrial = round.supportTower === 'volley'
+  for (const [id, [x, y]] of targets) {
+    const inset = volleyTrial ? 40 : barWidth / 2 + 2
+    const barX = Math.max(inset, Math.min(columns * tile - inset, x))
+    let barY = y - 32
+    if (volleyTrial) {
+      const occupied = [...healthBars.values()].filter(([otherX]) => Math.abs(otherX - barX) < 80)
+      const preferred = Math.max(12, barY)
+      barY = preferred
+      while (barY >= 12 && occupied.some(([, otherY]) => Math.abs(otherY - barY) < 21)) barY -= 21
+      if (barY < 12) {
+        barY = preferred
+        while (occupied.some(([, otherY]) => Math.abs(otherY - barY) < 21)) barY += 21
+      }
+    }
+    healthBars.set(id, [barX, barY])
+  }
+
+  if (volleyTrial) for (const [id, [barX, barY]] of healthBars) {
+    const [x, y] = targets.get(id)!
+    if (barX === x && barY === y - 32) continue
+    ctx.strokeStyle = '#262827'
+    ctx.lineWidth = 4
+    ctx.beginPath()
+    ctx.moveTo(barX, barY + 12)
+    ctx.lineTo(x, y - 15)
+    ctx.stroke()
+  }
+
   for (const hit of round.impacts) {
     const landed = center(hit.at)
     if (hit.cue && hit.elapsed < trialImpactTime) {
-      // The brackets follow surviving Volley recipients. A bolt marks its landing spot.
-      const [x, y] = hit.cue === 'volley' ? targets.get(hit.targetId) ?? landed : landed
+      // Highlight each recipient's health row. For a kill, mark the last position instead.
+      const bar = hit.cue === 'volley' ? healthBars.get(hit.targetId) : undefined
+      const [x, y] = bar ? [bar[0], bar[1] + 6] : [landed[0], landed[1] + 10]
+      const bracket = bar ? 33 : 23
       ctx.save()
-      ctx.translate(x, y + 10)
+      ctx.translate(x, y)
       ctx.beginPath()
       if (hit.cue === 'volley') {
-        ctx.moveTo(-23, -10); ctx.lineTo(-15, 0); ctx.lineTo(-23, 10)
-        ctx.moveTo(23, -10); ctx.lineTo(15, 0); ctx.lineTo(23, 10)
+        ctx.moveTo(-bracket, -5); ctx.lineTo(8 - bracket, 0); ctx.lineTo(-bracket, 5)
+        ctx.moveTo(bracket, -5); ctx.lineTo(bracket - 8, 0); ctx.lineTo(bracket, 5)
       } else {
         ctx.moveTo(0, -14); ctx.lineTo(17, 0); ctx.lineTo(0, 14); ctx.lineTo(-17, 0); ctx.closePath()
       }
@@ -451,20 +484,18 @@ export function drawBattlefield(
     ctx.fillText(label, labelX, labelY)
   }
   for (const enemy of round.enemies) {
-    const [x, y] = targets.get(enemy.id)!
+    const [barX, barY] = healthBars.get(enemy.id)!
     const max = enemyMaxHealth(round, enemy.kind)
-    const width = 46
     ctx.fillStyle = '#262827'
-    const barX = Math.max(width / 2 + 2, Math.min(columns * tile - width / 2 - 2, x))
-    ctx.fillRect(barX - width / 2 - 2, y - 32, width + 4, 12)
+    ctx.fillRect(barX - barWidth / 2 - 2, barY, barWidth + 4, 12)
     ctx.fillStyle = '#e8f69b'
     const health = Math.max(0, Math.min(max, enemy.health))
     if (max > 10) {
-      ctx.fillRect(barX - width / 2, y - 30, width * health / max, 8)
+      ctx.fillRect(barX - barWidth / 2, barY + 2, barWidth * health / max, 8)
     } else {
-      const pipWidth = width / max
+      const pipWidth = barWidth / max
       for (let pip = 0; pip < health; pip++) {
-        ctx.fillRect(barX - width / 2 + pip * pipWidth, y - 30, Math.max(1, pipWidth - 2), 8)
+        ctx.fillRect(barX - barWidth / 2 + pip * pipWidth, barY + 2, Math.max(1, pipWidth - 2), 8)
       }
     }
   }
