@@ -210,6 +210,7 @@ button:focus-visible { outline: 2px solid #ffedaf; outline-offset: 2px; }
 .command-status { justify-content: space-between; padding-inline: 4px; }
 .command-status .battle-readout { font-size: .76rem; line-height: 1.12; color: #e1d7bd; }
 .command-status .battle-readout span + span::before { content: ' · '; }
+.wave-preview { color: #ffdc9a; font-weight: 600; }
 .action-note { color: #ffdb96; }
 .refund { color: #ffdc9a; text-decoration: underline; text-underline-offset: 3px; }
 .command-row { align-items: stretch; }

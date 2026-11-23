@@ -250,8 +250,17 @@ function App() {
   }
   const openingHint = activeSite === null ? 'Tap the gold + for an Archer site.'
     : firstBuy ? `${selectedName} · Tap Build Archer to guard the gold road.` : 'Choose a site closer to the road.'
-  const firstThreat = attackerName(formation.sequence[0])
+  const forecast = new Map<typeof formation.sequence[number], number>()
+  for (const kind of formation.sequence) forecast.set(kind, (forecast.get(kind) ?? 0) + 1)
+  const counts = [...forecast]
+  const compactNames = {
+    infantry: 'Inf', runner: 'Run', veteran: 'Vet', veteranRunner: 'Vet run',
+    bowman: 'Bow', cavalry: 'Cav', commander: 'Cmd',
+  }
+  const fullCounts = counts.map(([kind, count]) => `${count} × ${attackerName(kind)}`).join(' · ')
   const lanes = roundRoutes(round).length
+  const previewing = setup || preparingLevel
+  const firstEntrance = lanes > 1 ? ` · Entry ${nextEntry(round, 0) + 1} first` : ''
   const report = finished ? { ...round.waveStats, waveNumber: round.waveNumber } : round.previousWave
   let status = setup ? (firstPlacement ? openingHint : tower ? `${towerDetails[tower.kind].name}${!upgradeable ? '' : tower.reach && tower.power ? ' · Fully upgraded' : ' · Choose an upgrade'}`
     : activeSite !== null ? 'Choose a tower' : 'Select a tower to upgrade or a stake to build')
@@ -609,8 +618,8 @@ function App() {
         <button type="button" onClick={back}>Back to battle</button>
       </header>
       <p>{mission?.title ?? 'Shu frontier'} · Wave {round.waveNumber} of {round.totalWaves}</p>
-      <p class="orders-intel">Wave {round.waveNumber} · {formation.name}. {Array.from(new Set(formation.sequence)).map(attackerName).join(', ')}.
-        {lanes > 1 && round.spawned < formation.sequence.length && ` Next arrival: Entry ${nextEntry(round) + 1}.`}
+      <p class="orders-intel">Wave {round.waveNumber} · {formation.name}. {fullCounts}{previewing && firstEntrance}.
+        {!previewing && lanes > 1 && round.spawned < formation.sequence.length && ` Next arrival: Entry ${nextEntry(round) + 1}.`}
         {' '}{running || preparingLevel ? paused ? 'Returns paused.' : 'Returns to play.' : ''}</p>
       <div class="orders-list">
         <nav class="guide-links" aria-label="Field guide">
@@ -670,6 +679,10 @@ function App() {
       <footer class="command-bar">
         <div class="command-status">
           <div class="battle-readout">
+            {previewing && <div class="wave-preview" aria-label={`Wave ${round.waveNumber}: ${fullCounts}${firstEntrance}`}>
+              {counts.map(([kind, count]) => `${count} ${compactNames[kind]}`).join(' · ')}
+              {firstEntrance}
+            </div>}
             {hudStatus && <span>{hudStatus}</span>}
             {!finished && upcomingClosures && <span>× closes next wave · tower refunded.</span>}
             {slowed.length > 0 && <span class="drum-effect">Drum slowing {slowed.length} · {inArcherRange} in Archer range</span>}
@@ -713,7 +726,7 @@ function App() {
             {speed}×</button>}
           {running || preparingLevel ? <button class="battle-primary" type="button" onClick={() => setPaused(value => !value)}>
             {paused ? 'Resume' : 'Pause'}</button>
-            : setup ? <button class="battle-primary" type="button" aria-label="Start wave" onClick={() => setRound(startRound)}>Start<small>{firstThreat}{lanes > 1 ? ` · E${nextEntry(round) + 1}` : ''}</small></button>
+            : setup ? <button class="battle-primary" type="button" aria-label="Start wave" onClick={() => setRound(startRound)}>Start</button>
             : round.phase === 'won' && upcoming && upcoming.battleId !== mission?.battleId ? <button class="battle-primary" type="button" onClick={() => openMission(upcoming)}>Next battle</button>
             : round.phase === 'lost' ? <button class="battle-primary" type="button" onClick={retryWave}>Retry wave</button>
             : <button class="battle-primary" type="button" onClick={back}>Main menu</button>}
