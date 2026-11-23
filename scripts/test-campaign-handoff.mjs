@@ -72,12 +72,15 @@ try {
   await handoff.waitFor()
   assert.match(await handoff.innerText(), /Hold the Changban Road · L4/)
   assert.match(await handoff.innerText(), /Silver kept · \+90 grant/)
-  assert.match(await handoff.innerText(), /Archer\/Drum \+ upgrades/)
+  assert.match(await handoff.locator('small[aria-hidden]').innerText(), /Archer\/Drum \+ upgrades/)
+  assert.match(await handoff.ariaSnapshot(), /Archer and Drum towers and their upgrades carry over/)
   assert(await handoff.evaluate(el => {
     const row = el.closest('.command-row').getBoundingClientRect()
     const text = new Range()
-    text.selectNodeContents(el)
-    return [...text.getClientRects()].every(rect => rect.top >= row.top && rect.bottom <= row.bottom)
+    return [...el.querySelectorAll('strong, small')].every(line => {
+      text.selectNodeContents(line)
+      return [...text.getClientRects()].every(rect => rect.top >= row.top && rect.bottom <= row.bottom)
+    })
   }))
   assert.deepEqual(await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.scrollHeight]), [320, 480])
   const copyFits = await readout.evaluate(el => {
