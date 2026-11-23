@@ -725,8 +725,9 @@ function App() {
                     title={branchEffect(option)} onClick={() => buy(current => upgradeTower(current, upgradeable.site, option))}>
                     <strong>{installedUpgrades[option]}</strong>
                     <span>{price} silver</span>
-                    <small>{branchEffect(option)}</small>
-                    {appliedUpgrades.length === 0 && option === 'reach' && <small class="tower-role">{towerDetails[upgradeKind].name} · {towerRoles[upgradeKind]}</small>}
+                    {appliedUpgrades.length === 0 && option === 'reach'
+                      ? <small class="tower-role">{towerRoles[upgradeKind]}</small>
+                      : <small>{branchEffect(option)}</small>}
                   </button>
               ))}</> : buildChoices(round).map(kind => (
                 <button key={kind} type="button" class={`purchase-card build-card${firstBuy && kind === 'archer' ? ' first-buy' : ''}`} disabled={shortfall > 0}
