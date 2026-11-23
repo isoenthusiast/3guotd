@@ -137,6 +137,26 @@ try {
   await button('Restore saved game').tap()
   await options(available, 'volley', 'drum')
   assert.equal(await page.evaluate(() => localStorage.getItem('3guotd.cleared-missions.v1')), null)
+  // A final leak can resolve the preceding wave and trigger the unlock in the same tick.
+  await button('Main menu').tap()
+  await page.evaluate(({ retried, saveKey }) => {
+    const opening = { towers: [], silver: 90, lives: 3 }
+    const round = { ...retried.round, ...opening, opening, phase: 'running', waveNumber: 1, waveAge: 20,
+      longSupport: undefined, rulesVersion: 2, spawned: 9, spawnTimer: 1, previousWave: null,
+      enemies: [{ id: 8, kind: 'veteranRunner', progress: 20.99, health: 4, slowed: false, routeIndex: 0 }] }
+    localStorage.setItem(saveKey, JSON.stringify({ ...retried, round }))
+  }, { retried, saveKey })
+  await page.reload()
+  await button('Restore saved game').tap()
+  await button('Resume').tap()
+  await page.clock.runFor(100)
+  assert.match(await readout.innerText(), /Volley Platform unlocked.*\nVeteran runner reached the gate/)
+  assert.match(await page.getByRole('status').innerText(), /Volley Platform unlocked.*Veteran runner reached the gate/)
+  assert(await readout.evaluate(el => {
+    const text = el.getBoundingClientRect()
+    const row = el.closest('.command-status').getBoundingClientRect()
+    return text.top >= row.top && text.bottom <= row.bottom
+  }))
   console.log('Offline clean-profile Long Battle reached Wave 6, built all three trial towers, and passed unlock, slot, save, Retry, and legacy checks at 320 × 480.')
 } finally {
   await browser.close()

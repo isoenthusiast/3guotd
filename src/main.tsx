@@ -733,15 +733,19 @@ function App() {
             {lost ? <div class="defeat-breach">
               <strong>Last breach · {lastBreach}</strong>
               <div>{defeatAdvice}</div>
-            </div> : (unlockMessage || hudStatus) && <span>{unlockMessage || hudStatus}</span>}
+            </div> : unlockMessage ? <>
+              <div>{unlockMessage}</div>
+              {breach && <div>{breach}</div>}
+            </> : hudStatus && <span>{hudStatus}</span>}
             {!finished && upcomingClosures && <span>{selectedClosing ? 'This tile' : '×'} closes next wave · refunded.</span>}
             {!lost && !unlockMessage && slowed.length > 0 && <span class="drum-effect">Drum slowing {slowed.length} · {inArcherRange} in Archer range</span>}
-            {needsSilver && <span class="action-note">Need {shortfall} more silver.</span>}
-            {showActions && upgradeable && !needsSilver && price > baseUpgradePrice && (!upgradeable.reach || !upgradeable.power) &&
+            {!unlockMessage && needsSilver && <span class="action-note">Need {shortfall} more silver.</span>}
+            {!unlockMessage && showActions && upgradeable && !needsSilver && price > baseUpgradePrice && (!upgradeable.reach || !upgradeable.power) &&
               <span>Second upgrade · +{price - baseUpgradePrice} silver</span>}
           </div>
           <span class="visually-hidden" role="status" aria-atomic="true">{lost ? `Gate fell. Last breach. ${lastBreach}. ${defeatAdvice} ${opening ? 'Retry wave available.' : 'Retry unavailable. Wave-start snapshot missing.'}`
-            : unlockMessage || breachAnnouncement || (preparingLevel ? 'Build or upgrade before the next level starts.' : `Wave ${round.waveNumber}. ${paused ? 'Paused.' : ''}`)}</span>
+            : unlockMessage ? `${unlockMessage}. ${breachAnnouncement}`.trim()
+              : breachAnnouncement || (preparingLevel ? 'Build or upgrade before the next level starts.' : `Wave ${round.waveNumber}. ${paused ? 'Paused.' : ''}`)}</span>
           {setup && !preparingLevel && upgradeable && !upgradeable.reach && !upgradeable.power && !needsSilver &&
             <small>Next branch {baseUpgradePrice + secondUpgradeSurcharge}</small>}
           {canRefund && tower && <button type="button" class="refund" aria-label="Remove & refund" aria-description={`Returns ${towerRefund(tower)} silver`}
