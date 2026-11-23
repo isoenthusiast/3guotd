@@ -16,6 +16,14 @@ Between levels of the same battle, towers keep their positions and upgrades. Uns
 
 Maps add different pressures. Red Cliffs and Jing have two approaches. Yiling marks tower sites that close on the next wave, refunds affected towers, and gives you five seconds to rebuild before attackers arrive. Wuzhang tracks supply deliveries. The current campaign uses the existing Archer and Drum towers. Road heroes and their upgrade economy are future systems. **Long battle** retains the 20–100 wave choices.
 
+## Preview a new campaign map
+
+Start with a playable layout using the shared route, placement, and combat rules. Mark the entry and gate, and test the full board at 320 × 480 with the purchase dock open. Compare two defenses with the same silver budget against formations that favor different placements. Record the results in the map audit before adding terrain art.
+
+Hanzhong Supply Pass is the reference prototype. Add `?map-preview=hanzhong` to the web game URL. Its three waves run separately from campaign progression and saves. Test the upper bend with Archers at D3 and F5, or the final bend with an Archer at E10 and a Drum at F9. An additional Archer at B2 makes either layout viable across all three waves.
+
+Run `npm test` for the route and balance checks. After `npm run build` and `npm run preview`, run `node scripts/test-map-preview.mjs http://localhost:4173/` for the offline phone checks.
+
 ## Main menu and saves
 
 Choose Campaign or Long battle from the main menu. Campaign shows the story briefing before you enter the battle. Use **Main menu** during play to freeze the battle, then **Continue** to return to the same run. **Restart** returns to wave one in the same mode and keeps the saved slot available.

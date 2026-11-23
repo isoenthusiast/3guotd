@@ -447,3 +447,7 @@ button:focus-visible { outline: 2px solid #ffedaf; outline-offset: 2px; }
 .trial-loadout { display: flex; flex-wrap: wrap; margin-block: .4rem; }
 .trial-loadout p { flex-basis: 100%; }
 .range-key.volley, .range-key.crossbow { border-top: 2px dotted #f2ac91; }
+
+.map-preview h1 { font: 700 .85rem/1.05 system-ui, sans-serif; }
+.map-preview .edge-control { display: grid; place-items: center; }
+.map-preview-note { flex: 1; align-self: center; padding-inline: 4px; font-size: .73rem; }

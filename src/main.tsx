@@ -12,6 +12,7 @@ import { roadCoverage } from './battlefield-scenery'
 import { loadBattlefieldArt } from './battlefield-art-assets'
 import { drawBattlefield, drawTower, tile } from './game-art'
 import { battles, campaign, isMissionUnlocked, nextMission } from './game/campaign'
+import { hanzhongPreview } from './game/hanzhong-preview'
 import { loadSound, saveSound } from './game/save-game'
 import { CampaignProgress, CampaignRecap, campaignDestination, recommendedMission, runLabel, useRecovery } from './continuity'
 import { OfflineDetails, useOfflineReadiness } from './offline-readiness'
@@ -97,8 +98,9 @@ function TowerPortrait({ kind, upgrade }: { kind: TowerKind; upgrade?: Upgrade }
   return <canvas ref={canvas} class="tower-portrait" width={80} height={80} aria-hidden="true" />
 }
 
-function Battlefield({ round, selected, suggested, onSelect }: {
+function Battlefield({ round, selected, suggested, onSelect, wireframe = false }: {
   suggested: number | null
+  wireframe?: boolean
   round: Round
   selected: number | null
   onSelect: (site: number | null) => void
@@ -113,11 +115,11 @@ function Battlefield({ round, selected, suggested, onSelect }: {
     if (!ctx) return
     let frame = 0
     const paint = () => {
-      if (drawBattlefield(ctx, round, selected)) frame = requestAnimationFrame(paint)
+      if (drawBattlefield(ctx, round, selected, { wireframe })) frame = requestAnimationFrame(paint)
     }
     paint()
     return () => cancelAnimationFrame(frame)
-  }, [round, selected, artReady])
+  }, [round, selected, artReady, wireframe])
 
   const closingSites = round.mission?.closedSites?.[round.waveNumber] ?? []
   const tabSite = selected ?? suggested ?? reachable.findIndex((_, site) => canBuildAt(round, site))
@@ -793,4 +795,73 @@ function App() {
   )
 }
 
-render(<App />, document.getElementById('app')!)
+function MapPreview() {
+  const offline = useOfflineReadiness()
+  const [round, setRound] = useState(() => createRound(20, hanzhongPreview))
+  const [selected, select] = useState<number | null>(null)
+  const [paused, setPaused] = useState(false)
+  const setup = round.phase === 'setup'
+  const running = round.phase === 'running'
+  const occupied = round.towers.find(tower => tower.site === selected)
+  const open = selected !== null && canSpend(round) && !occupied
+  useEffect(() => {
+    if (!running || paused) return
+    const timer = window.setInterval(() => {
+      if (!document.hidden) setRound(current => tickRound(current, 1))
+    }, 50)
+    return () => window.clearInterval(timer)
+  }, [running, paused])
+
+  return <main class="battle-screen map-preview">
+    <header class="battle-header">
+      <a class="edge-control" href="?" aria-label="Return to main game">Game</a>
+      <div class="hud">
+        <h1>{hanzhongPreview.title}</h1>
+        <div class="resources">
+          <strong>{round.silver} silver</strong><span>{round.lives} lives</span><span>Wave {round.waveNumber}/{round.totalWaves}</span>
+        </div>
+      </div>
+      <button class="edge-control" type="button" onClick={() => {
+        setRound(createRound(20, hanzhongPreview))
+        select(null)
+        setPaused(false)
+      }}>Reset</button>
+    </header>
+    <div class="board-view">
+      <Battlefield round={round} selected={selected} suggested={null} onSelect={site => select(site === selected ? null : site)} wireframe />
+    </div>
+    <footer class="command-bar">
+      <div class="command-status">
+        <div class="battle-readout" role="status">{round.phase === 'lost' ? hanzhongPreview.defeat
+          : round.phase === 'won' ? hanzhongPreview.victory
+          : running ? paused ? 'Paused' : `${enemiesRemaining(round)} attackers remain`
+          : occupied ? `${siteName(occupied.site)} · ${towerDetails[occupied.kind].name}`
+          : selected !== null ? `${siteName(selected)} · Choose a tower` : 'Tap a site. Compare upper-bend coverage with slowing near the gate.'}</div>
+        {setup && occupied && <button class="refund" type="button"
+          onClick={() => setRound(current => removeTower(current, occupied.site))}>Refund {towerRefund(occupied)}</button>}
+      </div>
+      <div class="command-row">
+        {open ? <section class="actions" aria-label="Tower actions">
+          {buildChoices(round).map(kind => {
+            const { price, name } = towerDetails[kind]
+            const coverage = roadCoverage(roundRoutes(round), selected, kind)
+            return <button key={kind} class="purchase-card" type="button" disabled={round.silver < price}
+              onClick={() => setRound(current => buildTower(current, selected, kind))}>
+              <strong>Build {name}</strong><span>{price} silver</span>
+              <small>{coverage.reachesRoad ? `${coverage.roadTiles} road tiles` : 'Out of range'}</small>
+            </button>
+          })}
+        </section> : <div class="map-preview-note">Map prototype · {offline.status}</div>}
+        {setup ? <button class="battle-primary" type="button" onClick={() => setRound(startRound)}>Start wave</button>
+          : running ? <button class="battle-primary" type="button" onClick={() => setPaused(value => !value)}>{paused ? 'Resume' : 'Pause'}</button>
+          : round.phase === 'lost' ? <button class="battle-primary" type="button" onClick={() => {
+            setRound(retryRound)
+            select(null)
+          }}>Retry wave</button> : null}
+      </div>
+    </footer>
+  </main>
+}
+
+const preview = new URLSearchParams(location.search).get('map-preview') === 'hanzhong'
+render(preview ? <MapPreview /> : <App />, document.getElementById('app')!)

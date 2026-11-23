@@ -11,7 +11,7 @@ const output = mkdtempSync(join(tmpdir(), '3guotd-round-'))
 try {
   execFileSync(process.execPath, [
     require.resolve('typescript/bin/tsc'), '--ignoreConfig', '--target', 'es2022',
-    '--module', 'commonjs', '--outDir', output, 'src/game/round.ts', 'src/game/campaign.ts', 'src/game/save-game.ts',
+    '--module', 'commonjs', '--outDir', output, 'src/game/round.ts', 'src/game/campaign.ts', 'src/game/save-game.ts', 'src/game/hanzhong-preview.ts',
   ], { stdio: 'inherit' })
 
   const model = require(join(output, 'round.js'))
@@ -384,6 +384,44 @@ try {
     'Late formations increase pressure without extending their spawn duration')
 
   checkTowerBalance(model, campaign, site)
+
+  {
+    const { hanzhongPreview } = require(join(output, 'hanzhong-preview.js'))
+    assert(!campaign.some(mission => mission.id === hanzhongPreview.id))
+    const [path] = hanzhongPreview.routes
+    assert.equal(path[0][1], 0)
+    assert.equal(path.at(-1)[1], rows - 1)
+    assert.equal(new Set(path.map(point => point.join(','))).size, path.length)
+    for (const [index, [x, y]] of path.entries()) {
+      assert(x >= 0 && x < columns && y >= 0 && y < rows)
+      assert(!isBuildable(site(x, y), hanzhongPreview.routes))
+      if (index > 0) assert.equal(Math.abs(path[index - 1][0] - x) + Math.abs(path[index - 1][1] - y), 1)
+    }
+    const early = [[3, 2, 'archer'], [5, 4, 'archer']]
+    const late = [[4, 9, 'archer'], [5, 8, 'drum']]
+    function replay(mission, layout) {
+      let round = createRound(20, mission)
+      for (const [x, y, kind] of layout) round = buildTower(round, site(x, y), kind)
+      assert.equal(round.towers.length, layout.length, 'Every prototype placement must be legal')
+      assert.equal(round.silver, startingSilver - layout.length * towerDetails.archer.price)
+      round = startRound(round)
+      for (let tick = 0; round.phase === 'running' && tick < 1800; tick++) round = tickRound(round, 1)
+      assert.notEqual(round.phase, 'running')
+      return round
+    }
+    const [infantry, riders] = hanzhongPreview.waves
+    for (const [wave, earlyKills, lateKills] of [[infantry, 3, 2], [riders, 2, 3]]) {
+      const mission = { ...hanzhongPreview, waves: [wave] }
+      const upperBend = replay(mission, early)
+      const gateBend = replay(mission, late)
+      assert.deepEqual([upperBend.waveStats.stopped, gateBend.waveStats.stopped], [earlyKills, lateKills])
+      assert.equal(upperBend.lives - gateBend.lives, earlyKills - lateKills)
+    }
+    for (const layout of [early, late]) {
+      assert.equal(replay(hanzhongPreview, [...layout, [1, 1, 'archer']]).phase, 'won')
+    }
+    console.log('Passed Hanzhong prototype path and equal-silver bend tradeoffs, with a full clear from either opening plus one Archer.')
+  }
 
   const local = new Map()
   Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: {

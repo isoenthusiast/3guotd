@@ -11,7 +11,7 @@ export { loadBattlefieldArt } from './battlefield-art-assets'
 export { placementCoverage, roadCoverage } from './battlefield-scenery'
 
 export const tile = 64
-export type BattlefieldArtOptions = { timeSeconds?: number; previewKind?: TowerKind; reducedEffects?: boolean; reducedMotion?: boolean }
+export type BattlefieldArtOptions = { timeSeconds?: number; previewKind?: TowerKind; reducedEffects?: boolean; reducedMotion?: boolean; wireframe?: boolean }
 
 function cue(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, font = 22) {
   ctx.save()
@@ -158,7 +158,22 @@ export function drawBattlefield(
   const reducedEffects = options.reducedEffects ?? comfort.reducedEffects
   const time = options.timeSeconds ?? (typeof performance === 'undefined' ? round.waveAge : performance.now() / 1000)
   const routes = roundRoutes(round)
-  drawLandscape(ctx, round)
+  if (options.wireframe) {
+    ctx.fillStyle = '#344341'
+    ctx.fillRect(0, 0, columns * tile, rows * tile)
+    ctx.strokeStyle = '#51605d'
+    ctx.lineWidth = 1
+    ctx.beginPath()
+    for (let x = tile; x < columns * tile; x += tile) {
+      ctx.moveTo(x, 0)
+      ctx.lineTo(x, rows * tile)
+    }
+    for (let y = tile; y < rows * tile; y += tile) {
+      ctx.moveTo(0, y)
+      ctx.lineTo(columns * tile, y)
+    }
+    ctx.stroke()
+  } else drawLandscape(ctx, round)
   ctx.lineCap = 'square'
   ctx.lineJoin = 'round'
   for (const [width, color] of [[57, '#6f6844'], [52, '#ac9461'], [45, '#dcc28c'], [32, '#e2ca98']] as const) {
@@ -176,7 +191,7 @@ export function drawBattlefield(
     ctx.stroke()
   }
 
-  drawRoadWear(ctx, routes)
+  if (!options.wireframe) drawRoadWear(ctx, routes)
   const [gateX, gateY] = center(routes[0][routes[0].length - 1])
   const closed = closedSites(round)
   const nextClosures = round.mission?.closedSites?.[round.waveNumber] ?? []
@@ -198,8 +213,8 @@ export function drawBattlefield(
     ctx.restore()
     cue(ctx, closed.includes(site) ? 'Closed' : 'Soon', x, y + 24, 15)
   }
-  const objective = drawObjective(ctx, round, time, gateX, gateY, reducedMotion)
-  if (!objective && !paintArt(ctx, 'gate', gateX - 58, gateY - 55, 116, 80)) {
+  const objective = !options.wireframe && drawObjective(ctx, round, time, gateX, gateY, reducedMotion)
+  if (!objective && (options.wireframe || !paintArt(ctx, 'gate', gateX - 58, gateY - 55, 116, 80))) {
     ctx.fillStyle = '#a98351'
     ctx.fillRect(gateX - 31, gateY - 5, 62, 26)
     roof(ctx, gateX, gateY - 19, 30, '#37383b')
