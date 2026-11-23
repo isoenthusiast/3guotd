@@ -8,6 +8,7 @@ const trials = [
   { kind: 'beacon', card: 'Beacon', name: 'Watch Beacon', chapter: 'wuzhang', level: 3, previousWaves: 4 },
 ]
 const trial = trials.find(trial => process.argv.includes(`--${trial.kind}`)) ?? trials[0]
+const price = Number(process.argv.find(arg => arg.startsWith('--price='))?.split('=')[1] ?? 30)
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH })
 try {
   const context = await browser.newContext({ viewport: { width: 320, height: 480 }, hasTouch: true, isMobile: true })
@@ -48,11 +49,37 @@ try {
     await selectTrial.selectOption('crossbow')
   }
   await button('Enter battle').tap()
+  if (price > 30) {
+    const original = await save()
+    const loadFixture = async silver => {
+      await page.evaluate(({ original, silver }) => {
+        localStorage.setItem('3guotd.saved-game.v1', JSON.stringify({ ...original, round: { ...original.round, silver } }))
+      }, { original, silver })
+      await page.reload()
+      await button('Restore saved game').tap()
+      await button('Select marked site').tap()
+    }
+    await loadFixture(price - 1)
+    assert(await card(trial.card).isDisabled())
+    assert(await card('Archer').isEnabled())
+    assert.match(await card(trial.card).getAttribute('aria-description'), /Need 1 more silver/)
+    await loadFixture(original.round.silver)
+    assert(await card(trial.card).isEnabled())
+    await page.locator('.cells [aria-pressed="true"]').tap()
+  }
   const bounds = await board.boundingBox()
   await button('Select marked site').tap()
   assert.deepEqual(await board.boundingBox(), bounds)
   assert.equal(await page.locator('.build-card').count(), 2)
   assert.equal(await card('Drum').count(), 0)
+  assert.match(await card(trial.card).innerText(), new RegExp(`${price} silver`))
+  await button('Battle orders').tap()
+  await button('Towers').tap()
+  await page.getByText(new RegExp(`^${trial.name} · ${price} silver`)).waitFor()
+  await button('Back to orders').tap()
+  await button('Back to battle').tap()
+  assert.deepEqual(await board.boundingBox(), bounds)
+
   for (const control of await page.locator('.command-row button').all()) {
     const box = await control.boundingBox()
     assert(box.width >= 44 && box.height >= 44 && box.x >= 8 && box.x + box.width <= 312 && box.y + box.height <= 468)
@@ -69,9 +96,11 @@ try {
   assert.equal(await page.getByRole('button', { name: new RegExp(`^${trial.name}, row`) }).count(), 1)
   assert.equal(await page.locator('.purchase-card').count(), 0)
   assert.doesNotMatch(await page.locator('.command-status').innerText(), /upgrade/i)
+  assert.match(await page.locator('.resources').innerText(), new RegExp(`${90 - price} silver`))
+  assert.equal(await button('Remove & refund').innerText(), `Refund ${price}`)
   await button('Remove & refund').tap()
   assert.match(await page.locator('.resources').innerText(), /90 silver/)
-  let remainingSilver = 60
+  let remainingSilver = 90 - price
   if (trial.kind === 'beacon') {
     assert.match(await card('Beacon').innerText(), /No link/)
     await button('Empty tile, row 2, column 6').tap()
@@ -82,7 +111,7 @@ try {
     assert.match(await page.locator('.command-location').innerText(), /Archer F2/)
     await button('Archer, row 2, column 6').tap()
     assert.match(await page.getByRole('button', { name: /^Faster fire/ }).innerText(), /unlinked/)
-    remainingSilver = 30
+    remainingSilver -= 30
   } else await card(trial.card).tap()
   await button('Start wave').tap()
   await button('Pause').tap()
@@ -122,7 +151,7 @@ try {
   const carried = await save()
   assert.equal(carried.round.supportTower, trial.kind)
   assert.equal(carried.round.towers[0].power, true)
-  console.log(`Offline 320 × 480: two-card briefing loadout, stable dock, purchase/refund, saved ${trial.name}, Retry, and retained Drum upgrade passed.`)
+  console.log(`Offline 320 × 480: ${price}-silver dock, guide and refund, two-card briefing loadout, stable dock, purchase/refund, saved ${trial.name}, Retry, and retained Drum upgrade passed.`)
 } finally {
   await browser.close()
 }

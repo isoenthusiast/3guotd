@@ -17,11 +17,12 @@ try {
   const model = require(join(output, 'round.js'))
   const {
     createRound, prepareNextLevel, beaconArcher, enemyMaxHealth, startRound, advanceRound, tickRound, canBuildAt, buildTower, upgradeTower, removeTower, retryRound,
-    towerPrice, startingSilver, baseUpgradePrice, secondUpgradeSurcharge, towerRange, towerDetails,
+    startingSilver, baseUpgradePrice, secondUpgradeSurcharge, towerRange, towerDetails,
     shotFlightTime, enemiesRemaining, enemyCount, enemyDetails, waveFormation, evacuatedGroups, roundFormation, roundRoutes,
   } = model
   const { isBuildable, columns, rows, route, sitePosition } = require(join(output, 'board.js'))
   const site = (x, y) => y * columns + x
+  const towerPrice = towerDetails.archer.price
   const initial = createRound()
   assert.equal(startingSilver, 3 * towerPrice)
   for (const [x, y] of route) assert.equal(isBuildable(site(x, y)), false)
@@ -435,7 +436,7 @@ try {
     assert.deepEqual(retryRound(active).towers, linked.towers)
     const next = prepareNextLevel({ ...linked, phase: 'won' }, nextMission(mission))
     assert.deepEqual(next.towers, archer.towers)
-    assert.equal(next.silver, linked.silver + startingSilver + towerPrice)
+    assert.equal(next.silver, linked.silver + startingSilver + towerDetails.beacon.price)
     local.delete('3guotd.saved-game.v1')
     local.delete('3guotd.checkpoint.v1')
     console.log('Passed Wuzhang Beacon at 1× and 3×: nearest and tie-break, faster reload, no stacking, real site tradeoffs, save/Retry and trial-end refund.')
@@ -448,7 +449,7 @@ try {
     assert(clear.towers.some(tower => tower.kind === 'crossbow'))
     const crossbowSite = site(2, 3)
     const equipped = buildTower(crossbowTrial, crossbowSite, 'crossbow')
-    assert.equal(equipped.silver, startingSilver - towerPrice)
+    assert.equal(equipped.silver, startingSilver - towerDetails.crossbow.price)
     assert.equal(buildTower(createRound(20, jingTrial), crossbowSite, 'crossbow').towers.length, 0)
     assert.equal(buildTower(crossbowTrial, 0, 'drum'), crossbowTrial)
     assert.equal(upgradeTower(equipped, crossbowSite, 'power'), equipped)
@@ -507,7 +508,7 @@ try {
   const trialSite = site(5, 1)
   const volleyRound = createRound(20, trial, 'volley')
   const volley = buildTower(volleyRound, trialSite, 'volley')
-  assert.equal(volley.silver, startingSilver - towerPrice)
+  assert.equal(volley.silver, startingSilver - towerDetails.volley.price)
   assert.equal(buildTower(createRound(20, trial), trialSite, 'volley').towers.length, 0)
   assert.equal(buildTower(volleyRound, 0, 'drum'), volleyRound)
   assert.equal(upgradeTower(volley, trialSite, 'power'), volley)
@@ -554,7 +555,7 @@ try {
   assert.deepEqual(retried.towers, volley.towers)
   const next = prepareNextLevel({ ...volley, phase: 'won', towers: [...volley.towers, drum] }, nextMission(trial))
   assert.deepEqual(next.towers, [drum])
-  assert.equal(next.silver, volley.silver + startingSilver + towerPrice)
+  assert.equal(next.silver, volley.silver + startingSilver + towerDetails.volley.price)
   assert.equal(next.supportTower, undefined)
   local.delete('3guotd.saved-game.v1')
   local.delete('3guotd.checkpoint.v1')

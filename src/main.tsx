@@ -4,7 +4,7 @@ import { columns, rows, sitePosition } from './game/board'
 import {
   beaconArcher, buildChoices, isTrialTower, trialTowerFor, levelPrepMs, attackerName, enemyMaxHealth, baseUpgradePrice, buildTower, canBuildAt, canSpend, closedSites, createRound, enemiesRemaining, objectiveProgress, removeTower,
   roundRoutes, prepareNextLevel, nextEntry, towerRefund, inRange, routeForEnemy, enemyPosition, startingSilver, secondUpgradeSurcharge,
-  retryRound, speedOptions, startRound, tickRound, towerDetails, towerPrice, upgradePrice,
+  retryRound, speedOptions, startRound, tickRound, towerDetails, upgradePrice,
   upgradeTower, waveCueTime, roundFormation, waveOptions,
 } from './game/round'
 import type { Mission, PlaySpeed, Round, TowerKind, Upgrade } from './game/round'
@@ -25,9 +25,14 @@ import './style.css'
 
 const siteCount = columns * rows
 const upgradeBranches = ['reach', 'power'] as const
-const towerRoles: Record<TowerKind, string> = {
-  archer: 'Road damage', drum: 'Slows enemies', volley: 'Hits up to 3',
-  crossbow: 'Targets highest HP', beacon: 'Speeds up Archer',
+function towerRole(kind: TowerKind) {
+  switch (towerDetails[kind].targeting) {
+    case 'first': return 'Road damage'
+    case 'areaSlow': return 'Slows enemies'
+    case 'cluster': return `Hits up to ${towerDetails.volley.maxTargets}`
+    case 'highestHealth': return 'Targets highest HP'
+    case 'nearestArcher': return 'Speeds up Archer'
+  }
 }
 
 function siteName(site: number) {
@@ -37,9 +42,9 @@ function siteName(site: number) {
 
 const trialNames = { volley: 'Volley', crossbow: 'Crossbow', beacon: 'Beacon' } as const
 const trialBrief = {
-  volley: 'Volley hits up to three nearby enemies. Try a bend where the column bunches. Volley is recalled for full silver after this level.',
+  volley: `Volley hits up to ${towerDetails.volley.maxTargets} nearby enemies. Try a bend where the column bunches. Volley is recalled for full silver after this level.`,
   crossbow: 'Heavy Crossbow targets the enemy with the most HP in range. Place it by a long stretch so it can reload before that enemy leaves.',
-  beacon: 'Watch Beacon boosts the nearest Archer within two tiles. Link it to an Archer that covers useful road. The Beacon is refunded after this level.',
+  beacon: `Watch Beacon boosts the nearest Archer within ${towerDetails.beacon.range} tiles. Link it to an Archer that covers useful road. The Beacon is refunded after this level.`,
 } as const
 
 function upgradeEffect(kind: Exclude<TowerKind, Round['supportTower']>, branch: Upgrade): string {
@@ -226,7 +231,9 @@ function App() {
   const appliedUpgrades = installedUpgrades && upgradeable
     ? upgradeBranches.filter(branch => upgradeable[branch]).map(branch => installedUpgrades[branch])
     : []
-  const price = upgradeable ? upgradePrice(upgradeable) : towerPrice
+  const choices = buildChoices(round)
+  const prices = choices.map(kind => towerDetails[kind].price)
+  const price = upgradeable ? upgradePrice(upgradeable) : Math.min(...prices)
   const shortfall = Math.max(0, price - round.silver)
   const spendingOpen = canSpend(round)
   const canRefund = setup && round.towers.length > 0
@@ -258,7 +265,7 @@ function App() {
     ? beaconArcher(round.towers, activeSite) : undefined
   const linkLabel = linkedArcher === undefined ? 'No Archer in reach' : `Archer ${siteName(linkedArcher)}`
   const towerSummary = tower && <div class="command-location tower-summary">
-    <strong>{towerDetails[tower.kind].name} · {towerRoles[tower.kind]}</strong>
+    <strong>{towerDetails[tower.kind].name} · {towerRole(tower.kind)}</strong>
     <small>{tower.kind === 'beacon' ? linkLabel : appliedUpgrades.join(' + ') || 'No upgrades installed'}</small>
   </div>
   const boosted = tower?.kind === 'archer' && round.towers.some(candidate =>
@@ -308,7 +315,7 @@ function App() {
     }
   }
   if (!preparingLevel && !finished && coverage && !firstPlacement && !paused && !alertActive) {
-    status = `${selectedName} available · Choose a tower${shortfall ? '' : ` · ${round.silver - towerPrice} silver left`}`
+    status = `${selectedName} available · Choose a tower${shortfall || prices.some(value => value !== price) ? '' : ` · ${round.silver - price} silver left`}`
   }
   if (!preparingLevel && !finished && tower && installedUpgrades && tower.reach && tower.power && !paused && !alertActive) {
     status = `${towerDetails[tower.kind].name} · ${installedUpgrades.reach} + ${installedUpgrades.power}`
@@ -614,15 +621,15 @@ function App() {
       {enemyPage ? <>
         <EnemyGuide round={round} />
       </> : <>
-        <h2>Archer · {towerPrice} silver</h2>
+        <h2>Archer · {towerDetails.archer.price} silver</h2>
         <p>Shoots one enemy at a time. Cover both sides of a bend. Upgrade range to reach farther or fire rate to land more shots.</p>
-        <h2>Drum · {towerPrice} silver</h2>
+        <h2>Drum · {towerDetails.drum.price} silver</h2>
         <p>Slows enemies inside its ring. Pair it with an Archer for extra shots. Blue lines mark slowed enemies. The Drum deals no damage.</p>
         <p>Wider reach extends the ring. Stronger slow raises the speed reduction from {Math.round(100 * (1 - towerDetails.drum.speedFactor))}% to {Math.round(100 * (1 - towerDetails.drum.strongerSpeedFactor))}%. Where Drums overlap, the strongest slow applies.</p>
         <PairingGuide />
-        {trialTowerFor(mission) === 'beacon' && <p>Watch Beacon · {towerPrice} silver. The dotted line points to the nearest Archer within two tiles. That Archer reloads in {towerDetails.beacon.archerInterval}s. Equal distances favor the earlier board tile. Beacons and Faster fire do not stack. A Beacon deals no damage.</p>}
-        {trialTowerFor(mission) === 'crossbow' && <p>Heavy Crossbow · {towerPrice} silver. A bolt deals {towerDetails.crossbow.damage} damage to the highest-HP enemy in range. It has a slow reload and no upgrades in this trial.</p>}
-        {trialTowerFor(mission) === 'volley' && <p>Volley Platform · 30 silver. Hits up to three tightly grouped enemies and reloads slowly. It has no upgrades in this trial.</p>}
+        {trialTowerFor(mission) === 'beacon' && <p>Watch Beacon · {towerDetails.beacon.price} silver. The dotted line points to the nearest Archer within {towerDetails.beacon.range} tiles. That Archer reloads in {towerDetails.beacon.archerInterval}s. Equal distances favor the earlier board tile. Beacons and Faster fire do not stack. A Beacon deals no damage.</p>}
+        {trialTowerFor(mission) === 'crossbow' && <p>Heavy Crossbow · {towerDetails.crossbow.price} silver. {towerRole('crossbow')}. A bolt deals {towerDetails.crossbow.damage} damage within {towerDetails.crossbow.range} tiles. Reloads in {towerDetails.crossbow.shotInterval}s. No upgrades in this trial.</p>}
+        {trialTowerFor(mission) === 'volley' && <p>Volley Platform · {towerDetails.volley.price} silver. {towerRole('volley')} enemies within {towerDetails.volley.clusterRadius} tiles of the first target. Range {towerDetails.volley.range} tiles. Reloads in {towerDetails.volley.shotInterval}s. No upgrades in this trial.</p>}
       </>}
       <VisualComfortControls />
       </section>
@@ -726,15 +733,19 @@ function App() {
                     <strong>{installedUpgrades[option]}</strong>
                     <span>{price} silver</span>
                     {appliedUpgrades.length === 0 && option === 'reach'
-                      ? <small class="tower-role">{towerRoles[upgradeKind]}</small>
+                      ? <small class="tower-role">{towerRole(upgradeKind)}</small>
                       : <small>{branchEffect(option)}</small>}
                   </button>
-              ))}</> : buildChoices(round).map(kind => (
-                <button key={kind} type="button" class={`purchase-card build-card${firstBuy && kind === 'archer' ? ' first-buy' : ''}`} disabled={shortfall > 0}
+              ))}</> : choices.map(kind => (
+                <button key={kind} type="button" class={`purchase-card build-card${firstBuy && kind === 'archer' ? ' first-buy' : ''}`} disabled={round.silver < towerDetails[kind].price}
+                  title={towerRole(kind)}
+                  aria-description={round.silver < towerDetails[kind].price
+                    ? `${towerRole(kind)}. Need ${towerDetails[kind].price - round.silver} more silver`
+                    : towerRole(kind)}
                   onClick={() => buy(current => buildTower(current, activeSite, kind))}>
                   <TowerPortrait kind={kind} />
                   <span><strong>Build {isTrialTower(kind) ? trialNames[kind] : towerDetails[kind].name}</strong>
-                    <span>{towerPrice} silver</span></span>
+                    <span>{towerDetails[kind].price} silver</span></span>
                   <small>{kind === 'beacon' ? (linkedArcher === undefined ? 'No link' : linkLabel) : coverage?.[kind].reachesRoad
                     ? <><i class={`range-key ${kind}`} aria-hidden="true" />{kind === 'drum' ? 'Slow' : kind === 'volley' ? 'Volley' : 'Hit'} · {coverage[kind].zones[0]}</>
                     : 'Out of range'}</small>
@@ -742,7 +753,7 @@ function App() {
               ))}
             </section>
           ) : suggested !== null && activeSite === null ? <button type="button" class="choose-site"
-            onClick={() => selectTile(suggested)} aria-label="Select marked site">Select marked site<small>Archer · {towerPrice} silver</small></button> : round.phase !== 'lost' && towerSummary ? towerSummary : <div class="command-location">{round.phase === 'lost' ? rewind : mission?.title ?? 'Shu frontier'}</div>}
+            onClick={() => selectTile(suggested)} aria-label="Select marked site">Select marked site<small>Archer · {towerDetails.archer.price} silver</small></button> : round.phase !== 'lost' && towerSummary ? towerSummary : <div class="command-location">{round.phase === 'lost' ? rewind : mission?.title ?? 'Shu frontier'}</div>}
           {!finished && <button class="battle-speed" type="button" aria-label={`Play speed ${speed}×`}
             onClick={() => setSpeed(value => speedOptions[(speedOptions.indexOf(value) + 1) % speedOptions.length])}>
             {speed}×</button>}

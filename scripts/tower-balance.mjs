@@ -1,15 +1,16 @@
 import assert from 'node:assert/strict'
 
 export function checkTowerBalance(model, campaign, site) {
-  const { createRound, buildTower, upgradeTower, startRound, tickRound, towerPrice, towerDetails, enemyDetails, enemyPosition } = model
+  const { createRound, buildTower, upgradeTower, startRound, tickRound, towerDetails, enemyDetails, enemyPosition } = model
   const findMission = id => campaign.find(mission => mission.id === id)
   const attacker = (id, kind, health, progress) => ({ id, kind, health, progress, slowed: false })
   const column = (kind, health, positions) => positions.map((progress, id) => attacker(id, kind, health, progress))
+  const cost = layout => layout.reduce((silver, [, kind]) => silver + towerDetails[kind].price, 0)
   const seed = (setup, enemies) => ({ ...startRound(setup), spawnTimer: 99, spawned: enemies.length, enemies })
 
   function encounter(missionId, support, layout, enemies, speed) {
     const mission = { ...findMission(missionId), waves: [{ name: 'Balance encounter', sequence: enemies.map(enemy => enemy.kind) }] }
-    const budget = layout.length * towerPrice
+    const budget = cost(layout)
     let opening = { ...createRound(20, mission, support), silver: budget, mission, totalWaves: 1 }
     for (const [towerSite, kind] of layout) {
       const next = buildTower(opening, towerSite, kind)
@@ -53,13 +54,13 @@ export function checkTowerBalance(model, campaign, site) {
 
   const rows = []
   for (const fixture of [...volley, ...crossbow, ...beacon]) {
-    assert.equal(fixture.baseline.length, fixture.trial.length)
+    assert.equal(cost(fixture.baseline), cost(fixture.trial), 'Fixtures must spend equal silver')
     const compareAt = speed => {
       const results = {}
       for (const layout of ['baseline', 'trial']) {
         const result = encounter(fixture.mission, fixture.support, fixture[layout], fixture.enemies, speed)
         rows.push({ tower: fixture.support, condition: fixture.condition, speed: `${speed}×`,
-          layout, silver: fixture[layout].length * towerPrice, ...result })
+          layout, silver: cost(fixture[layout]), ...result })
         results[layout] = result
       }
       return results

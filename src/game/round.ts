@@ -9,7 +9,6 @@ export const waveOptions = [20, 40, 60, 80, 100] as const
 export const speedOptions = [1, 2, 3] as const
 export type WaveCount = typeof waveOptions[number]
 export type PlaySpeed = typeof speedOptions[number]
-export const towerPrice = 30
 export const startingSilver = 90
 export const baseUpgradePrice = 18
 export const secondUpgradeSurcharge = 9
@@ -20,22 +19,22 @@ export const trialImpactTime = 0.42
 
 export const towerDetails = {
   archer: {
-    name: 'Archer', reach: 'Longer range', power: 'Faster fire', range: 1.8, extendedRange: 2.5,
+    name: 'Archer', price: 30, targeting: 'first', reach: 'Longer range', power: 'Faster fire', range: 1.8, extendedRange: 2.5,
     shotInterval: 1.05, fasterShotInterval: 0.75,
   },
   drum: {
-    name: 'Drum', reach: 'Wider reach', power: 'Stronger slow', range: 2.2, extendedRange: 2.8,
+    name: 'Drum', price: 30, targeting: 'areaSlow', reach: 'Wider reach', power: 'Stronger slow', range: 2.2, extendedRange: 2.8,
     speedFactor: 0.28, strongerSpeedFactor: 0.18,
   },
   volley: {
-    name: 'Volley Platform', range: 1.8, extendedRange: 1.8,
+    name: 'Volley Platform', price: 30, targeting: 'cluster', range: 1.8, extendedRange: 1.8,
     shotInterval: 2.1, clusterRadius: 1.15, maxTargets: 3,
   },
   crossbow: {
-    name: 'Heavy Crossbow', range: 2.35, extendedRange: 2.35,
+    name: 'Heavy Crossbow', price: 30, targeting: 'highestHealth', range: 2.35, extendedRange: 2.35,
     shotInterval: 2.6, damage: 3,
   },
-  beacon: { name: 'Watch Beacon', range: 2, extendedRange: 2, archerInterval: 0.6 },
+  beacon: { name: 'Watch Beacon', price: 30, targeting: 'nearestArcher', range: 2, extendedRange: 2, archerInterval: 0.6 },
 } as const
 
 export function trialTowerFor(mission: Mission | null): TrialTower | undefined {
@@ -280,10 +279,11 @@ export function canSpend(round: Round): boolean {
 }
 
 export function buildTower(round: Round, site: number, kind: TowerKind): Round {
-  if (!canSpend(round) || !buildChoices(round).includes(kind) || round.silver < towerPrice || !canBuildAt(round, site)
+  const { price } = towerDetails[kind]
+  if (!canSpend(round) || !buildChoices(round).includes(kind) || round.silver < price || !canBuildAt(round, site)
     || round.towers.some(tower => tower.site === site)) return round
   const tower: Tower = { site, kind, reach: false, power: false, cooldown: 0 }
-  return { ...round, silver: round.silver - towerPrice, towers: [...round.towers, tower] }
+  return { ...round, silver: round.silver - price, towers: [...round.towers, tower] }
 }
 
 export function upgradeTower(round: Round, site: number, branch: Upgrade): Round {
@@ -297,7 +297,7 @@ export function upgradeTower(round: Round, site: number, branch: Upgrade): Round
 }
 
 export function towerRefund(tower: Tower): number {
-  return towerPrice + Number(tower.reach || tower.power) * baseUpgradePrice
+  return towerDetails[tower.kind].price + Number(tower.reach || tower.power) * baseUpgradePrice
     + Number(tower.reach && tower.power) * (baseUpgradePrice + secondUpgradeSurcharge)
 }
 
@@ -410,13 +410,14 @@ export function advanceRound(round: Round, seconds: number, visualSeconds = seco
     const eligible = (enemy: Enemy) => enemy.health > (incoming.get(enemy.id) ?? 0)
       && inRange(tower, enemyPosition(enemy.progress, routeForEnemy(round, enemy)))
     const heavy = tower.kind === 'crossbow'
-    const target = heavy
+    const targeting = towerDetails[tower.kind].targeting
+    const target = targeting === 'highestHealth'
       ? enemies.reduce<Enemy | undefined>((best, enemy) =>
         (!best || enemy.health > best.health) && eligible(enemy) ? enemy : best, undefined)
       : enemies.find(eligible)
     if (!target) return { ...tower, cooldown }
     let recipients = [target]
-    if (tower.kind === 'volley') {
+    if (targeting === 'cluster') {
       const [x, y] = enemyPosition(target.progress, routeForEnemy(round, target))
       const nearby = enemies.filter(enemy => {
         if (enemy === target || enemy.health <= (incoming.get(enemy.id) ?? 0)) return false
