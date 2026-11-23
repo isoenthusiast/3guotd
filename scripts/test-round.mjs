@@ -388,7 +388,7 @@ try {
   const { loadGame, saveGame, loadCheckpoint, saveCheckpoint, loadSound, saveSound } = require(join(output, 'save-game.js'))
   const trial = campaign.find(mission => mission.id === 'changban:3')
   const volleyWitness = playMission(trial, { upgrade: true }, createRound(20, trial, 'volley'))
-  assert.equal(volleyWitness.phase, 'won', 'Archer + Volley can clear all four Changban Level 3 waves from a fresh briefing')
+  assert.equal(volleyWitness.phase, 'won', 'Archer + Volley can clear all Changban Level 3 waves from a fresh briefing')
   assert(volleyWitness.towers.some(tower => tower.kind === 'volley'))
   const trialSite = site(5, 1)
   const volleyRound = createRound(20, trial, 'volley')
