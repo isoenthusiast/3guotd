@@ -1,6 +1,6 @@
 import { columns, rows, sitePosition } from './game/board'
 import type { Point, Route } from './game/board'
-import { buildChoices, canBuildAt, objectiveProgress, roundRoutes, towerRange } from './game/round'
+import { beaconArcher, buildChoices, canBuildAt, objectiveProgress, roundRoutes, towerRange } from './game/round'
 import type { Round, TowerKind } from './game/round'
 import { paintArt } from './battlefield-art-assets'
 
@@ -46,10 +46,10 @@ export function placementCoverage(round: Round, site: number) {
 export function drawRoadCoverage(ctx: CanvasRenderingContext2D, round: Round, site: number,
   kind?: TowerKind) {
   const coverage = placementCoverage(round, site)
-  if (!coverage) return
+  if (!coverage || kind === 'beacon') return
   ctx.save()
   ctx.lineCap = 'round'
-  const choices = buildChoices(round)
+  const choices = buildChoices(round).filter(tower => tower !== 'beacon')
   for (const tower of [...choices].reverse()) {
     if (kind && tower !== kind) continue
     ctx.strokeStyle = tower === 'archer' ? '#ffdc87' : tower === 'drum' ? '#7bd9dc' : '#f2ac91'
@@ -63,7 +63,8 @@ export function drawRoadCoverage(ctx: CanvasRenderingContext2D, round: Round, si
     ctx.stroke()
   }
   const [x, y] = sitePosition(site)
-  if (kind ? !coverage[kind].reachesRoad : choices.every(tower => !coverage[tower].reachesRoad)) {
+  const beaconLink = round.supportTower === 'beacon' && beaconArcher(round.towers, site) !== undefined
+  if (kind ? !coverage[kind].reachesRoad : !beaconLink && choices.every(tower => !coverage[tower].reachesRoad)) {
     ctx.font = 'bold 17px system-ui'
     ctx.textAlign = 'center'
     ctx.strokeStyle = '#35291f'

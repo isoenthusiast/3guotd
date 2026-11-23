@@ -2,9 +2,12 @@ import assert from 'node:assert/strict'
 import { chromium } from 'playwright'
 
 const url = process.argv[2] ?? 'http://localhost:4173/'
-const trial = process.argv.includes('--crossbow')
-  ? { kind: 'crossbow', card: 'Crossbow', name: 'Heavy Crossbow', chapter: 'jing', level: 5, previousWaves: 6 }
-  : { kind: 'volley', card: 'Volley', name: 'Volley Platform', chapter: 'changban', level: 3, previousWaves: 4 }
+const trials = [
+  { kind: 'volley', card: 'Volley', name: 'Volley Platform', chapter: 'changban', level: 3, previousWaves: 4 },
+  { kind: 'crossbow', card: 'Crossbow', name: 'Heavy Crossbow', chapter: 'jing', level: 5, previousWaves: 6 },
+  { kind: 'beacon', card: 'Beacon', name: 'Watch Beacon', chapter: 'wuzhang', level: 3, previousWaves: 4 },
+]
+const trial = trials.find(trial => process.argv.includes(`--${trial.kind}`)) ?? trials[0]
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH })
 try {
   const context = await browser.newContext({ viewport: { width: 320, height: 480 }, hasTouch: true, isMobile: true })
@@ -24,7 +27,8 @@ try {
   await page.getByText('Ready offline', { exact: true }).waitFor()
   await context.setOffline(true)
   await page.reload()
-  const completedChapters = ['village-watch', 'changban', 'red-cliffs', 'jing'].slice(0, trial.chapter === 'jing' ? 3 : 1)
+  const chapters = ['village-watch', 'changban', 'red-cliffs', 'jing', 'yiling', 'wuzhang']
+  const completedChapters = chapters.slice(0, chapters.indexOf(trial.chapter))
   const clears = [...completedChapters.flatMap(chapter => Array.from({ length: 5 }, (_, i) => `${chapter}:${i + 1}`)),
     ...Array.from({ length: trial.level - 1 }, (_, i) => `${trial.chapter}:${i + 1}`)]
   await page.evaluate(clears => localStorage.setItem('3guotd.cleared-missions.v1', JSON.stringify(clears)), clears)
@@ -67,19 +71,31 @@ try {
   assert.doesNotMatch(await page.locator('.command-status').innerText(), /upgrade/i)
   await button('Remove & refund').tap()
   assert.match(await page.locator('.resources').innerText(), /90 silver/)
-  await card(trial.card).tap()
+  let remainingSilver = 60
+  if (trial.kind === 'beacon') {
+    assert.match(await card('Beacon').innerText(), /No link/)
+    await button('Empty tile, row 2, column 6').tap()
+    await card('Archer').tap()
+    await button('Empty tile, row 2, column 4').tap()
+    assert.match(await card('Beacon').innerText(), /Archer F2/)
+    await card('Beacon').tap()
+    assert.match(await page.locator('.command-location').innerText(), /Archer F2/)
+    await button('Archer, row 2, column 6').tap()
+    assert.match(await page.getByRole('button', { name: /^Faster fire/ }).innerText(), /unlinked/)
+    remainingSilver = 30
+  } else await card(trial.card).tap()
   await button('Start wave').tap()
   await button('Pause').tap()
   const saved = await save()
   assert.equal(saved.round.supportTower, trial.kind)
-  assert.equal(saved.round.silver, 60)
+  assert.equal(saved.round.silver, remainingSilver)
   await page.reload()
   await button('Restore saved game').tap()
   await button('Resume').waitFor()
   await button('Battle orders').tap()
   await button('Retry wave').tap()
   await button('Start wave').waitFor()
-  assert.match(await page.locator('.resources').innerText(), /60 silver/)
+  assert.match(await page.locator('.resources').innerText(), new RegExp(`${remainingSilver} silver`))
   assert.equal(await page.getByRole('button', { name: new RegExp(`^${trial.name}, row`) }).count(), 1)
   assert.deepEqual(await board.boundingBox(), bounds)
 

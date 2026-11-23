@@ -14,7 +14,7 @@ try {
   ], { stdio: 'inherit' })
 
   const {
-    createRound, prepareNextLevel, enemyMaxHealth, startRound, advanceRound, tickRound, canBuildAt, buildTower, upgradeTower, removeTower, retryRound,
+    createRound, prepareNextLevel, beaconArcher, enemyMaxHealth, startRound, advanceRound, tickRound, canBuildAt, buildTower, upgradeTower, removeTower, retryRound,
     towerPrice, startingSilver, baseUpgradePrice, secondUpgradeSurcharge, towerRange, towerDetails,
     shotFlightTime, enemiesRemaining, enemyCount, enemyDetails, waveFormation, evacuatedGroups, roundFormation, roundRoutes,
   } = require(join(output, 'round.js'))
@@ -386,6 +386,56 @@ try {
     setItem: (key, value) => local.set(key, value),
   } })
   const { loadGame, saveGame, loadCheckpoint, saveCheckpoint, loadSound, saveSound } = require(join(output, 'save-game.js'))
+  {
+    const mission = campaign.find(mission => mission.id === 'wuzhang:3')
+    const trial = createRound(20, mission, 'beacon')
+    const cleared = playMission(mission, { upgrade: true, spacing: 8, minimum: 20 }, trial)
+    assert.equal(cleared.phase, 'won', 'Archer + Beacon can clear the Wuzhang trial')
+    assert(cleared.towers.some(tower => tower.kind === 'beacon'))
+    const archerSite = site(5, 1), shortSite = site(3, 1), otherSite = site(7, 1)
+    const archer = buildTower(trial, archerSite, 'archer')
+    const linked = buildTower(archer, shortSite, 'beacon')
+    const boosted = upgradeTower(linked, archerSite, 'power')
+    const overlap = buildTower(linked, site(4, 1), 'beacon')
+    const fast = upgradeTower(archer, archerSite, 'power')
+    const weakSecond = buildTower(archer, shortSite, 'archer')
+    const strongSecond = buildTower(archer, otherSite, 'archer')
+    assert.equal(linked.silver, weakSecond.silver)
+    assert.equal(fast.silver - linked.silver, towerPrice - baseUpgradePrice)
+    assert.equal(beaconArcher(linked.towers, shortSite), archerSite)
+    assert.equal(beaconArcher(linked.towers, 0), undefined)
+    assert.equal(beaconArcher(strongSecond.towers.slice().reverse(), site(6, 2)), archerSite)
+    assert.equal(upgradeTower(linked, shortSite, 'power'), linked)
+    assert.deepEqual(removeTower(linked, shortSite), archer)
+    const noTrial = createRound(20)
+    assert.equal(buildTower(noTrial, 0, 'beacon'), noTrial)
+    function fight(setup, speed) {
+      let state = { ...startRound(setup), spawnTimer: 99, spawned: 1,
+        enemies: [{ id: 0, kind: 'infantry', health: 20, progress: 0.2, slowed: false }] }
+      for (let ticks = 0; ticks < 45 / speed; ticks++) state = tickRound(state, speed)
+      return state
+    }
+    for (const speed of [1, 3]) {
+      const hp = setup => fight(setup, speed).enemies[0].health
+      assert(hp(linked) < hp(fast), 'Beacon gives earlier follow-up shots than Faster fire alone')
+      assert(hp(linked) < hp(weakSecond), 'Beacon makes use of a site that cannot cover this approach')
+      assert(hp(strongSecond) < hp(linked), 'A second Archer with useful road coverage wins the comparison')
+      assert.equal(hp(overlap), hp(linked), 'Beacons do not stack')
+      assert.equal(hp(boosted), hp(linked), 'Faster fire does not stack with the Beacon')
+      assert.equal(hp(buildTower(trial, shortSite, 'beacon')), 20, 'Beacon never fires')
+    }
+    const active = fight(linked, 3)
+    assert(saveGame(active, 3) && saveCheckpoint(active, 3))
+    assert.deepEqual(loadGame(), { round: active, speed: 3 })
+    assert.deepEqual(loadCheckpoint(), loadGame())
+    assert.deepEqual(retryRound(active).towers, linked.towers)
+    const next = prepareNextLevel({ ...linked, phase: 'won' }, nextMission(mission))
+    assert.deepEqual(next.towers, archer.towers)
+    assert.equal(next.silver, linked.silver + startingSilver + towerPrice)
+    local.delete('3guotd.saved-game.v1')
+    local.delete('3guotd.checkpoint.v1')
+    console.log('Passed Wuzhang Beacon at 1× and 3×: nearest and tie-break, faster reload, no stacking, real site tradeoffs, save/Retry and trial-end refund.')
+  }
   {
     const jingTrial = campaign.find(mission => mission.id === 'jing:5')
     const crossbowTrial = createRound(20, jingTrial, 'crossbow')

@@ -1,5 +1,5 @@
 import { columns, rows, sitePosition } from './game/board'
-import { attackerName, buildChoices, isTrialTower, canBuildAt, closedSites, enemyPosition, impactTime, enemyMaxHealth, objectiveProgress, roundRoutes, routeForEnemy, shotFlightTime, towerRange } from './game/round'
+import { attackerName, beaconArcher, buildChoices, isTrialTower, canBuildAt, closedSites, enemyPosition, impactTime, enemyMaxHealth, objectiveProgress, roundRoutes, routeForEnemy, shotFlightTime, towerRange } from './game/round'
 import type { Round, TowerKind } from './game/round'
 
 import { drawAttacker } from './attacker-art'
@@ -39,6 +39,20 @@ function roof(ctx: CanvasRenderingContext2D, x: number, y: number, width: number
 }
 
 export function drawTower(ctx: CanvasRenderingContext2D, x: number, y: number, kind: TowerKind) {
+  if (kind === 'beacon') {
+    ctx.save()
+    ctx.translate(x, y)
+    ctx.fillStyle = '#473428'
+    ctx.fillRect(-17, 17, 34, 7)
+    ctx.fillRect(-4, -23, 8, 45)
+    ctx.fillStyle = '#9c653e'
+    ctx.fillRect(-10, -20, 20, 22)
+    ctx.fillStyle = '#ffe1a1'
+    ctx.fillRect(-6, -16, 12, 14)
+    roof(ctx, 0, -22, 15, '#554131')
+    ctx.restore()
+    return
+  }
   if (kind === 'crossbow') {
     ctx.save()
     ctx.translate(x, y)
@@ -278,7 +292,28 @@ export function drawBattlefield(
     }
   }
 
-  if (selected !== null) drawRoadCoverage(ctx, round, selected, options.previewKind)
+  if (selected !== null) {
+    drawRoadCoverage(ctx, round, selected, options.previewKind)
+    const links = round.towers.filter(tower => tower.kind === 'beacon').map(tower => tower.site)
+    if (!active && round.supportTower === 'beacon' && canBuildAt(round, selected)) links.push(selected)
+    for (const site of links) {
+      const linked = beaconArcher(round.towers, site)
+      if (linked === undefined || (site !== selected && linked !== selected)) continue
+      const [x, y] = center(sitePosition(site))
+      const [ax, ay] = center(sitePosition(linked))
+      ctx.save()
+      ctx.lineWidth = 5
+      ctx.strokeStyle = '#fff4aa'
+      ctx.setLineDash([5, 6])
+      ctx.beginPath()
+      ctx.moveTo(x, y - 12)
+      ctx.lineTo(ax, ay - 12)
+      ctx.stroke()
+      ctx.setLineDash([])
+      ctx.strokeRect(ax - 24, ay - 25, 48, 47)
+      ctx.restore()
+    }
+  }
 
   for (const tower of round.towers) {
     const [x, y] = center(sitePosition(tower.site))

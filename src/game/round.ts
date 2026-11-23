@@ -2,7 +2,7 @@ import { defaultRoutes, frontierApproach, isBuildable, route, sitePosition } fro
 import { campaign } from './campaign'
 
 import type { Point, Route } from './board'
-export type TrialTower = 'volley' | 'crossbow'
+export type TrialTower = 'volley' | 'crossbow' | 'beacon'
 export type TowerKind = 'archer' | 'drum' | TrialTower
 export type Upgrade = 'reach' | 'power'
 export const waveOptions = [20, 40, 60, 80, 100] as const
@@ -34,15 +34,33 @@ export const towerDetails = {
     name: 'Heavy Crossbow', range: 2.35, extendedRange: 2.35,
     shotInterval: 2.6, damage: 3,
   },
+  beacon: { name: 'Watch Beacon', range: 2, extendedRange: 2, archerInterval: 0.6 },
 } as const
 
 export function trialTowerFor(mission: Mission | null): TrialTower | undefined {
   if (mission?.id === 'changban:3') return 'volley'
   if (mission?.id === 'jing:5') return 'crossbow'
+  if (mission?.id === 'wuzhang:3') return 'beacon'
 }
 
 export function isTrialTower(kind: unknown): kind is TrialTower {
-  return kind === 'volley' || kind === 'crossbow'
+  return kind === 'volley' || kind === 'crossbow' || kind === 'beacon'
+}
+
+export function beaconArcher(towers: readonly Tower[], site: number): number | undefined {
+  const [x, y] = sitePosition(site)
+  let selected: number | undefined
+  let closest = towerDetails.beacon.range ** 2
+  for (const tower of towers) {
+    if (tower.kind !== 'archer') continue
+    const [ax, ay] = sitePosition(tower.site)
+    const distance = (ax - x) ** 2 + (ay - y) ** 2
+    if (distance < closest || (distance === closest && (selected === undefined || tower.site < selected))) {
+      closest = distance
+      selected = tower.site
+    }
+  }
+  return selected
 }
 
 export function buildChoices(round: Round): readonly TowerKind[] {
@@ -378,8 +396,10 @@ export function advanceRound(round: Round, seconds: number, visualSeconds = seco
     spawnTimer += formation.interval ?? spawnInterval
   }
   const activeIds = new Set(enemies.map(enemy => enemy.id))
+  const supported = new Set(round.towers.filter(tower => tower.kind === 'beacon')
+    .map(tower => beaconArcher(round.towers, tower.site)))
   const towers = round.towers.map(tower => {
-    if (tower.kind === 'drum') return tower
+    if (tower.kind === 'drum' || tower.kind === 'beacon') return tower
     const cooldown = Math.max(0, tower.cooldown - seconds)
     if (cooldown > 0) return { ...tower, cooldown }
 
@@ -405,8 +425,10 @@ export function advanceRound(round: Round, seconds: number, visualSeconds = seco
       shots.push({ from: sitePosition(tower.site), targetId: enemy.id, elapsed: 0, ...(heavy && { heavy: true as const }) })
       incoming.set(enemy.id, (incoming.get(enemy.id) ?? 0) + (heavy ? towerDetails.crossbow.damage : 1))
     }
-    const interval = isTrialTower(tower.kind) ? towerDetails[tower.kind].shotInterval
-      : tower.power ? towerDetails.archer.fasterShotInterval : towerDetails.archer.shotInterval
+    const interval = tower.kind === 'archer'
+      ? supported.has(tower.site) ? towerDetails.beacon.archerInterval
+        : tower.power ? towerDetails.archer.fasterShotInterval : towerDetails.archer.shotInterval
+      : towerDetails[tower.kind].shotInterval
     return { ...tower, cooldown: interval }
   })
   const cleared = spawned === formation.sequence.length && enemies.length === 0

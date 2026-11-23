@@ -2,7 +2,7 @@ import { render } from 'preact'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { columns, rows, sitePosition } from './game/board'
 import {
-  buildChoices, isTrialTower, trialTowerFor, levelPrepMs, attackerName, enemyMaxHealth, baseUpgradePrice, buildTower, canBuildAt, canSpend, closedSites, createRound, enemiesRemaining, objectiveProgress, removeTower,
+  beaconArcher, buildChoices, isTrialTower, trialTowerFor, levelPrepMs, attackerName, enemyMaxHealth, baseUpgradePrice, buildTower, canBuildAt, canSpend, closedSites, createRound, enemiesRemaining, objectiveProgress, removeTower,
   roundRoutes, prepareNextLevel, nextEntry, towerRefund, inRange, routeForEnemy, enemyPosition, startingSilver, secondUpgradeSurcharge,
   retryRound, speedOptions, startRound, tickRound, towerDetails, towerPrice, upgradePrice,
   upgradeTower, waveCueTime, roundFormation, waveOptions,
@@ -25,6 +25,18 @@ import './style.css'
 
 const siteCount = columns * rows
 const upgradeBranches = ['reach', 'power'] as const
+
+function siteName(site: number) {
+  const [column, row] = sitePosition(site)
+  return String.fromCharCode(65 + column) + (row + 1)
+}
+
+const trialNames = { volley: 'Volley', crossbow: 'Crossbow', beacon: 'Beacon' } as const
+const trialBrief = {
+  volley: 'Volley hits up to three nearby enemies. Try a bend where the column bunches. Volley is recalled for full silver after this level.',
+  crossbow: 'Heavy Crossbow targets the enemy with the most HP in range. Place it by a long stretch so it can reload before that enemy leaves.',
+  beacon: 'Watch Beacon boosts the nearest Archer within two tiles. Link it to an Archer that covers useful road. The Beacon is refunded after this level.',
+} as const
 
 function upgradeEffect(kind: Exclude<TowerKind, Round['supportTower']>, branch: Upgrade): string {
   if (branch === 'reach') {
@@ -227,7 +239,15 @@ function App() {
     crossbow: roadCoverage(roundRoutes(round), activeSite, 'crossbow'),
   }, [activeSite, tower, mission, round.rulesVersion])
   const firstBuy = firstPlacement && coverage?.archer.reachesRoad
-  const selectedName = activeSite === null ? '' : String.fromCharCode(65 + activeSite % columns) + (1 + Math.floor(activeSite / columns))
+  const selectedName = activeSite === null ? '' : siteName(activeSite)
+  const linkedArcher = activeSite !== null && (tower?.kind === 'beacon' || (!tower && round.supportTower === 'beacon'))
+    ? beaconArcher(round.towers, activeSite) : undefined
+  const linkLabel = linkedArcher === undefined ? 'No Archer in reach' : `Archer ${siteName(linkedArcher)}`
+  const boosted = tower?.kind === 'archer' && round.towers.some(candidate =>
+    candidate.kind === 'beacon' && beaconArcher(round.towers, candidate.site) === tower.site)
+  function branchEffect(branch: Upgrade) {
+    return boosted && branch === 'power' ? `${towerDetails.archer.fasterShotInterval}s unlinked` : upgradeKind ? upgradeEffect(upgradeKind, branch) : ''
+  }
   const openingHint = activeSite === null ? 'Tap the gold + for an Archer site.'
     : firstBuy ? `${selectedName} · Tap Build Archer to guard the gold road.` : 'Choose a site closer to the road.'
   const firstThreat = attackerName(formation.sequence[0])
@@ -256,7 +276,7 @@ function App() {
     const seconds = Math.ceil(round.levelPrepRemainingMs! / 1000)
     status = `${paused ? 'Paused · ' : ''}Build or upgrade · Wave in ${seconds}s`
     if (activeSite === null) {
-      const carried = mission?.id === 'changban:4' ? 'Standard towers kept' : 'Towers kept'
+      const carried = mission?.id === 'changban:4' || mission?.id === 'wuzhang:4' ? 'Standard towers kept' : 'Towers kept'
       status += `. ${carried}; +${startingSilver} silver.`
     }
   }
@@ -483,11 +503,9 @@ function App() {
           <select id="support-tower" value={selectedSupport ?? 'drum'}
             onChange={event => setDraftSupport(event.currentTarget.value === trial ? trial : undefined)}>
             <option value="drum">Archer + Drum</option>
-            <option value={trial}>Archer + {trial === 'volley' ? 'Volley' : 'Crossbow'}</option>
+            <option value={trial}>Archer + {trialNames[trial]}</option>
           </select>
-          <p>{trial === 'volley'
-            ? 'Volley hits up to three nearby enemies. Try a bend where the column bunches. Volley is recalled for full silver after this level.'
-            : 'Heavy Crossbow targets the enemy with the most HP in range. Place it by a long stretch so it can reload before that enemy leaves.'}</p>
+          <p>{trialBrief[trial]}</p>
         </div>}
         <img class="briefing-art" src={selectedMission.battleId === 'village-watch'
           ? villageWatch : terrainArt[selectedMission.terrain]} alt="" />
@@ -575,6 +593,7 @@ function App() {
         <p>Slows enemies inside its ring. Pair it with an Archer for extra shots. Blue lines mark slowed enemies. The Drum deals no damage.</p>
         <p>Wider reach extends the ring. Stronger slow raises the speed reduction from {Math.round(100 * (1 - towerDetails.drum.speedFactor))}% to {Math.round(100 * (1 - towerDetails.drum.strongerSpeedFactor))}%. Where Drums overlap, the strongest slow applies.</p>
         <PairingGuide />
+        {trialTowerFor(mission) === 'beacon' && <p>Watch Beacon · {towerPrice} silver. The dotted line points to the nearest Archer within two tiles. That Archer reloads in {towerDetails.beacon.archerInterval}s. Equal distances favor the earlier board tile. Beacons and Faster fire do not stack. A Beacon deals no damage.</p>}
         {trialTowerFor(mission) === 'crossbow' && <p>Heavy Crossbow · {towerPrice} silver. A bolt deals {towerDetails.crossbow.damage} damage to the highest-HP enemy in range. It has a slow reload and no upgrades in this trial.</p>}
         {trialTowerFor(mission) === 'volley' && <p>Volley Platform · 30 silver. Hits up to three tightly grouped enemies and reloads slowly. It has no upgrades in this trial.</p>}
       </>}
@@ -670,25 +689,25 @@ function App() {
             <section class="actions" aria-label="Tower actions">
               {upgradeable && installedUpgrades && upgradeKind ? upgradeBranches.filter(option => !upgradeable[option]).map(option => (
                 <button key={option} type="button" class="purchase-card" disabled={shortfall > 0}
-                  title={upgradeEffect(upgradeKind, option)} onClick={() => buy(current => upgradeTower(current, upgradeable.site, option))}>
+                  title={branchEffect(option)} onClick={() => buy(current => upgradeTower(current, upgradeable.site, option))}>
                   <strong>{installedUpgrades[option]}</strong>
                   <span>{price} silver</span>
-                  <small>{upgradeEffect(upgradeKind, option)}</small>
+                  <small>{branchEffect(option)}</small>
                 </button>
               )) : buildChoices(round).map(kind => (
                 <button key={kind} type="button" class={`purchase-card build-card${firstBuy && kind === 'archer' ? ' first-buy' : ''}`} disabled={shortfall > 0}
                   onClick={() => buy(current => buildTower(current, activeSite, kind))}>
                   <TowerPortrait kind={kind} />
-                  <span><strong>Build {kind === 'volley' ? 'Volley' : kind === 'crossbow' ? 'Crossbow' : towerDetails[kind].name}</strong>
+                  <span><strong>Build {isTrialTower(kind) ? trialNames[kind] : towerDetails[kind].name}</strong>
                     <span>{towerPrice} silver</span></span>
-                  <small>{coverage?.[kind].reachesRoad
+                  <small>{kind === 'beacon' ? (linkedArcher === undefined ? 'No link' : linkLabel) : coverage?.[kind].reachesRoad
                     ? <><i class={`range-key ${kind}`} aria-hidden="true" />{kind === 'drum' ? 'Slow' : kind === 'volley' ? 'Volley' : 'Hit'} · {coverage[kind].zones[0]}</>
                     : 'Out of range'}</small>
                 </button>
               ))}
             </section>
           ) : suggested !== null && activeSite === null ? <button type="button" class="choose-site"
-            onClick={() => selectTile(suggested)} aria-label="Select marked site">Select marked site<small>Archer · {towerPrice} silver</small></button> : <div class="command-location">{round.phase === 'lost' ? rewind : tower?.kind === 'volley' ? 'Volley · Hits up to 3' : tower?.kind === 'crossbow' ? 'Crossbow · Highest HP' : mission?.title ?? 'Shu frontier'}</div>}
+            onClick={() => selectTile(suggested)} aria-label="Select marked site">Select marked site<small>Archer · {towerPrice} silver</small></button> : <div class="command-location">{round.phase === 'lost' ? rewind : tower?.kind === 'volley' ? 'Volley · Hits up to 3' : tower?.kind === 'crossbow' ? 'Crossbow · Highest HP' : tower?.kind === 'beacon' ? linkLabel : mission?.title ?? 'Shu frontier'}</div>}
           {!finished && <button class="battle-speed" type="button" aria-label={`Play speed ${speed}×`}
             onClick={() => setSpeed(value => speedOptions[(speedOptions.indexOf(value) + 1) % speedOptions.length])}>
             {speed}×</button>}
