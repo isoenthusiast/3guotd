@@ -459,6 +459,7 @@ try {
       { ...mixed, waveNumber: 1, announceUnlock: undefined },
       { ...initial, longSupport: 'beacon' },
       { ...initial, announceUnlock: true },
+      { ...mixed, shots: [{ ...mixed.shots[0], heavy: true }] },
     ]) {
       assert(saveGame(invalid, 1))
       assert.equal(loadGame(), null)

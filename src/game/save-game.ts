@@ -54,7 +54,7 @@ function decodeRound(value: unknown, mission: Round['mission']): Round | null {
     || !Array.isArray(shots) || !shots.every(shot => record(shot) && point(shot.from)
       && integer(shot.targetId) && amount(shot.elapsed)
       && (shot.heavy === undefined || (shot.heavy === true && eligibleTrial('crossbow')))
-      && (shot.volley === undefined || (shot.volley === true && eligibleTrial('volley'))))
+      && (shot.volley === undefined || (shot.volley === true && shot.heavy === undefined && eligibleTrial('volley'))))
     || !Array.isArray(impacts) || !impacts.every(impact => record(impact) && point(impact.at)
       && amount(impact.elapsed) && integer(impact.silver)
       && (impact.cue === undefined || ((impact.cue === 'volley' || impact.cue === 'crossbow')
