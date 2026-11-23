@@ -2,7 +2,7 @@ import { defaultRoutes, frontierApproach, isBuildable, route, sitePosition } fro
 import { campaign } from './campaign'
 
 import type { Point, Route } from './board'
-export type TowerKind = 'archer' | 'drum'
+export type TowerKind = 'archer' | 'drum' | 'volley'
 export type Upgrade = 'reach' | 'power'
 export const waveOptions = [20, 40, 60, 80, 100] as const
 export const speedOptions = [1, 2, 3] as const
@@ -25,7 +25,19 @@ export const towerDetails = {
     name: 'Drum', reach: 'Wider reach', power: 'Stronger slow', range: 2.2, extendedRange: 2.8,
     speedFactor: 0.28, strongerSpeedFactor: 0.18,
   },
+  volley: {
+    name: 'Volley Platform', range: 1.8, extendedRange: 1.8,
+    shotInterval: 2.1, clusterRadius: 1.15, maxTargets: 3,
+  },
 } as const
+
+export function offersVolley(mission: Mission | null) {
+  return mission?.id === 'changban:3'
+}
+
+export function buildChoices(round: Round): readonly TowerKind[] {
+  return round.supportTower === 'volley' && offersVolley(round.mission) ? ['archer', 'volley'] : ['archer', 'drum']
+}
 
 const wave = [
   'infantry', 'infantry', 'runner', 'infantry', 'runner',
@@ -120,6 +132,7 @@ type Opening = Pick<Round, 'towers' | 'silver' | 'lives'>
 export const levelPrepMs = 10_000
 
 export type Round = {
+  supportTower?: 'volley'
   continuedStory?: true
   levelPrepRemainingMs?: number
   rulesVersion?: 2
@@ -143,22 +156,25 @@ export type Round = {
   spawnTimer: number
 }
 
-export function createRound(totalWaves = 20, mission: Mission | null = null): Round {
+export function createRound(totalWaves = 20, mission: Mission | null = null, supportTower?: Round['supportTower']): Round {
   // Explicit restarts adopt current rules; retry and wave transitions retain the snapshot's rules.
   const missionId = mission?.id
   if (missionId) mission = campaign.find(candidate => candidate.id === missionId) ?? mission
   return {
+    ...(supportTower === 'volley' && offersVolley(mission) && { supportTower }),
     rulesVersion: 2, phase: 'setup', totalWaves: mission?.waves.length ?? totalWaves, mission, waveNumber: 1, towers: [], silver: startingSilver, opening: null,
     enemies: [], shots: [], impacts: [], gateHit: null, waveAge: 0, rebuildTime: 0,
     waveStats: emptyStats, previousWave: null, lives: initialLives, spawned: 0, spawnTimer: 0,
   }
 }
 
-export function prepareNextLevel(round: Round, next: Mission): Round {
+export function prepareNextLevel(round: Round, next: Mission, supportTower?: Round['supportTower']): Round {
   if (round.phase !== 'won' || next.battleId !== round.mission?.battleId || next.level !== round.mission.level + 1) return round
+  const retained = round.towers.filter(tower => tower.kind !== 'volley' || offersVolley(next))
+  const reclaimed = round.towers.filter(tower => !retained.includes(tower)).reduce((sum, tower) => sum + towerRefund(tower), 0)
   return {
-    ...createRound(20, next), continuedStory: true, levelPrepRemainingMs: levelPrepMs,
-    towers: round.towers.map(tower => ({ ...tower, cooldown: 0 })), silver: round.silver + startingSilver,
+    ...createRound(20, next, supportTower), continuedStory: true, levelPrepRemainingMs: levelPrepMs,
+    towers: retained.map(tower => ({ ...tower, cooldown: 0 })), silver: round.silver + startingSilver + reclaimed,
   }
 }
 
@@ -178,7 +194,7 @@ export function startRound(round: Round): Round {
 
 export function retryRound(round: Round): Round {
   if (!round.opening) return round
-  return { ...createRound(round.totalWaves, round.mission), mission: round.mission, ...(round.continuedStory && { continuedStory: true as const }), rulesVersion: round.rulesVersion, waveNumber: round.waveNumber, previousWave: round.previousWave, ...round.opening }
+  return { ...createRound(round.totalWaves, round.mission, round.supportTower), mission: round.mission, ...(round.continuedStory && { continuedStory: true as const }), rulesVersion: round.rulesVersion, waveNumber: round.waveNumber, previousWave: round.previousWave, ...round.opening }
 }
 
 export function roundFormation(round: Round): Formation {
@@ -234,7 +250,7 @@ export function canSpend(round: Round): boolean {
 }
 
 export function buildTower(round: Round, site: number, kind: TowerKind): Round {
-  if (!canSpend(round) || round.silver < towerPrice || !canBuildAt(round, site)
+  if (!canSpend(round) || !buildChoices(round).includes(kind) || round.silver < towerPrice || !canBuildAt(round, site)
     || round.towers.some(tower => tower.site === site)) return round
   const tower: Tower = { site, kind, reach: false, power: false, cooldown: 0 }
   return { ...round, silver: round.silver - towerPrice, towers: [...round.towers, tower] }
@@ -242,7 +258,7 @@ export function buildTower(round: Round, site: number, kind: TowerKind): Round {
 
 export function upgradeTower(round: Round, site: number, branch: Upgrade): Round {
   const tower = round.towers.find(candidate => candidate.site === site)
-  if (!canSpend(round) || !tower || tower[branch] || round.silver < upgradePrice(tower)) return round
+  if (!canSpend(round) || !tower || tower.kind === 'volley' || tower[branch] || round.silver < upgradePrice(tower)) return round
   return {
     ...round,
     silver: round.silver - upgradePrice(tower),
@@ -359,14 +375,27 @@ export function advanceRound(round: Round, seconds: number, visualSeconds = seco
     const target = enemies.find(enemy => enemy.health > (incoming.get(enemy.id) ?? 0)
       && inRange(tower, enemyPosition(enemy.progress, routeForEnemy(round, enemy))))
     if (!target) return { ...tower, cooldown }
-    shots.push({ from: sitePosition(tower.site), targetId: target.id, elapsed: 0 })
-    incoming.set(target.id, (incoming.get(target.id) ?? 0) + 1)
-    const stats = towerDetails.archer
-    return { ...tower, cooldown: tower.power ? stats.fasterShotInterval : stats.shotInterval }
+    let recipients = [target]
+    if (tower.kind === 'volley') {
+      const [x, y] = enemyPosition(target.progress, routeForEnemy(round, target))
+      const nearby = enemies.filter(enemy => {
+        if (enemy === target || enemy.health <= (incoming.get(enemy.id) ?? 0)) return false
+        const point = enemyPosition(enemy.progress, routeForEnemy(round, enemy))
+        return inRange(tower, point) && Math.hypot(point[0] - x, point[1] - y) <= towerDetails.volley.clusterRadius
+      })
+      recipients = [target, ...nearby.slice(0, towerDetails.volley.maxTargets - 1)]
+    }
+    for (const enemy of recipients) {
+      shots.push({ from: sitePosition(tower.site), targetId: enemy.id, elapsed: 0 })
+      incoming.set(enemy.id, (incoming.get(enemy.id) ?? 0) + 1)
+    }
+    const interval = tower.kind === 'volley' ? towerDetails.volley.shotInterval
+      : tower.power ? towerDetails.archer.fasterShotInterval : towerDetails.archer.shotInterval
+    return { ...tower, cooldown: interval }
   })
   const cleared = spawned === formation.sequence.length && enemies.length === 0
   if (lives > 0 && cleared && round.waveNumber < round.totalWaves) {
-    const next = { ...createRound(round.totalWaves, round.mission), mission: round.mission, ...(round.continuedStory && { continuedStory: true as const }), rulesVersion: round.rulesVersion, waveNumber: round.waveNumber + 1 }
+    const next = { ...createRound(round.totalWaves, round.mission, round.supportTower), mission: round.mission, ...(round.continuedStory && { continuedStory: true as const }), rulesVersion: round.rulesVersion, waveNumber: round.waveNumber + 1 }
     const closed = closedSites(next)
     const needsRebuild = closed.length > closedSites(round).length
     const remaining = towers.filter(tower => !closed.includes(tower.site))

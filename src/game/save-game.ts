@@ -1,7 +1,7 @@
 import { campaign } from './campaign'
 import { campaign as legacyCampaign } from './legacy-campaign'
 import { columns, rows } from './board'
-import { attackerName, levelPrepMs, roundFormation, speedOptions, waveOptions } from './round'
+import { attackerName, offersVolley, levelPrepMs, roundFormation, speedOptions, waveOptions } from './round'
 import type { PlaySpeed, Round } from './round'
 
 const saveKey = '3guotd.saved-game.v1'
@@ -16,7 +16,7 @@ const point = (value: unknown): boolean => Array.isArray(value) && value.length 
 const attacker = (value: unknown): boolean => typeof value === 'string' && typeof attackerName(value as Parameters<typeof attackerName>[0]) === 'string'
 const tower = (value: unknown): boolean => record(value)
   && integer(value.site) && value.site < columns * rows
-  && (value.kind === 'archer' || value.kind === 'drum')
+  && (value.kind === 'archer' || value.kind === 'drum' || (value.kind === 'volley' && value.reach === false && value.power === false))
   && typeof value.reach === 'boolean' && typeof value.power === 'boolean' && amount(value.cooldown)
 const towers = (value: unknown): boolean => Array.isArray(value) && value.every(tower)
 const stats = (value: unknown): boolean => record(value)
@@ -29,6 +29,7 @@ function decodeRound(value: unknown, mission: Round['mission']): Round | null {
     || (value.levelPrepRemainingMs !== undefined && (!value.continuedStory || !mission || value.phase !== 'setup'
       || value.waveNumber !== 1 || !integer(value.levelPrepRemainingMs) || value.levelPrepRemainingMs < 1
       || value.levelPrepRemainingMs > levelPrepMs))
+    || (value.supportTower !== undefined && (value.supportTower !== 'volley' || value.rulesVersion !== 2 || !offersVolley(mission)))
     || (value.rulesVersion !== undefined && value.rulesVersion !== 2)
     || !integer(value.waveNumber) || value.waveNumber < 1
     || !integer(value.totalWaves) || value.waveNumber > value.totalWaves
@@ -55,6 +56,8 @@ function decodeRound(value: unknown, mission: Round['mission']): Round | null {
   if (previousWave !== null && !(record(previousWave) && stats(previousWave) && integer(previousWave.waveNumber))) return null
 
   const round = { ...value, mission } as Round
+  if (round.supportTower !== 'volley' &&
+      [...round.towers, ...(round.opening?.towers ?? [])].some(tower => tower.kind === 'volley')) return null
   return round.spawned <= roundFormation(round).sequence.length ? round : null
 }
 

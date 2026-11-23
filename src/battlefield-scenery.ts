@@ -1,6 +1,6 @@
 import { columns, rows, sitePosition } from './game/board'
 import type { Point, Route } from './game/board'
-import { canBuildAt, objectiveProgress, roundRoutes, towerRange } from './game/round'
+import { buildChoices, canBuildAt, objectiveProgress, roundRoutes, towerRange } from './game/round'
 import type { Round, TowerKind } from './game/round'
 import { paintArt } from './battlefield-art-assets'
 
@@ -40,7 +40,7 @@ export function roadCoverage(routes: readonly Route[], site: number, kind: Tower
 export function placementCoverage(round: Round, site: number) {
   if (!canBuildAt(round, site) || round.towers.some(tower => tower.site === site)) return null
   const routes = roundRoutes(round)
-  return { archer: roadCoverage(routes, site, 'archer'), drum: roadCoverage(routes, site, 'drum') }
+  return { archer: roadCoverage(routes, site, 'archer'), drum: roadCoverage(routes, site, 'drum'), volley: roadCoverage(routes, site, 'volley') }
 }
 
 export function drawRoadCoverage(ctx: CanvasRenderingContext2D, round: Round, site: number,
@@ -49,11 +49,12 @@ export function drawRoadCoverage(ctx: CanvasRenderingContext2D, round: Round, si
   if (!coverage) return
   ctx.save()
   ctx.lineCap = 'round'
-  for (const tower of ['drum', 'archer'] as const) {
+  const choices = buildChoices(round)
+  for (const tower of [...choices].reverse()) {
     if (kind && tower !== kind) continue
-    ctx.strokeStyle = tower === 'archer' ? '#ffdc87' : '#7bd9dc'
+    ctx.strokeStyle = tower === 'archer' ? '#ffdc87' : tower === 'volley' ? '#f2ac91' : '#7bd9dc'
     ctx.lineWidth = tower === 'archer' ? 13 : 25
-    ctx.setLineDash(tower === 'drum' ? [8, 6] : [])
+    ctx.setLineDash(tower === 'drum' ? [8, 6] : tower === 'volley' ? [3, 5] : [])
     ctx.beginPath()
     for (const [a, b] of coverage[tower].segments) {
       ctx.moveTo((a[0] + .5) * tile, (a[1] + .5) * tile)
@@ -62,7 +63,7 @@ export function drawRoadCoverage(ctx: CanvasRenderingContext2D, round: Round, si
     ctx.stroke()
   }
   const [x, y] = sitePosition(site)
-  if (kind ? !coverage[kind].reachesRoad : !coverage.archer.reachesRoad && !coverage.drum.reachesRoad) {
+  if (kind ? !coverage[kind].reachesRoad : choices.every(tower => !coverage[tower].reachesRoad)) {
     ctx.font = 'bold 17px system-ui'
     ctx.textAlign = 'center'
     ctx.strokeStyle = '#35291f'

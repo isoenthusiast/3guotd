@@ -2,7 +2,7 @@ import { render } from 'preact'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { columns, rows, sitePosition } from './game/board'
 import {
-  levelPrepMs, attackerName, enemyMaxHealth, baseUpgradePrice, buildTower, canBuildAt, canSpend, closedSites, createRound, enemiesRemaining, objectiveProgress, removeTower,
+  buildChoices, offersVolley, levelPrepMs, attackerName, enemyMaxHealth, baseUpgradePrice, buildTower, canBuildAt, canSpend, closedSites, createRound, enemiesRemaining, objectiveProgress, removeTower,
   roundRoutes, prepareNextLevel, nextEntry, towerRefund, inRange, routeForEnemy, enemyPosition, startingSilver, secondUpgradeSurcharge,
   retryRound, speedOptions, startRound, tickRound, towerDetails, towerPrice, upgradePrice,
   upgradeTower, waveCueTime, roundFormation, waveOptions,
@@ -24,10 +24,9 @@ import { EnemyGuide, PairingGuide, VisualComfortControls } from './combat-guide'
 import './style.css'
 
 const siteCount = columns * rows
-const towerKinds = ['archer', 'drum'] as const
 const upgradeBranches = ['reach', 'power'] as const
 
-function upgradeEffect(kind: TowerKind, branch: Upgrade): string {
+function upgradeEffect(kind: Exclude<TowerKind, 'volley'>, branch: Upgrade): string {
   if (branch === 'reach') {
     const { range, extendedRange } = towerDetails[kind]
     return `${range} → ${extendedRange} tiles`
@@ -175,6 +174,7 @@ function App() {
     if (confirmation === 'report') reportDialog.current?.showModal()
   }, [confirmation])
   const [draftMission, setDraftMission] = useState<Mission>(campaign[0])
+  const [draftSupport, setDraftSupport] = useState<Round['supportTower']>()
   const [draftWaves, setDraftWaves] = useState(20)
   const previousAudio = useRef<Round | null>(null)
   const [round, setRound] = useState(createRound)
@@ -197,11 +197,14 @@ function App() {
   const finished = round.phase === 'won' || round.phase === 'lost'
   const activeSite = selected !== null && (canBuildAt(round, selected) || round.towers.some(tower => tower.site === selected)) ? selected : null
   const tower = round.towers.find(candidate => candidate.site === activeSite)
-  const price = tower ? upgradePrice(tower) : towerPrice
+  const upgradeKind = tower?.kind === 'volley' ? undefined : tower?.kind
+  const upgradeable = upgradeKind ? tower : undefined
+  const installedUpgrades = upgradeKind ? towerDetails[upgradeKind] : null
+  const price = upgradeable ? upgradePrice(upgradeable) : towerPrice
   const shortfall = Math.max(0, price - round.silver)
   const spendingOpen = canSpend(round)
   const canRefund = setup && round.towers.length > 0
-  const showActions = activeSite !== null && spendingOpen && (!tower || !tower.reach || !tower.power || canRefund)
+  const showActions = activeSite !== null && spendingOpen && (!tower || !!upgradeable && (!upgradeable.reach || !upgradeable.power))
   const firstPlacement = (setup || running) && round.waveNumber === 1 && !preparingLevel && round.towers.length === 0
   const suggested = useMemo(() => {
     if (!firstPlacement) return null
@@ -220,6 +223,7 @@ function App() {
   const coverage = useMemo(() => activeSite === null || tower ? null : {
     archer: roadCoverage(roundRoutes(round), activeSite, 'archer'),
     drum: roadCoverage(roundRoutes(round), activeSite, 'drum'),
+    volley: roadCoverage(roundRoutes(round), activeSite, 'volley'),
   }, [activeSite, tower, mission, round.rulesVersion])
   const firstBuy = firstPlacement && coverage?.archer.reachesRoad
   const selectedName = activeSite === null ? '' : String.fromCharCode(65 + activeSite % columns) + (1 + Math.floor(activeSite / columns))
@@ -228,7 +232,7 @@ function App() {
   const firstThreat = attackerName(formation.sequence[0])
   const lanes = roundRoutes(round).length
   const report = finished ? { ...round.waveStats, waveNumber: round.waveNumber } : round.previousWave
-  let status = setup ? (firstPlacement ? openingHint : tower ? `${towerDetails[tower.kind].name}${tower.reach && tower.power ? ' · Fully upgraded' : ' · Choose an upgrade'}`
+  let status = setup ? (firstPlacement ? openingHint : tower ? `${towerDetails[tower.kind].name}${!upgradeable ? ' · Hits up to 3' : tower.reach && tower.power ? ' · Fully upgraded' : ' · Choose an upgrade'}`
     : activeSite !== null ? 'Choose a tower' : 'Select a tower to upgrade or a stake to build')
     : round.phase === 'won' ? (mission ? 'Level cleared!' : 'Gate defended!') : 'The gate fell.'
   // waveAge measures viewing time even at 3×. Give fast play two seconds to read
@@ -250,13 +254,16 @@ function App() {
   if (preparingLevel) {
     const seconds = Math.ceil(round.levelPrepRemainingMs! / 1000)
     status = `${paused ? 'Paused · ' : ''}Build or upgrade · Wave in ${seconds}s`
-    if (activeSite === null) status += `. Towers kept; +${startingSilver} silver.`
+    if (activeSite === null) {
+      const carried = mission?.id === 'changban:4' ? 'Standard towers kept' : 'Towers kept'
+      status += `. ${carried}; +${startingSilver} silver.`
+    }
   }
   if (!preparingLevel && !finished && coverage && !firstPlacement && !paused && !alertActive) {
     status = `${selectedName} · Choose a tower${shortfall ? '' : ` · ${round.silver - towerPrice} silver left after buying`}`
   }
-  if (!preparingLevel && !finished && tower && tower.reach && tower.power && !paused && !alertActive) {
-    status = `${towerDetails[tower.kind].name} · ${towerDetails[tower.kind].reach} + ${towerDetails[tower.kind].power}`
+  if (!preparingLevel && !finished && tower && installedUpgrades && tower.reach && tower.power && !paused && !alertActive) {
+    status = `${towerDetails[tower.kind].name} · ${installedUpgrades.reach} + ${installedUpgrades.power}`
   }
   const opening = round.opening
   const rewind = opening && `Wave start: ${opening.towers.length} tower${opening.towers.length === 1 ? '' : 's'} (upgrades kept), ${opening.silver} silver, ${opening.lives} lives.`
@@ -301,6 +308,12 @@ function App() {
 
   useEffect(() => {
     if (screen !== 'battle' || round.phase !== 'won' || !upcoming || upcoming.battleId !== mission?.battleId) return
+    if (offersVolley(upcoming)) {
+      setDraftMission(upcoming)
+      setDraftSupport(undefined)
+      navigate('campaign')
+      return
+    }
     setRound(current => prepareNextLevel(current, upcoming))
     setDraftMission(upcoming)
     selectTile(null)
@@ -340,6 +353,7 @@ function App() {
   function openMission(next: Mission) {
     if (!isMissionUnlocked(next, clears) && !(round.phase === 'won' && upcoming === next)) return
     setDraftMission(next)
+    setDraftSupport(undefined)
     navigate('campaign')
   }
 
@@ -388,6 +402,7 @@ function App() {
         }}>Continue</button>}
         <button type="button" class={hasRun ? undefined : 'primary'} onClick={() => {
           setDraftMission(recommendedMission(clears))
+          setDraftSupport(undefined)
           navigate('campaign')
         }}>Campaign</button>
         <button type="button" onClick={() => {
@@ -433,7 +448,7 @@ function App() {
       </details>
       {confirmation === 'restart' && <div class="menu-confirm">
         <p>Restart from wave one? Your saved game stays available.</p>
-        <button type="button" class="primary" onClick={() => enterBattle(createRound(round.totalWaves, mission))}>Restart from wave one</button>
+        <button type="button" class="primary" onClick={() => enterBattle(createRound(round.totalWaves, mission, round.supportTower))}>Restart from wave one</button>
         <button type="button" onClick={back}>Cancel</button>
       </div>}
       {confirmation === 'restore' && <div class="menu-confirm">
@@ -448,6 +463,11 @@ function App() {
 
   if (screen === 'campaign' || screen === 'long') {
     const selectedMission = screen === 'campaign' ? draftMission : null
+    function startBattle() {
+      if (selectedMission && offersVolley(selectedMission) && round.phase === 'won' && upcoming?.id === selectedMission.id) {
+        enterBattle(prepareNextLevel(round, selectedMission, draftSupport))
+      } else enterBattle(createRound(draftWaves, selectedMission, draftSupport))
+    }
     return <main class="menu-screen setup-screen">
       {header}
       <button type="button" onClick={back}>Main menu</button>
@@ -455,6 +475,15 @@ function App() {
         <h2 class="visually-hidden">Campaign</h2>
         <h3>{selectedMission.title} · Level {selectedMission.level}</h3>
         <p class="mission-order">{selectedMission.objective} · Hold for {selectedMission.waves.length} waves</p>
+        {offersVolley(selectedMission) && <div class="map-setting trial-loadout">
+          <label for="support-tower">Tower loadout</label>
+          <select id="support-tower" value={draftSupport ?? 'drum'}
+            onChange={event => setDraftSupport(event.currentTarget.value === 'volley' ? 'volley' : undefined)}>
+            <option value="drum">Archer + Drum</option>
+            <option value="volley">Archer + Volley</option>
+          </select>
+          <p>Volley hits up to three nearby enemies. Try a bend where the column bunches. Volley is recalled for full silver after this level.</p>
+        </div>}
         <img class="briefing-art" src={selectedMission.battleId === 'village-watch'
           ? villageWatch : terrainArt[selectedMission.terrain]} alt="" />
         <details class="story-scene"><summary>Story</summary>
@@ -510,11 +539,11 @@ function App() {
       {confirmation === 'new' ? <div class="menu-confirm">
         <p>Start this battle and replace your active run and automatic checkpoint? Your manual save stays available.</p>
         <button class="primary" type="button"
-          onClick={() => enterBattle(createRound(draftWaves, selectedMission))}>Replace and enter battle</button>
+          onClick={startBattle}>Replace and enter battle</button>
         <button type="button" onClick={back}>Cancel</button>
       </div> : <button class="primary enter-battle" type="button" onClick={() => {
         if (unfinishedRun) navigate(screen, 'new')
-        else enterBattle(createRound(draftWaves, selectedMission))
+        else startBattle()
       }}>Enter battle</button>}
     </main>
   }
@@ -541,6 +570,7 @@ function App() {
         <p>Slows enemies inside its ring. Pair it with an Archer for extra shots. Blue lines mark slowed enemies. The Drum deals no damage.</p>
         <p>Wider reach extends the ring. Stronger slow raises the speed reduction from {Math.round(100 * (1 - towerDetails.drum.speedFactor))}% to {Math.round(100 * (1 - towerDetails.drum.strongerSpeedFactor))}%. Where Drums overlap, the strongest slow applies.</p>
         <PairingGuide />
+        {offersVolley(mission) && <p>Volley Platform · 30 silver. Hits up to three tightly grouped enemies and reloads slowly. It has no upgrades in this trial.</p>}
       </>}
       <VisualComfortControls />
       </section>
@@ -568,8 +598,8 @@ function App() {
         }} aria-label="Report">Report{(running || preparingLevel) && !paused && ' · pauses play'}</button>}
         {!setup && <div><button type="button" onClick={retryWave}>Retry wave</button> <small>{rewind}</small></div>}
         {initialSetup && !round.continuedStory && round.towers.length > 0 && <button type="button"
-          onClick={() => enterBattle(createRound(round.totalWaves, mission))}>Clear towers</button>}
-        {finished && <button type="button" onClick={() => enterBattle(createRound(round.totalWaves, mission))}>
+          onClick={() => enterBattle(createRound(round.totalWaves, mission, round.supportTower))}>Clear towers</button>}
+        {finished && <button type="button" onClick={() => enterBattle(createRound(round.totalWaves, mission, round.supportTower))}>
           {mission ? 'Restart level' : 'New battle'}</button>}
       </div>
       {confirmation === 'report' && <dialog ref={reportDialog} onCancel={event => {
@@ -624,35 +654,35 @@ function App() {
           </div>
           <span class="visually-hidden" role="status" aria-atomic="true">{round.phase === 'lost' ? `${breachAnnouncement} Gate fell. Retry wave available.`.trim()
             : breachAnnouncement || (preparingLevel ? 'Build or upgrade before the next level starts.' : `Wave ${round.waveNumber}. ${paused ? 'Paused.' : ''}`)}</span>
-          {setup && !preparingLevel && tower && !tower.reach && !tower.power && !needsSilver &&
+          {setup && !preparingLevel && upgradeable && !upgradeable.reach && !upgradeable.power && !needsSilver &&
             <small>Next branch {baseUpgradePrice + secondUpgradeSurcharge}</small>}
           {canRefund && tower && <button type="button" class="refund" aria-label="Remove & refund" aria-description={`Returns ${towerRefund(tower)} silver`}
             onClick={() => setRound(current => removeTower(current, tower.site))}>Refund {towerRefund(tower)}</button>}
         </div>
         <div class="command-row">
-          {showActions && activeSite !== null && (!tower || !tower.reach || !tower.power) ? (
+          {showActions && activeSite !== null ? (
             <section class="actions" aria-label="Tower actions">
-              {tower ? upgradeBranches.filter(option => !tower[option]).map(option => (
+              {upgradeable && installedUpgrades && upgradeKind ? upgradeBranches.filter(option => !upgradeable[option]).map(option => (
                 <button key={option} type="button" class="purchase-card" disabled={shortfall > 0}
-                  title={upgradeEffect(tower.kind, option)} onClick={() => buy(current => upgradeTower(current, tower.site, option))}>
-                  <strong>{towerDetails[tower.kind][option]}</strong>
+                  title={upgradeEffect(upgradeKind, option)} onClick={() => buy(current => upgradeTower(current, upgradeable.site, option))}>
+                  <strong>{installedUpgrades[option]}</strong>
                   <span>{price} silver</span>
-                  <small>{upgradeEffect(tower.kind, option)}</small>
+                  <small>{upgradeEffect(upgradeKind, option)}</small>
                 </button>
-              )) : towerKinds.map(kind => (
+              )) : buildChoices(round).map(kind => (
                 <button key={kind} type="button" class={`purchase-card build-card${firstBuy && kind === 'archer' ? ' first-buy' : ''}`} disabled={shortfall > 0}
                   onClick={() => buy(current => buildTower(current, activeSite, kind))}>
                   <TowerPortrait kind={kind} />
-                  <span><strong>Build {towerDetails[kind].name}</strong>
+                  <span><strong>Build {kind === 'volley' ? 'Volley' : towerDetails[kind].name}</strong>
                     <span>{towerPrice} silver</span></span>
                   <small>{coverage?.[kind].reachesRoad
-                    ? <><i class={`range-key ${kind}`} aria-hidden="true" />{kind === 'archer' ? 'Hit' : 'Slow'} · {coverage[kind].zones[0]}</>
+                    ? <><i class={`range-key ${kind}`} aria-hidden="true" />{kind === 'drum' ? 'Slow' : kind === 'volley' ? 'Volley' : 'Hit'} · {coverage[kind].zones[0]}</>
                     : 'Out of range'}</small>
                 </button>
               ))}
             </section>
           ) : suggested !== null && activeSite === null ? <button type="button" class="choose-site"
-            onClick={() => selectTile(suggested)} aria-label="Select marked site">Select marked site<small>Archer · {towerPrice} silver</small></button> : <div class="command-location">{round.phase === 'lost' ? rewind : mission?.title ?? 'Shu frontier'}</div>}
+            onClick={() => selectTile(suggested)} aria-label="Select marked site">Select marked site<small>Archer · {towerPrice} silver</small></button> : <div class="command-location">{round.phase === 'lost' ? rewind : tower?.kind === 'volley' ? 'Volley · Hits up to 3' : mission?.title ?? 'Shu frontier'}</div>}
           {!finished && <button class="battle-speed" type="button" aria-label={`Play speed ${speed}×`}
             onClick={() => setSpeed(value => speedOptions[(speedOptions.indexOf(value) + 1) % speedOptions.length])}>
             {speed}×</button>}

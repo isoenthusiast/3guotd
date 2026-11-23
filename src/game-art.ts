@@ -1,5 +1,5 @@
 import { columns, rows, sitePosition } from './game/board'
-import { attackerName, canBuildAt, closedSites, enemyPosition, impactTime, enemyMaxHealth, objectiveProgress, roundRoutes, routeForEnemy, shotFlightTime, towerRange } from './game/round'
+import { attackerName, buildChoices, canBuildAt, closedSites, enemyPosition, impactTime, enemyMaxHealth, objectiveProgress, roundRoutes, routeForEnemy, shotFlightTime, towerRange } from './game/round'
 import type { Round, TowerKind } from './game/round'
 
 import { drawAttacker } from './attacker-art'
@@ -39,6 +39,25 @@ function roof(ctx: CanvasRenderingContext2D, x: number, y: number, width: number
 }
 
 export function drawTower(ctx: CanvasRenderingContext2D, x: number, y: number, kind: TowerKind) {
+  if (kind === 'volley') {
+    ctx.save()
+    ctx.translate(x, y)
+    ctx.fillStyle = '#482e24'
+    ctx.fillRect(-24, -12, 48, 35)
+    ctx.fillStyle = '#ac744e'
+    ctx.fillRect(-21, -9, 42, 21)
+    ctx.strokeStyle = '#ffcf99'
+    ctx.lineWidth = 3
+    for (const offset of [-13, 0, 13]) {
+      ctx.beginPath()
+      ctx.moveTo(offset - 4, 7)
+      ctx.lineTo(offset + 4, -20)
+      ctx.lineTo(offset - 1, -17)
+      ctx.stroke()
+    }
+    ctx.restore()
+    return
+  }
   const width = kind === 'archer' ? 54 : 53
   const height = kind === 'archer' ? 72 : 55
   if (paintArt(ctx, kind, x - width / 2, y + 25 - height, width, height)) return
@@ -204,10 +223,11 @@ export function drawBattlefield(
     ctx.beginPath()
     ctx.arc(x, y, towerRange('archer', false) * tile, 0, 2 * Math.PI)
     ctx.stroke()
-    ctx.strokeStyle = '#b7f1e9'
-    ctx.setLineDash([9, 5])
+    const support = buildChoices(round)[1]
+    ctx.strokeStyle = support === 'volley' ? '#f2ac91' : '#b7f1e9'
+    ctx.setLineDash(support === 'volley' ? [3, 5] : [9, 5])
     ctx.beginPath()
-    ctx.arc(x, y, towerRange('drum', false) * tile, 0, 2 * Math.PI)
+    ctx.arc(x, y, towerRange(support, false) * tile, 0, 2 * Math.PI)
     ctx.stroke()
     ctx.restore()
   }
@@ -225,7 +245,7 @@ export function drawBattlefield(
     ctx.fill()
     ctx.stroke()
     ctx.restore()
-    if (!active.reach) {
+    if (!active.reach && active.kind !== 'volley') {
       ctx.save()
       ctx.setLineDash([9, 5])
       ctx.strokeStyle = '#fff5c4'

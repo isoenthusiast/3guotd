@@ -423,3 +423,7 @@ button:focus-visible { outline: 2px solid #ffedaf; outline-offset: 2px; }
   .build-card .tower-portrait { display: none; }
   .build-card strong { font-size: .72rem; }
 }
+
+.trial-loadout { display: flex; flex-wrap: wrap; margin-block: .4rem; }
+.trial-loadout p { flex-basis: 100%; }
+.range-key.volley { border-top: 2px dotted #f2ac91; }

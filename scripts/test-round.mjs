@@ -264,8 +264,9 @@ try {
   function playMission(mission, policy = {}, opening) {
     let level = opening ?? createRound(policy.waves ?? 20, mission)
     const sites = rankedSites(level, policy.coverageOnly)
+    const support = level.supportTower ?? 'drum'
     sites.slice(0, 3).forEach((cell, index) => {
-      level = buildTower(level, cell, index === (policy.drumIndex ?? 1) ? 'drum' : 'archer')
+      level = buildTower(level, cell, index === (policy.drumIndex ?? 1) ? support : 'archer')
     })
     if (level.levelPrepRemainingMs !== undefined) {
       for (let i = 0; i < 200; i++) level = tickRound(level, 3)
@@ -286,7 +287,7 @@ try {
         const cell = sites.find(candidate => canBuildAt(level, candidate)
           && !level.towers.some(tower => tower.site === candidate))
         if (cell !== undefined) level = buildTower(level, cell,
-          policy.drumIndex !== -1 && level.towers.length % (policy.spacing ?? 4) === 1 ? 'drum' : 'archer')
+          policy.drumIndex !== -1 && level.towers.length % (policy.spacing ?? 4) === 1 ? support : 'archer')
       }
       if (level.silver < beforePurchase) policy.events?.push({ wave: level.waveNumber, step })
     }
@@ -385,6 +386,58 @@ try {
     setItem: (key, value) => local.set(key, value),
   } })
   const { loadGame, saveGame, loadCheckpoint, saveCheckpoint, loadSound, saveSound } = require(join(output, 'save-game.js'))
+  const trial = campaign.find(mission => mission.id === 'changban:3')
+  const volleyWitness = playMission(trial, { upgrade: true }, createRound(20, trial, 'volley'))
+  assert.equal(volleyWitness.phase, 'won', 'Archer + Volley can clear all four Changban Level 3 waves from a fresh briefing')
+  assert(volleyWitness.towers.some(tower => tower.kind === 'volley'))
+  const trialSite = site(5, 1)
+  const volleyRound = createRound(20, trial, 'volley')
+  const volley = buildTower(volleyRound, trialSite, 'volley')
+  assert.equal(volley.silver, startingSilver - towerPrice)
+  assert.equal(buildTower(createRound(20, trial), trialSite, 'volley').towers.length, 0)
+  assert.equal(buildTower(volleyRound, 0, 'drum'), volleyRound)
+  assert.equal(upgradeTower(volley, trialSite, 'power'), volley)
+  assert.deepEqual(removeTower(volley, trialSite), volleyRound)
+  const archerTrial = buildTower(volleyRound, trialSite, 'archer')
+  const drum = buildTower(createRound(20, trial), site(7, 1), 'drum').towers[0]
+  function trialCombat(round, progress, kind = 'infantry', health = 1, speed = 1, drumSupport = false) {
+    let state = { ...startRound(round), spawnTimer: 99, spawned: progress.length,
+      enemies: progress.map((p, id) => ({ id, kind, progress: p, health, slowed: false })) }
+    if (drumSupport) state.towers = [...state.towers, drum]
+    for (let ticks = 0; ticks < 30 / speed; ticks++) state = tickRound(state, speed)
+    return state
+  }
+  for (const speed of [1, 3]) {
+    const packed = [0.15, 0.25, 0.35]
+    const grouped = trialCombat(volley, packed, 'infantry', 1, speed)
+    const singleTarget = trialCombat(archerTrial, packed, 'infantry', 1, speed)
+    assert.equal(grouped.waveStats.stopped, 3)
+    assert(grouped.waveStats.stopped > singleTarget.waveStats.stopped)
+    const archerHit = trialCombat(archerTrial, [0.15], 'veteran', 6, speed).enemies[0].health
+    const volleyHit = trialCombat(volley, [0.15], 'veteran', 6, speed).enemies[0].health
+    assert(archerHit < volleyHit)
+    const fast = trialCombat(volleyRound, [0.15], 'cavalry', 4, speed)
+    const slowed = trialCombat(volleyRound, [0.15], 'cavalry', 4, speed, true)
+    assert(slowed.enemies[0].progress < fast.enemies[0].progress)
+  }
+  const inFlight = tickRound({
+    ...startRound(volley), spawnTimer: 99, spawned: 3,
+    enemies: [0.15, 0.25, 0.35].map((progress, id) => ({ id, kind: 'infantry', progress, health: 4, slowed: false })),
+  }, 1)
+  assert.equal(inFlight.shots.length, 3)
+  assert(saveGame(inFlight, 3) && saveCheckpoint(inFlight, 3))
+  assert.deepEqual(loadGame(), { round: inFlight, speed: 3 })
+  assert.deepEqual(loadCheckpoint(), loadGame())
+  const retried = retryRound(loadGame().round)
+  assert.equal(retried.supportTower, 'volley')
+  assert.deepEqual(retried.towers, volley.towers)
+  const next = prepareNextLevel({ ...volley, phase: 'won', towers: [...volley.towers, drum] }, nextMission(trial))
+  assert.deepEqual(next.towers, [drum])
+  assert.equal(next.silver, volley.silver + startingSilver + towerPrice)
+  assert.equal(next.supportTower, undefined)
+  local.delete('3guotd.saved-game.v1')
+  local.delete('3guotd.checkpoint.v1')
+  console.log('Passed: equal-silver Volley vs Archer scenarios at 1× and 3×, Drum slowing, saved three-shot flight, retry and trial-end refund.')
   for (const speed of [1, 3]) for (const routeIndex of [0, 1]) {
     const atGate = {
       ...startRound(docks), spawnTimer: 999,
