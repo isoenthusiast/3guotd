@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 
 export function checkTowerBalance(model, campaign, site) {
-  const { createRound, buildTower, upgradeTower, startRound, tickRound, towerPrice, towerDetails, enemyDetails } = model
+  const { createRound, buildTower, upgradeTower, startRound, tickRound, towerPrice, towerDetails, enemyDetails, enemyPosition } = model
   const findMission = id => campaign.find(mission => mission.id === id)
   const attacker = (id, kind, health, progress) => ({ id, kind, health, progress, slowed: false })
   const column = (kind, health, positions) => positions.map((progress, id) => attacker(id, kind, health, progress))
@@ -75,7 +75,12 @@ export function checkTowerBalance(model, campaign, site) {
   const volleySetup = buildTower(createRound(20, findMission('changban:3'), 'volley'), volleySite, 'volley')
   const oneDrum = buildTower(createRound(), site(1, 0), 'drum')
   const stronger = upgradeTower(buildTower(oneDrum, site(3, 0), 'drum'), site(3, 0), 'power')
-  const boundary = Math.sqrt(towerDetails.drum.range ** 2 - 1)
+  const boundaryRoute = [[0, 1], [0, 2], [0, 3], [0, 4]]
+  const boundaryMission = { ...findMission('changban:3'), routes: [boundaryRoute] }
+  const boundaryDrum = buildTower({ ...createRound(), mission: boundaryMission }, site(0, 0), 'drum')
+  const boundary = towerDetails.drum.range - 1
+  assert.equal(enemyPosition(boundary, boundaryRoute)[1], towerDetails.drum.range,
+    'Boundary sample must be exactly at range in floating-point arithmetic')
   for (const speed of [1, 3]) {
     const boltTies = tickRound(seed(crossbowSetup, column('veteran', 6, [1.4, 1.4])), speed)
     assert.deepEqual(boltTies.shots.map(shot => shot.targetId), [0], 'The earlier eligible enemy wins a Crossbow HP tie')
@@ -86,8 +91,8 @@ export function checkTowerBalance(model, campaign, site) {
     const delta = (setup, progress) => tickRound(seed(setup, column('infantry', 4, [progress])), speed).enemies[0].progress - progress
     const close = (actual, expected, label) => assert(Math.abs(actual - expected) < 1e-9, label)
     // An enemy starting exactly on the boundary is slowed during the first substep only.
-    close(delta(oneDrum, boundary), movement * (towerDetails.drum.speedFactor + speed - 1), 'Drum range includes the boundary')
-    close(delta(oneDrum, boundary + 0.0001), movement * speed, 'Drum has no effect just outside range')
+    close(delta(boundaryDrum, boundary), movement * (towerDetails.drum.speedFactor + speed - 1), 'Drum range includes the boundary')
+    close(delta(boundaryDrum, boundary + 0.0001), movement * speed, 'Drum has no effect just outside range')
     const strongestDelta = movement * speed * towerDetails.drum.strongerSpeedFactor
     close(delta(stronger, 0.15), strongestDelta, 'Overlapping Drums use the strongest effect without stacking')
     close(delta({ ...stronger, towers: [...stronger.towers].reverse() }, 0.15), strongestDelta, 'Drum overlap is order-independent')
