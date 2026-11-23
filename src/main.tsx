@@ -321,8 +321,13 @@ function App() {
     status = `${towerDetails[tower.kind].name} · ${installedUpgrades.reach} + ${installedUpgrades.power}`
   }
   const opening = round.opening
-  const rewind = opening && `Wave start: ${opening.towers.length} tower${opening.towers.length === 1 ? '' : 's'} (upgrades kept), ${opening.silver} silver, ${opening.lives} lives.`
-  if (round.phase === 'lost') status = `${round.waveStats.escaped} breached · ${round.waveStats.runnersEscaped} fast. ${round.waveStats.runnersEscaped ? 'Pair a Drum with an Archer.' : 'Cover more road with Archers.'}`
+  const openingSummary = opening && `${opening.towers.length} ${opening.towers.length === 1 ? 'tower' : 'towers'} · ${opening.silver} silver · ${opening.lives} ${opening.lives === 1 ? 'life' : 'lives'}`
+  const lost = round.phase === 'lost'
+  const lastBreach = !round.gateHit ? 'Breach details unavailable' : [
+    round.gateHit.routeIndex === undefined ? 'Entrance unknown' : `Entry ${round.gateHit.routeIndex + 1}`,
+    attackerName(round.gateHit.kind),
+  ].join(' · ')
+  const defeatAdvice = round.waveStats.runnersEscaped ? 'Pair a Drum with an Archer.' : 'Cover more road with Archers.'
   const breach = round.gateHit && !paused && `${attackerName(round.gateHit.kind)} reached the gate`
   const breachAnnouncement = breach && round.gateHit
     ? `${breach}. ${round.gateHit.routeIndex !== undefined ? `Entry ${round.gateHit.routeIndex + 1}. ` : ''}${round.lives} lives remaining.`
@@ -655,7 +660,7 @@ function App() {
           if (running || preparingLevel) setPaused(true)
           navigate('orders', 'report')
         }} aria-label="Report">Report{(running || preparingLevel) && !paused && ' · pauses play'}</button>}
-        {!setup && <div><button type="button" onClick={retryWave}>Retry wave</button> <small>{rewind}</small></div>}
+        {!setup && <div><button type="button" disabled={!opening} onClick={retryWave}>Retry wave</button> {openingSummary && <small>Wave start · {openingSummary} · upgrades kept</small>}</div>}
         {initialSetup && !round.continuedStory && round.towers.length > 0 && <button type="button"
           onClick={() => enterBattle(createRound(round.totalWaves, mission, round.supportTower))}>Clear towers</button>}
         {finished && <button type="button" onClick={() => enterBattle(createRound(round.totalWaves, mission, round.supportTower))}>
@@ -708,14 +713,17 @@ function App() {
               {counts.map(([kind, count]) => `${count} ${compactNames[kind]}`).join(' · ')}
               {firstEntrance}
             </div>}
-            {hudStatus && <span>{hudStatus}</span>}
+            {lost ? <div class="defeat-breach">
+              <strong>Last breach · {lastBreach}</strong>
+              <div>{defeatAdvice}</div>
+            </div> : hudStatus && <span>{hudStatus}</span>}
             {!finished && upcomingClosures && <span>{selectedClosing ? 'This tile' : '×'} closes next wave · refunded.</span>}
-            {slowed.length > 0 && <span class="drum-effect">Drum slowing {slowed.length} · {inArcherRange} in Archer range</span>}
+            {!lost && slowed.length > 0 && <span class="drum-effect">Drum slowing {slowed.length} · {inArcherRange} in Archer range</span>}
             {needsSilver && <span class="action-note">Need {shortfall} more silver.</span>}
             {upgradeable && !needsSilver && price > baseUpgradePrice && (!upgradeable.reach || !upgradeable.power) &&
               <span>Second upgrade · +{price - baseUpgradePrice} silver</span>}
           </div>
-          <span class="visually-hidden" role="status" aria-atomic="true">{round.phase === 'lost' ? `${breachAnnouncement} Gate fell. Retry wave available.`.trim()
+          <span class="visually-hidden" role="status" aria-atomic="true">{lost ? `Gate fell. Last breach. ${lastBreach}. ${defeatAdvice} Retry wave available.`
             : breachAnnouncement || (preparingLevel ? 'Build or upgrade before the next level starts.' : `Wave ${round.waveNumber}. ${paused ? 'Paused.' : ''}`)}</span>
           {setup && !preparingLevel && upgradeable && !upgradeable.reach && !upgradeable.power && !needsSilver &&
             <small>Next branch {baseUpgradePrice + secondUpgradeSurcharge}</small>}
@@ -753,7 +761,13 @@ function App() {
               ))}
             </section>
           ) : suggested !== null && activeSite === null ? <button type="button" class="choose-site"
-            onClick={() => selectTile(suggested)} aria-label="Select marked site">Select marked site<small>Archer · {towerDetails.archer.price} silver</small></button> : round.phase !== 'lost' && towerSummary ? towerSummary : <div class="command-location">{round.phase === 'lost' ? rewind : mission?.title ?? 'Shu frontier'}</div>}
+            onClick={() => selectTile(suggested)} aria-label="Select marked site">Select marked site<small>Archer · {towerDetails.archer.price} silver</small></button> : lost ? <div class="defeat-rewind" id="retry-restores">
+              {opening ? <>
+                <strong>Retry restores wave start</strong>
+                <small>{openingSummary}</small>
+                <small>Tower upgrades kept</small>
+              </> : <strong>Wave-start snapshot unavailable</strong>}
+            </div> : towerSummary ?? <div class="command-location">{mission?.title ?? 'Shu frontier'}</div>}
           {!finished && <button class="battle-speed" type="button" aria-label={`Play speed ${speed}×`}
             onClick={() => setSpeed(value => speedOptions[(speedOptions.indexOf(value) + 1) % speedOptions.length])}>
             {speed}×</button>}
@@ -761,7 +775,7 @@ function App() {
             {paused ? 'Resume' : 'Pause'}</button>
             : setup ? <button class="battle-primary" type="button" aria-label="Start wave" onClick={() => setRound(startRound)}>Start</button>
             : round.phase === 'won' && upcoming && upcoming.battleId !== mission?.battleId ? <button class="battle-primary" type="button" onClick={() => openMission(upcoming)}>Next battle</button>
-            : round.phase === 'lost' ? <button class="battle-primary" type="button" onClick={retryWave}>Retry wave</button>
+            : round.phase === 'lost' ? <button class="battle-primary" type="button" aria-describedby="retry-restores" disabled={!opening} onClick={retryWave}>Retry wave</button>
             : <button class="battle-primary" type="button" onClick={back}>Main menu</button>}
         </div>
       </footer>
