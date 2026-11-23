@@ -283,10 +283,10 @@ function App() {
   if (running && firstPlacement && !paused && !alertActive) status = openingHint
   if (preparingLevel) {
     const seconds = Math.ceil(round.levelPrepRemainingMs! / 1000)
-    status = `${paused ? 'Paused · ' : ''}Build or upgrade · Wave in ${seconds}s`
+    status = `${paused ? 'Paused · ' : ''}Wave in ${seconds}s`
     if (activeSite === null) {
       const carried = mission?.id === 'changban:4' || mission?.id === 'wuzhang:4' ? 'Standard towers kept' : 'Towers kept'
-      status += `. ${carried}; +${startingSilver} silver.`
+      status += ` · ${carried} · +${startingSilver} silver`
     }
   }
   if (!preparingLevel && !finished && coverage && !firstPlacement && !paused && !alertActive) {
@@ -684,7 +684,7 @@ function App() {
               {firstEntrance}
             </div>}
             {hudStatus && <span>{hudStatus}</span>}
-            {!finished && upcomingClosures && <span>× closes next wave · tower refunded.</span>}
+            {!finished && upcomingClosures && <span>× closes next wave · refunded.</span>}
             {slowed.length > 0 && <span class="drum-effect">Drum slowing {slowed.length} · {inArcherRange} in Archer range</span>}
             {needsSilver && <span class="action-note">Need {shortfall} more silver.</span>}
             {upgradeable && !needsSilver && price > baseUpgradePrice && (!upgradeable.reach || !upgradeable.power) &&
