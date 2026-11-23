@@ -49,6 +49,7 @@ try {
   await card('Volley').tap()
   assert.equal(await page.getByRole('button', { name: /^Volley Platform, row/ }).count(), 1)
   assert.equal(await page.locator('.purchase-card').count(), 0)
+  assert.doesNotMatch(await page.locator('.command-status').innerText(), /upgrade/i)
   await button('Remove & refund').tap()
   assert.match(await page.locator('.resources').innerText(), /90 silver/)
   await card('Volley').tap()

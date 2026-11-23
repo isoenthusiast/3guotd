@@ -649,7 +649,7 @@ function App() {
             {!finished && upcomingClosures && <span>× closes next wave · tower refunded.</span>}
             {slowed.length > 0 && <span class="drum-effect">Drum slowing {slowed.length} · {inArcherRange} in Archer range</span>}
             {needsSilver && <span class="action-note">Need {shortfall} more silver.</span>}
-            {tower && !needsSilver && price > baseUpgradePrice && (!tower.reach || !tower.power) &&
+            {upgradeable && !needsSilver && price > baseUpgradePrice && (!upgradeable.reach || !upgradeable.power) &&
               <span>Second upgrade · +{price - baseUpgradePrice} silver</span>}
           </div>
           <span class="visually-hidden" role="status" aria-atomic="true">{round.phase === 'lost' ? `${breachAnnouncement} Gate fell. Retry wave available.`.trim()
