@@ -181,6 +181,22 @@
         <dd>11–15, 20–21</dd>
       </dl>
     </article>
+    <article id="imp-09">
+      <div class="item-heading">
+        <h3><span class="id">IMP-09</span>Use tower definitions in the dock and guide</h3>
+        <span class="status">Accepted</span>
+      </div>
+      <dl>
+        <dt>Expected behavior</dt>
+        <dd>Start with price, targeting text, and the existing trial tower stats. Make the dock and Field Guide read them from the same definitions the simulation uses. Extract shared combat behavior when a concrete next tower needs it.</dd>
+        <dt>How to verify</dt>
+        <dd>Change a fixture tower’s price or effect in one definition and verify the dock, guide, and purchase or simulation agree. Retain the existing purchase, upgrade, refund, Retry, save and restore tests for all five towers.</dd>
+        <dt>Acceptance</dt>
+        <dd>SimaYi approved AUD-035 on <code>a36e161010be70ac30eff2196bb102feeac916ab</code>. The isolated 41-silver Crossbow price propagated through the dock, guide, purchase and refund. All live offline trial flows passed at the original prices.</dd>
+        <dt>Research ideas</dt>
+        <dd>7, 9–10, 17–19</dd>
+      </dl>
+    </article>
   </main>
 </body>
 </html>
