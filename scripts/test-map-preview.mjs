@@ -35,6 +35,12 @@ try {
     ['Entry', 'Supply gate'])
   const board = page.locator('.battlefield')
   const bounds = await board.boundingBox()
+  assert(await page.locator('.map-preview .hud').evaluate(hud => {
+    const header = hud.closest('.battle-header').getBoundingClientRect()
+    const range = new Range()
+    range.selectNodeContents(hud)
+    return [...range.getClientRects()].every(rect => !rect.width || rect.top >= header.top - 1 && rect.bottom <= header.bottom + 1)
+  }))
   assert(bounds.x >= 8 && bounds.y >= 16 && bounds.x + bounds.width <= 312 && bounds.height / bounds.width > 1.4)
   const first = button('Empty tile, row 3, column 4')
   const adjacent = button('Empty tile, row 3, column 5')
