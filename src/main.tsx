@@ -25,6 +25,10 @@ import './style.css'
 
 const siteCount = columns * rows
 const upgradeBranches = ['reach', 'power'] as const
+const towerRoles: Record<TowerKind, string> = {
+  archer: 'Road damage', drum: 'Slows enemies', volley: 'Hits up to 3',
+  crossbow: 'Targets highest HP', beacon: 'Speeds up Archer',
+}
 
 function siteName(site: number) {
   const [column, row] = sitePosition(site)
@@ -110,6 +114,7 @@ function Battlefield({ round, selected, suggested, onSelect }: {
     return () => cancelAnimationFrame(frame)
   }, [round, selected, artReady])
 
+  const closingSites = round.mission?.closedSites?.[round.waveNumber] ?? []
   const tabSite = selected ?? suggested ?? reachable.findIndex((_, site) => canBuildAt(round, site))
   return (
     <div class="battlefield">
@@ -126,7 +131,12 @@ function Battlefield({ round, selected, suggested, onSelect }: {
           return (
             <button key={site} ref={button => { cells.current[site] = button }}
               type="button" class={tower ? 'cell' : reachable[site] ? 'cell empty-cell useful-site' : 'cell empty-cell'} data-suggested={site === suggested && selected === null ? 'true' : undefined}
-              aria-description={site === suggested ? 'Suggested first tower site' : undefined}
+              aria-description={[
+                tower ? 'Occupied' : 'Available to build',
+                !tower && reachable[site] && 'Archer can reach the road',
+                closingSites.includes(site) && 'Closes next wave. Tower refunded in full.',
+                site === suggested && 'Suggested first tower site',
+              ].filter(Boolean).join('. ')}
               tabIndex={site === tabSite ? 0 : -1}
               aria-label={`${label}, row ${y + 1}, column ${x + 1}`}
               aria-pressed={selected === site} onClick={() => onSelect(site)}
@@ -202,6 +212,7 @@ function App() {
   const showChronicle = mission !== null && ((mission.level === 5 && round.phase === 'won') || clears.includes(`${mission.battleId}:5`)
     || (mission.battleId === 'changban' && clears.includes('changban')))
   const upcomingClosures = (mission?.closedSites?.[round.waveNumber]?.length ?? 0) > closedSites(round).length
+  const selectedClosing = selected !== null && mission?.closedSites?.[round.waveNumber]?.includes(selected)
   const setup = round.phase === 'setup'
   const [paused, setPaused] = useState(false)
   const preparingLevel = round.levelPrepRemainingMs !== undefined
@@ -212,6 +223,9 @@ function App() {
   const upgradeKind = isTrialTower(tower?.kind) ? undefined : tower?.kind
   const upgradeable = upgradeKind ? tower : undefined
   const installedUpgrades = upgradeKind ? towerDetails[upgradeKind] : null
+  const appliedUpgrades = installedUpgrades && upgradeable
+    ? upgradeBranches.filter(branch => upgradeable[branch]).map(branch => installedUpgrades[branch])
+    : []
   const price = upgradeable ? upgradePrice(upgradeable) : towerPrice
   const shortfall = Math.max(0, price - round.silver)
   const spendingOpen = canSpend(round)
@@ -243,6 +257,10 @@ function App() {
   const linkedArcher = activeSite !== null && (tower?.kind === 'beacon' || (!tower && round.supportTower === 'beacon'))
     ? beaconArcher(round.towers, activeSite) : undefined
   const linkLabel = linkedArcher === undefined ? 'No Archer in reach' : `Archer ${siteName(linkedArcher)}`
+  const towerSummary = tower && <div class="command-location tower-summary">
+    <strong>{towerDetails[tower.kind].name} · {towerRoles[tower.kind]}</strong>
+    <small>{tower.kind === 'beacon' ? linkLabel : appliedUpgrades.join(' + ') || 'No upgrades installed'}</small>
+  </div>
   const boosted = tower?.kind === 'archer' && round.towers.some(candidate =>
     candidate.kind === 'beacon' && beaconArcher(round.towers, candidate.site) === tower.site)
   function branchEffect(branch: Upgrade) {
@@ -290,7 +308,7 @@ function App() {
     }
   }
   if (!preparingLevel && !finished && coverage && !firstPlacement && !paused && !alertActive) {
-    status = `${selectedName} · Choose a tower${shortfall ? '' : ` · ${round.silver - towerPrice} silver left after buying`}`
+    status = `${selectedName} available · Choose a tower${shortfall ? '' : ` · ${round.silver - towerPrice} silver left`}`
   }
   if (!preparingLevel && !finished && tower && installedUpgrades && tower.reach && tower.power && !paused && !alertActive) {
     status = `${towerDetails[tower.kind].name} · ${installedUpgrades.reach} + ${installedUpgrades.power}`
@@ -684,7 +702,7 @@ function App() {
               {firstEntrance}
             </div>}
             {hudStatus && <span>{hudStatus}</span>}
-            {!finished && upcomingClosures && <span>× closes next wave · refunded.</span>}
+            {!finished && upcomingClosures && <span>{selectedClosing ? 'This tile' : '×'} closes next wave · refunded.</span>}
             {slowed.length > 0 && <span class="drum-effect">Drum slowing {slowed.length} · {inArcherRange} in Archer range</span>}
             {needsSilver && <span class="action-note">Need {shortfall} more silver.</span>}
             {upgradeable && !needsSilver && price > baseUpgradePrice && (!upgradeable.reach || !upgradeable.power) &&
@@ -700,14 +718,17 @@ function App() {
         <div class="command-row">
           {showActions && activeSite !== null ? (
             <section class="actions" aria-label="Tower actions">
-              {upgradeable && installedUpgrades && upgradeKind ? upgradeBranches.filter(option => !upgradeable[option]).map(option => (
-                <button key={option} type="button" class="purchase-card" disabled={shortfall > 0}
-                  title={branchEffect(option)} onClick={() => buy(current => upgradeTower(current, upgradeable.site, option))}>
-                  <strong>{installedUpgrades[option]}</strong>
-                  <span>{price} silver</span>
-                  <small>{branchEffect(option)}</small>
-                </button>
-              )) : buildChoices(round).map(kind => (
+              {upgradeable && installedUpgrades && upgradeKind ? <>
+                {appliedUpgrades.length === 1 && towerSummary}
+                {upgradeBranches.filter(option => !upgradeable[option]).map(option => (
+                  <button key={option} type="button" class="purchase-card" disabled={shortfall > 0}
+                    title={branchEffect(option)} onClick={() => buy(current => upgradeTower(current, upgradeable.site, option))}>
+                    <strong>{installedUpgrades[option]}</strong>
+                    <span>{price} silver</span>
+                    <small>{branchEffect(option)}</small>
+                    {appliedUpgrades.length === 0 && option === 'reach' && <small class="tower-role">{towerDetails[upgradeKind].name} · {towerRoles[upgradeKind]}</small>}
+                  </button>
+              ))}</> : buildChoices(round).map(kind => (
                 <button key={kind} type="button" class={`purchase-card build-card${firstBuy && kind === 'archer' ? ' first-buy' : ''}`} disabled={shortfall > 0}
                   onClick={() => buy(current => buildTower(current, activeSite, kind))}>
                   <TowerPortrait kind={kind} />
@@ -720,7 +741,7 @@ function App() {
               ))}
             </section>
           ) : suggested !== null && activeSite === null ? <button type="button" class="choose-site"
-            onClick={() => selectTile(suggested)} aria-label="Select marked site">Select marked site<small>Archer · {towerPrice} silver</small></button> : <div class="command-location">{round.phase === 'lost' ? rewind : tower?.kind === 'volley' ? 'Volley · Hits up to 3' : tower?.kind === 'crossbow' ? 'Crossbow · Highest HP' : tower?.kind === 'beacon' ? linkLabel : mission?.title ?? 'Shu frontier'}</div>}
+            onClick={() => selectTile(suggested)} aria-label="Select marked site">Select marked site<small>Archer · {towerPrice} silver</small></button> : round.phase !== 'lost' && towerSummary ? towerSummary : <div class="command-location">{round.phase === 'lost' ? rewind : mission?.title ?? 'Shu frontier'}</div>}
           {!finished && <button class="battle-speed" type="button" aria-label={`Play speed ${speed}×`}
             onClick={() => setSpeed(value => speedOptions[(speedOptions.indexOf(value) + 1) % speedOptions.length])}>
             {speed}×</button>}

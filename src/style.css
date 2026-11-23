@@ -237,11 +237,19 @@ button:focus-visible { outline: 2px solid #ffedaf; outline-offset: 2px; }
 .purchase-card strong { font-size: .84rem; }
 .purchase-card span { font-size: .76rem; }
 .purchase-card small { font-size: .64rem; line-height: 1; margin: 0; }
+.purchase-card .tower-role { color: #ffdc9a; }
 .purchase-card:disabled { opacity: .76; }
 .build-card { display: grid; grid-template-columns: auto auto; align-content: center; gap: 1px 4px; text-align: left; }
 .build-card small { grid-column: 1 / -1; text-align: center; }
 .tower-portrait { width: 30px; }
 .command-location { flex: 1; align-self: center; padding-inline: .45rem; font: 1.05rem Georgia, serif; color: #ebd8b3; }
+.tower-summary {
+  min-width: 0;
+  padding-inline: 4px;
+  font: .75rem/1.1 system-ui, sans-serif;
+}
+.tower-summary strong, .tower-summary small { display: block; }
+.tower-summary small { margin-top: 2px; font-size: .70rem; }
 .battle-primary {
   width: clamp(72px, 24%, 8rem);
   background: #873f30;

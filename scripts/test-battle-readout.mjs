@@ -8,7 +8,7 @@ const tower = (kind, site) => ({ kind, site, reach: false, power: false, cooldow
 async function load(page, missionId, phase, towers, enemies = [], gateHit = null) {
   const waveStats = { stopped: 0, escaped: 0, runnersEscaped: 0, earned: 0 }
   const round = {
-    rulesVersion: 2, phase, waveNumber: missionId ? 3 : 1, totalWaves: missionId ? 3 : 20,
+    rulesVersion: 2, phase, waveNumber: missionId && phase !== 'setup' ? 3 : 1, totalWaves: missionId ? 3 : 20,
     towers, silver: 0, lives: 3, spawned: enemies.length, spawnTimer: 10, enemies,
     opening: { towers, silver: 0, lives: 3 }, shots: [], impacts: [], waveAge: 3,
     rebuildTime: 0, waveStats, previousWave: null, gateHit,
@@ -39,6 +39,38 @@ try {
     const board = await p.locator('.battlefield').boundingBox()
     const actions = await p.locator('.command-row').boundingBox()
     assert(box.y >= board.y + board.height && box.y + box.height <= actions.y)
+    await p.close()
+  }
+  {
+    const p = await browser.newPage({ viewport: { width: 320, height: 480 }, hasTouch: true, isMobile: true })
+    const button = name => p.getByRole('button', { name, exact: true })
+    await load(p, 'yiling:1', 'setup', [{ ...tower('archer', 24), reach: true, power: true }])
+    const board = await p.locator('.battlefield').boundingBox()
+    const resources = p.locator('.resources')
+    const before = await resources.innerText()
+    const occupied = button('Archer, row 3, column 7')
+    const available = button('Empty tile, row 3, column 6')
+    await available.tap()
+    assert.match(await available.getAttribute('aria-description'), /Available to build.*reach the road/)
+    assert.equal(await p.locator('.build-card').count(), 2)
+    assert.match(await p.locator('.build-card').first().innerText(), /Hit/)
+    await occupied.tap()
+    assert.match(await occupied.getAttribute('aria-description'), /Occupied/)
+    assert.match(await p.locator('.tower-summary').innerText(), /Archer · Road damage\s+Longer range \+ Faster fire/)
+    const refund = button('Remove & refund')
+    assert.match(await refund.innerText(), /Refund 75/)
+    const closing = button('Empty tile, row 3, column 4')
+    await closing.tap()
+    assert.match(await closing.getAttribute('aria-description'), /Closes next wave.*refunded in full/)
+    assert.match(await p.locator('.battle-readout').innerText(), /This tile closes next wave/)
+    assert.equal(await resources.innerText(), before)
+    assert.deepEqual(await p.locator('.battlefield').boundingBox(), board)
+    assert.deepEqual(await p.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.scrollHeight]), [320, 480])
+    await occupied.tap()
+    await refund.tap()
+    assert.match(await resources.innerText(), /75 silver/)
+    assert.equal(await occupied.count(), 0)
+    assert.equal(await button('Empty tile, row 3, column 7').getAttribute('aria-pressed'), 'true')
     await p.close()
   }
   for (const expected of [0, 1, 2]) {

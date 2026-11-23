@@ -253,13 +253,18 @@ async function checkPreparation() {
         const rect = cell.getBoundingClientRect()
         const x = rect.x + rect.width / 2, y = rect.y + rect.height / 2
         if (Math.hypot(x - ring.x - ring.width / 2, y - ring.y - ring.height / 2) < ring.width / 2 &&
-            document.elementFromPoint(x, y) === cell) return { x, y }
+            document.elementFromPoint(x, y) === cell) return { x, y, label: cell.getAttribute('aria-label') }
       }
       return null
     })
     assert(target, 'Centered timer leaves covered build sites tappable')
+    const beforeSelection = await page.locator('.resources').innerText()
     await page.touchscreen.tap(target.x, target.y)
+    assert.equal(await button(target.label).getAttribute('aria-pressed'), 'true')
+    assert.equal(await page.locator('.resources').innerText(), beforeSelection)
     await page.getByRole('button', { name: /Build Archer/ }).tap()
+    assert.equal(await page.locator('.cells [aria-pressed="true"]').getAttribute('aria-label'),
+      target.label.replace('Empty tile', 'Archer'))
     await button('Pause').tap()
     const held = await clock.innerText()
     await page.clock.runFor(12000)
