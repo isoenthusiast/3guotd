@@ -522,7 +522,6 @@ try {
     const grouped = trialCombat(volley, packed, 'infantry', 1, speed)
     const singleTarget = trialCombat(archerTrial, packed, 'infantry', 1, speed)
     assert.equal(grouped.waveStats.stopped, 3)
-    assert.deepEqual(grouped.impacts.map(hit => [hit.cue, hit.targetId]), [['volley', 0], ['volley', 1], ['volley', 2]])
     assert(grouped.waveStats.stopped > singleTarget.waveStats.stopped)
     const archerHit = trialCombat(archerTrial, [0.15], 'veteran', 6, speed).enemies[0].health
     const volleyHit = trialCombat(volley, [0.15], 'veteran', 6, speed).enemies[0].health
@@ -541,6 +540,12 @@ try {
   assert.deepEqual(loadGame(), { round: inFlight, speed: 3 })
   assert.deepEqual(loadCheckpoint(), loadGame())
   const retried = retryRound(loadGame().round)
+  let onImpact = inFlight
+  for (let frame = 0; frame < 6; frame++) onImpact = tickRound(onImpact, 1)
+  assert.deepEqual(onImpact.impacts.map(hit => [hit.cue, hit.targetId]), [['volley', 0], ['volley', 1], ['volley', 2]])
+  assert.deepEqual(onImpact.enemies.map(enemy => enemy.health), [3, 3, 3])
+  assert(saveGame(onImpact, 1))
+  assert.deepEqual(loadGame(), { round: onImpact, speed: 1 })
   assert.equal(retried.supportTower, 'volley')
   assert.deepEqual(retried.towers, volley.towers)
   const next = prepareNextLevel({ ...volley, phase: 'won', towers: [...volley.towers, drum] }, nextMission(trial))

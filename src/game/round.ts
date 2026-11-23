@@ -373,10 +373,8 @@ export function advanceRound(round: Round, seconds: number, visualSeconds = seco
         waveStats.stopped++
       }
       const cue = shot.heavy ? 'crossbow' : shot.volley ? 'volley' : undefined
-      impacts.push({
-        at: enemyPosition(target.progress, routeForEnemy(round, target)), elapsed: 0, silver: reward,
-        ...(cue && { cue, targetId: target.id }),
-      })
+      const impact = { at: enemyPosition(target.progress, routeForEnemy(round, target)), elapsed: 0, silver: reward }
+      impacts.push(cue ? { ...impact, cue, targetId: target.id } : impact)
     } else {
       shots.push({ ...shot, elapsed })
       incoming.set(target.id, (incoming.get(target.id) ?? 0) + damage)
