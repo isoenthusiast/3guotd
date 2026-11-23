@@ -32,6 +32,17 @@ try {
   await button('Campaign').tap()
   assert.equal(await selectTrial.inputValue(), 'drum')
   await selectTrial.selectOption(trial.kind)
+  if (trial.kind === 'crossbow') {
+    await page.getByText('Choose level', { exact: true }).tap()
+    await page.locator('#battle').selectOption('changban')
+    await page.locator('#level').selectOption('changban:3')
+    assert.equal(await selectTrial.inputValue(), 'drum')
+    await selectTrial.selectOption('volley')
+    await page.locator('#battle').selectOption('jing')
+    await page.locator('#level').selectOption('jing:5')
+    assert.equal(await selectTrial.inputValue(), 'drum')
+    await selectTrial.selectOption('crossbow')
+  }
   await button('Enter battle').tap()
   const bounds = await board.boundingBox()
   await button('Select marked site').tap()
