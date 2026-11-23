@@ -1,5 +1,5 @@
 import { columns, rows, sitePosition } from './game/board'
-import { attackerName, buildChoices, canBuildAt, closedSites, enemyPosition, impactTime, enemyMaxHealth, objectiveProgress, roundRoutes, routeForEnemy, shotFlightTime, towerRange } from './game/round'
+import { attackerName, buildChoices, isTrialTower, canBuildAt, closedSites, enemyPosition, impactTime, enemyMaxHealth, objectiveProgress, roundRoutes, routeForEnemy, shotFlightTime, towerRange } from './game/round'
 import type { Round, TowerKind } from './game/round'
 
 import { drawAttacker } from './attacker-art'
@@ -39,6 +39,27 @@ function roof(ctx: CanvasRenderingContext2D, x: number, y: number, width: number
 }
 
 export function drawTower(ctx: CanvasRenderingContext2D, x: number, y: number, kind: TowerKind) {
+  if (kind === 'crossbow') {
+    ctx.save()
+    ctx.translate(x, y)
+    ctx.fillStyle = '#482e24'
+    ctx.fillRect(-19, -12, 38, 36)
+    ctx.fillStyle = '#997052'
+    ctx.fillRect(-15, -9, 30, 27)
+    ctx.strokeStyle = '#ffcf99'
+    ctx.lineJoin = 'round'
+    ctx.lineWidth = 4
+    ctx.beginPath()
+    ctx.moveTo(-24, -14)
+    ctx.quadraticCurveTo(0, -32, 24, -14)
+    ctx.lineTo(0, 0)
+    ctx.closePath()
+    ctx.moveTo(0, 14)
+    ctx.lineTo(0, -24)
+    ctx.stroke()
+    ctx.restore()
+    return
+  }
   if (kind === 'volley') {
     ctx.save()
     ctx.translate(x, y)
@@ -224,8 +245,8 @@ export function drawBattlefield(
     ctx.arc(x, y, towerRange('archer', false) * tile, 0, 2 * Math.PI)
     ctx.stroke()
     const support = buildChoices(round)[1]
-    ctx.strokeStyle = support === 'volley' ? '#f2ac91' : '#b7f1e9'
-    ctx.setLineDash(support === 'volley' ? [3, 5] : [9, 5])
+    ctx.strokeStyle = support === 'drum' ? '#b7f1e9' : '#f2ac91'
+    ctx.setLineDash(support === 'drum' ? [9, 5] : [3, 5])
     ctx.beginPath()
     ctx.arc(x, y, towerRange(support, false) * tile, 0, 2 * Math.PI)
     ctx.stroke()
@@ -245,7 +266,7 @@ export function drawBattlefield(
     ctx.fill()
     ctx.stroke()
     ctx.restore()
-    if (!active.reach && active.kind !== 'volley') {
+    if (!active.reach && !isTrialTower(active.kind)) {
       ctx.save()
       ctx.setLineDash([9, 5])
       ctx.strokeStyle = '#fff5c4'
@@ -327,8 +348,8 @@ export function drawBattlefield(
     const dx = target[0] - x
     const dy = target[1] - y
     const tail = Math.max(0, progress - 0.24)
-    ctx.strokeStyle = '#ffe5a3'
-    ctx.lineWidth = reducedEffects ? 2 : 7
+    ctx.strokeStyle = shot.heavy ? '#f2ac91' : '#ffe5a3'
+    ctx.lineWidth = reducedEffects ? 2 : shot.heavy ? 10 : 7
     if (!reducedEffects && !reducedMotion) {
       ctx.beginPath()
       ctx.moveTo(x + dx * tail, y + dy * tail)

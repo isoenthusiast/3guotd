@@ -2,6 +2,9 @@ import assert from 'node:assert/strict'
 import { chromium } from 'playwright'
 
 const url = process.argv[2] ?? 'http://localhost:4173/'
+const trial = process.argv.includes('--crossbow')
+  ? { kind: 'crossbow', card: 'Crossbow', name: 'Heavy Crossbow', chapter: 'jing', level: 5, previousWaves: 6 }
+  : { kind: 'volley', card: 'Volley', name: 'Volley Platform', chapter: 'changban', level: 3, previousWaves: 4 }
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH })
 try {
   const context = await browser.newContext({ viewport: { width: 320, height: 480 }, hasTouch: true, isMobile: true })
@@ -21,13 +24,14 @@ try {
   await page.getByText('Ready offline', { exact: true }).waitFor()
   await context.setOffline(true)
   await page.reload()
-  await page.evaluate(() => localStorage.setItem('3guotd.cleared-missions.v1', JSON.stringify([
-    ...Array.from({ length: 5 }, (_, i) => `village-watch:${i + 1}`), 'changban:1', 'changban:2',
-  ])))
+  const completedChapters = ['village-watch', 'changban', 'red-cliffs', 'jing'].slice(0, trial.chapter === 'jing' ? 3 : 1)
+  const clears = [...completedChapters.flatMap(chapter => Array.from({ length: 5 }, (_, i) => `${chapter}:${i + 1}`)),
+    ...Array.from({ length: trial.level - 1 }, (_, i) => `${trial.chapter}:${i + 1}`)]
+  await page.evaluate(clears => localStorage.setItem('3guotd.cleared-missions.v1', JSON.stringify(clears)), clears)
   await page.reload()
   await button('Campaign').tap()
   assert.equal(await selectTrial.inputValue(), 'drum')
-  await selectTrial.selectOption('volley')
+  await selectTrial.selectOption(trial.kind)
   await button('Enter battle').tap()
   const bounds = await board.boundingBox()
   await button('Select marked site').tap()
@@ -46,17 +50,17 @@ try {
     }), `Label fits for ${await control.innerText()}`)
   }
   assert.deepEqual(await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.scrollHeight]), [320, 480])
-  await card('Volley').tap()
-  assert.equal(await page.getByRole('button', { name: /^Volley Platform, row/ }).count(), 1)
+  await card(trial.card).tap()
+  assert.equal(await page.getByRole('button', { name: new RegExp(`^${trial.name}, row`) }).count(), 1)
   assert.equal(await page.locator('.purchase-card').count(), 0)
   assert.doesNotMatch(await page.locator('.command-status').innerText(), /upgrade/i)
   await button('Remove & refund').tap()
   assert.match(await page.locator('.resources').innerText(), /90 silver/)
-  await card('Volley').tap()
+  await card(trial.card).tap()
   await button('Start wave').tap()
   await button('Pause').tap()
   const saved = await save()
-  assert.equal(saved.round.supportTower, 'volley')
+  assert.equal(saved.round.supportTower, trial.kind)
   assert.equal(saved.round.silver, 60)
   await page.reload()
   await button('Restore saved game').tap()
@@ -65,33 +69,33 @@ try {
   await button('Retry wave').tap()
   await button('Start wave').waitFor()
   assert.match(await page.locator('.resources').innerText(), /60 silver/)
-  assert.equal(await page.getByRole('button', { name: /^Volley Platform, row/ }).count(), 1)
+  assert.equal(await page.getByRole('button', { name: new RegExp(`^${trial.name}, row`) }).count(), 1)
   assert.deepEqual(await board.boundingBox(), bounds)
 
   // Reach the same briefing through the natural story-completion entry point.
   await button('Main menu').tap()
-  await page.evaluate(record => {
+  await page.evaluate(({ record, trial }) => {
     const drum = { kind: 'drum', site: 16, power: false, reach: true, cooldown: 1 }
-    record.missionId = 'changban:2'
+    record.missionId = `${trial.chapter}:${trial.level - 1}`
     delete record.round.supportTower
     Object.assign(record.round, {
-      phase: 'won', totalWaves: 4, waveNumber: 4, towers: [drum], opening: null,
+      phase: 'won', totalWaves: trial.previousWaves, waveNumber: trial.previousWaves, towers: [drum], opening: null,
       enemies: [], shots: [], impacts: [], spawned: 0,
     })
     localStorage.setItem('3guotd.saved-game.v1', JSON.stringify(record))
-  }, saved)
+  }, { record: saved, trial })
   await page.reload()
   await button('Restore saved game').tap()
-  await selectTrial.selectOption('volley')
+  await selectTrial.selectOption(trial.kind)
   await button('Enter battle').tap()
   await page.locator('.prep-clock').waitFor()
   await page.getByRole('button', { name: /^Drum, row/ }).tap()
   await page.getByRole('button', { name: /^Stronger slow 27 silver/ }).tap()
   assert.equal(await page.getByRole('button', { name: /^Drum, row/ }).count(), 1)
   const carried = await save()
-  assert.equal(carried.round.supportTower, 'volley')
+  assert.equal(carried.round.supportTower, trial.kind)
   assert.equal(carried.round.towers[0].power, true)
-  console.log('Offline 320 × 480: two-card briefing loadout, stable dock, purchase/refund, saved Volley, Retry, and retained Drum upgrade passed.')
+  console.log(`Offline 320 × 480: two-card briefing loadout, stable dock, purchase/refund, saved ${trial.name}, Retry, and retained Drum upgrade passed.`)
 } finally {
   await browser.close()
 }

@@ -426,4 +426,4 @@ button:focus-visible { outline: 2px solid #ffedaf; outline-offset: 2px; }
 
 .trial-loadout { display: flex; flex-wrap: wrap; margin-block: .4rem; }
 .trial-loadout p { flex-basis: 100%; }
-.range-key.volley { border-top: 2px dotted #f2ac91; }
+.range-key.volley, .range-key.crossbow { border-top: 2px dotted #f2ac91; }

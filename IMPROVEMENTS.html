@@ -50,8 +50,9 @@
       <summary>How to use it</summary>
       <ol>
         <li><strong>Proposed.</strong> Add one entry per improvement with a stable ID and a short title. Describe what the player should see or be able to do under <strong>Expected behavior</strong>. Under <strong>How to verify</strong>, state what to test and the result to look for.</li>
-        <li><strong>Agreed.</strong> After Edward approves the expected behavior, update the entry and mark it Agreed. KongMing picks it up at this point. Bring material changes back for agreement.</li>
-        <li><strong>Building.</strong> KongMing marks the entry when work starts and uses its verification check during the web playtest.</li>
+        <li><strong>Agreed.</strong> After Edward approves the expected behavior, update the entry and mark it Agreed. The queue hands it to KongMing when he is free and its prerequisites are Accepted. Bring material changes back for agreement.</li>
+        <li><strong>Building.</strong> KongMing marks the entry when work starts. Before pausing, add a Next action using a span with class “checkpoint” so the queue can resume from it.</li>
+        <li><strong>Blocked.</strong> Record the specific decision or dependency. Independent agreed work can continue. Return the item to Agreed once resolved and record the next action.</li>
         <li><strong>Accepted.</strong> Mark the entry Accepted after SimaYi accepts the web change. Record the review ID or accepted commit when available.</li>
       </ol>
       <p>For an existing finding, include its GF ID and keep the evidence in the project’s audit ledger.</p>
@@ -86,19 +87,21 @@
         <dd>SimaYi approved AUD-027 on <code>54a6bb7</code> for private web playtest. Offline touch, equal-silver scenarios, save, Retry and Level 4 refund checks passed.</dd>
       </dl>
     </article>
-    <article id="imp-03">
+    <article id="imp-03" data-after="imp-02">
       <div class="item-heading">
         <h3><span class="id">IMP-03</span>Heavy Crossbow</h3>
-        <span class="status">Agreed</span>
+        <span class="status">Building</span>
       </div>
       <dl>
         <dt>Expected behavior</dt>
         <dd>Trial after Volley in Jing Level 5. A heavy bolt targets the enemy with the most remaining HP in range. The slow reload rewards placement along a long stretch of road.</dd>
         <dt>How to verify</dt>
         <dd>In a mixed wave, verify the Crossbow prioritizes high-HP enemies, a long stretch allows a second shot, and the Archer remains useful against lighter troops. Reuse the purchase and save systems from the first trial.</dd>
+        <dt>Next action</dt>
+        <dd><span class="checkpoint">Await SimaYi’s exact-commit review of the Jing Level 5 trial. Resolve findings, then publish the accepted web build and verify the private link.</span></dd>
       </dl>
     </article>
-    <article id="imp-04">
+    <article id="imp-04" data-after="imp-03">
       <div class="item-heading">
         <h3><span class="id">IMP-04</span>Watch Beacon</h3>
         <span class="status">Agreed</span>

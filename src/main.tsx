@@ -2,7 +2,7 @@ import { render } from 'preact'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { columns, rows, sitePosition } from './game/board'
 import {
-  buildChoices, offersVolley, levelPrepMs, attackerName, enemyMaxHealth, baseUpgradePrice, buildTower, canBuildAt, canSpend, closedSites, createRound, enemiesRemaining, objectiveProgress, removeTower,
+  buildChoices, isTrialTower, trialTowerFor, levelPrepMs, attackerName, enemyMaxHealth, baseUpgradePrice, buildTower, canBuildAt, canSpend, closedSites, createRound, enemiesRemaining, objectiveProgress, removeTower,
   roundRoutes, prepareNextLevel, nextEntry, towerRefund, inRange, routeForEnemy, enemyPosition, startingSilver, secondUpgradeSurcharge,
   retryRound, speedOptions, startRound, tickRound, towerDetails, towerPrice, upgradePrice,
   upgradeTower, waveCueTime, roundFormation, waveOptions,
@@ -26,7 +26,7 @@ import './style.css'
 const siteCount = columns * rows
 const upgradeBranches = ['reach', 'power'] as const
 
-function upgradeEffect(kind: Exclude<TowerKind, 'volley'>, branch: Upgrade): string {
+function upgradeEffect(kind: Exclude<TowerKind, Round['supportTower']>, branch: Upgrade): string {
   if (branch === 'reach') {
     const { range, extendedRange } = towerDetails[kind]
     return `${range} → ${extendedRange} tiles`
@@ -197,7 +197,7 @@ function App() {
   const finished = round.phase === 'won' || round.phase === 'lost'
   const activeSite = selected !== null && (canBuildAt(round, selected) || round.towers.some(tower => tower.site === selected)) ? selected : null
   const tower = round.towers.find(candidate => candidate.site === activeSite)
-  const upgradeKind = tower?.kind === 'volley' ? undefined : tower?.kind
+  const upgradeKind = isTrialTower(tower?.kind) ? undefined : tower?.kind
   const upgradeable = upgradeKind ? tower : undefined
   const installedUpgrades = upgradeKind ? towerDetails[upgradeKind] : null
   const price = upgradeable ? upgradePrice(upgradeable) : towerPrice
@@ -224,6 +224,7 @@ function App() {
     archer: roadCoverage(roundRoutes(round), activeSite, 'archer'),
     drum: roadCoverage(roundRoutes(round), activeSite, 'drum'),
     volley: roadCoverage(roundRoutes(round), activeSite, 'volley'),
+    crossbow: roadCoverage(roundRoutes(round), activeSite, 'crossbow'),
   }, [activeSite, tower, mission, round.rulesVersion])
   const firstBuy = firstPlacement && coverage?.archer.reachesRoad
   const selectedName = activeSite === null ? '' : String.fromCharCode(65 + activeSite % columns) + (1 + Math.floor(activeSite / columns))
@@ -232,7 +233,7 @@ function App() {
   const firstThreat = attackerName(formation.sequence[0])
   const lanes = roundRoutes(round).length
   const report = finished ? { ...round.waveStats, waveNumber: round.waveNumber } : round.previousWave
-  let status = setup ? (firstPlacement ? openingHint : tower ? `${towerDetails[tower.kind].name}${!upgradeable ? ' · Hits up to 3' : tower.reach && tower.power ? ' · Fully upgraded' : ' · Choose an upgrade'}`
+  let status = setup ? (firstPlacement ? openingHint : tower ? `${towerDetails[tower.kind].name}${!upgradeable ? '' : tower.reach && tower.power ? ' · Fully upgraded' : ' · Choose an upgrade'}`
     : activeSite !== null ? 'Choose a tower' : 'Select a tower to upgrade or a stake to build')
     : round.phase === 'won' ? (mission ? 'Level cleared!' : 'Gate defended!') : 'The gate fell.'
   // waveAge measures viewing time even at 3×. Give fast play two seconds to read
@@ -308,7 +309,7 @@ function App() {
 
   useEffect(() => {
     if (screen !== 'battle' || round.phase !== 'won' || !upcoming || upcoming.battleId !== mission?.battleId) return
-    if (offersVolley(upcoming)) {
+    if (trialTowerFor(upcoming)) {
       setDraftMission(upcoming)
       setDraftSupport(undefined)
       navigate('campaign')
@@ -463,8 +464,9 @@ function App() {
 
   if (screen === 'campaign' || screen === 'long') {
     const selectedMission = screen === 'campaign' ? draftMission : null
+    const trial = trialTowerFor(selectedMission)
     function startBattle() {
-      if (selectedMission && offersVolley(selectedMission) && round.phase === 'won' && upcoming?.id === selectedMission.id) {
+      if (selectedMission && trial && round.phase === 'won' && upcoming?.id === selectedMission.id) {
         enterBattle(prepareNextLevel(round, selectedMission, draftSupport))
       } else enterBattle(createRound(draftWaves, selectedMission, draftSupport))
     }
@@ -475,14 +477,16 @@ function App() {
         <h2 class="visually-hidden">Campaign</h2>
         <h3>{selectedMission.title} · Level {selectedMission.level}</h3>
         <p class="mission-order">{selectedMission.objective} · Hold for {selectedMission.waves.length} waves</p>
-        {offersVolley(selectedMission) && <div class="map-setting trial-loadout">
+        {trial && <div class="map-setting trial-loadout">
           <label for="support-tower">Tower loadout</label>
           <select id="support-tower" value={draftSupport ?? 'drum'}
-            onChange={event => setDraftSupport(event.currentTarget.value === 'volley' ? 'volley' : undefined)}>
+            onChange={event => setDraftSupport(event.currentTarget.value === trial ? trial : undefined)}>
             <option value="drum">Archer + Drum</option>
-            <option value="volley">Archer + Volley</option>
+            <option value={trial}>Archer + {trial === 'volley' ? 'Volley' : 'Crossbow'}</option>
           </select>
-          <p>Volley hits up to three nearby enemies. Try a bend where the column bunches. Volley is recalled for full silver after this level.</p>
+          <p>{trial === 'volley'
+            ? 'Volley hits up to three nearby enemies. Try a bend where the column bunches. Volley is recalled for full silver after this level.'
+            : 'Heavy Crossbow targets the enemy with the most HP in range. Place it by a long stretch so it can reload before that enemy leaves.'}</p>
         </div>}
         <img class="briefing-art" src={selectedMission.battleId === 'village-watch'
           ? villageWatch : terrainArt[selectedMission.terrain]} alt="" />
@@ -570,7 +574,8 @@ function App() {
         <p>Slows enemies inside its ring. Pair it with an Archer for extra shots. Blue lines mark slowed enemies. The Drum deals no damage.</p>
         <p>Wider reach extends the ring. Stronger slow raises the speed reduction from {Math.round(100 * (1 - towerDetails.drum.speedFactor))}% to {Math.round(100 * (1 - towerDetails.drum.strongerSpeedFactor))}%. Where Drums overlap, the strongest slow applies.</p>
         <PairingGuide />
-        {offersVolley(mission) && <p>Volley Platform · 30 silver. Hits up to three tightly grouped enemies and reloads slowly. It has no upgrades in this trial.</p>}
+        {trialTowerFor(mission) === 'crossbow' && <p>Heavy Crossbow · {towerPrice} silver. A bolt deals {towerDetails.crossbow.damage} damage to the highest-HP enemy in range. It has a slow reload and no upgrades in this trial.</p>}
+        {trialTowerFor(mission) === 'volley' && <p>Volley Platform · 30 silver. Hits up to three tightly grouped enemies and reloads slowly. It has no upgrades in this trial.</p>}
       </>}
       <VisualComfortControls />
       </section>
@@ -673,7 +678,7 @@ function App() {
                 <button key={kind} type="button" class={`purchase-card build-card${firstBuy && kind === 'archer' ? ' first-buy' : ''}`} disabled={shortfall > 0}
                   onClick={() => buy(current => buildTower(current, activeSite, kind))}>
                   <TowerPortrait kind={kind} />
-                  <span><strong>Build {kind === 'volley' ? 'Volley' : towerDetails[kind].name}</strong>
+                  <span><strong>Build {kind === 'volley' ? 'Volley' : kind === 'crossbow' ? 'Crossbow' : towerDetails[kind].name}</strong>
                     <span>{towerPrice} silver</span></span>
                   <small>{coverage?.[kind].reachesRoad
                     ? <><i class={`range-key ${kind}`} aria-hidden="true" />{kind === 'drum' ? 'Slow' : kind === 'volley' ? 'Volley' : 'Hit'} · {coverage[kind].zones[0]}</>
@@ -682,7 +687,7 @@ function App() {
               ))}
             </section>
           ) : suggested !== null && activeSite === null ? <button type="button" class="choose-site"
-            onClick={() => selectTile(suggested)} aria-label="Select marked site">Select marked site<small>Archer · {towerPrice} silver</small></button> : <div class="command-location">{round.phase === 'lost' ? rewind : tower?.kind === 'volley' ? 'Volley · Hits up to 3' : mission?.title ?? 'Shu frontier'}</div>}
+            onClick={() => selectTile(suggested)} aria-label="Select marked site">Select marked site<small>Archer · {towerPrice} silver</small></button> : <div class="command-location">{round.phase === 'lost' ? rewind : tower?.kind === 'volley' ? 'Volley · Hits up to 3' : tower?.kind === 'crossbow' ? 'Crossbow · Highest HP' : mission?.title ?? 'Shu frontier'}</div>}
           {!finished && <button class="battle-speed" type="button" aria-label={`Play speed ${speed}×`}
             onClick={() => setSpeed(value => speedOptions[(speedOptions.indexOf(value) + 1) % speedOptions.length])}>
             {speed}×</button>}

@@ -1,7 +1,7 @@
 import { campaign } from './campaign'
 import { campaign as legacyCampaign } from './legacy-campaign'
 import { columns, rows } from './board'
-import { attackerName, offersVolley, levelPrepMs, roundFormation, speedOptions, waveOptions } from './round'
+import { attackerName, isTrialTower, trialTowerFor, levelPrepMs, roundFormation, speedOptions, waveOptions } from './round'
 import type { PlaySpeed, Round } from './round'
 
 const saveKey = '3guotd.saved-game.v1'
@@ -16,7 +16,7 @@ const point = (value: unknown): boolean => Array.isArray(value) && value.length 
 const attacker = (value: unknown): boolean => typeof value === 'string' && typeof attackerName(value as Parameters<typeof attackerName>[0]) === 'string'
 const tower = (value: unknown): boolean => record(value)
   && integer(value.site) && value.site < columns * rows
-  && (value.kind === 'archer' || value.kind === 'drum' || (value.kind === 'volley' && value.reach === false && value.power === false))
+  && (value.kind === 'archer' || value.kind === 'drum' || (isTrialTower(value.kind) && value.reach === false && value.power === false))
   && typeof value.reach === 'boolean' && typeof value.power === 'boolean' && amount(value.cooldown)
 const towers = (value: unknown): boolean => Array.isArray(value) && value.every(tower)
 const stats = (value: unknown): boolean => record(value)
@@ -29,7 +29,7 @@ function decodeRound(value: unknown, mission: Round['mission']): Round | null {
     || (value.levelPrepRemainingMs !== undefined && (!value.continuedStory || !mission || value.phase !== 'setup'
       || value.waveNumber !== 1 || !integer(value.levelPrepRemainingMs) || value.levelPrepRemainingMs < 1
       || value.levelPrepRemainingMs > levelPrepMs))
-    || (value.supportTower !== undefined && (value.supportTower !== 'volley' || value.rulesVersion !== 2 || !offersVolley(mission)))
+    || (value.supportTower !== undefined && (!isTrialTower(value.supportTower) || value.rulesVersion !== 2 || value.supportTower !== trialTowerFor(mission)))
     || (value.rulesVersion !== undefined && value.rulesVersion !== 2)
     || !integer(value.waveNumber) || value.waveNumber < 1
     || !integer(value.totalWaves) || value.waveNumber > value.totalWaves
@@ -45,7 +45,8 @@ function decodeRound(value: unknown, mission: Round['mission']): Round | null {
     && attacker(enemy.kind) && amount(enemy.progress) && integer(enemy.health) && typeof enemy.slowed === 'boolean'
     && (enemy.routeIndex === undefined || (integer(enemy.routeIndex) && enemy.routeIndex < routeCount)))
     || !Array.isArray(shots) || !shots.every(shot => record(shot) && point(shot.from)
-      && integer(shot.targetId) && amount(shot.elapsed))
+      && integer(shot.targetId) && amount(shot.elapsed)
+      && (shot.heavy === undefined || (shot.heavy === true && value.supportTower === 'crossbow')))
     || !Array.isArray(impacts) || !impacts.every(impact => record(impact) && point(impact.at)
       && amount(impact.elapsed) && integer(impact.silver))) return null
 
@@ -56,8 +57,8 @@ function decodeRound(value: unknown, mission: Round['mission']): Round | null {
   if (previousWave !== null && !(record(previousWave) && stats(previousWave) && integer(previousWave.waveNumber))) return null
 
   const round = { ...value, mission } as Round
-  if (round.supportTower !== 'volley' &&
-      [...round.towers, ...(round.opening?.towers ?? [])].some(tower => tower.kind === 'volley')) return null
+  if ([...round.towers, ...(round.opening?.towers ?? [])].some(tower =>
+    isTrialTower(tower.kind) && tower.kind !== round.supportTower)) return null
   return round.spawned <= roundFormation(round).sequence.length ? round : null
 }
 

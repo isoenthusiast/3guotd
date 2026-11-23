@@ -40,7 +40,7 @@ export function roadCoverage(routes: readonly Route[], site: number, kind: Tower
 export function placementCoverage(round: Round, site: number) {
   if (!canBuildAt(round, site) || round.towers.some(tower => tower.site === site)) return null
   const routes = roundRoutes(round)
-  return { archer: roadCoverage(routes, site, 'archer'), drum: roadCoverage(routes, site, 'drum'), volley: roadCoverage(routes, site, 'volley') }
+  return { archer: roadCoverage(routes, site, 'archer'), drum: roadCoverage(routes, site, 'drum'), volley: roadCoverage(routes, site, 'volley'), crossbow: roadCoverage(routes, site, 'crossbow') }
 }
 
 export function drawRoadCoverage(ctx: CanvasRenderingContext2D, round: Round, site: number,
@@ -52,9 +52,9 @@ export function drawRoadCoverage(ctx: CanvasRenderingContext2D, round: Round, si
   const choices = buildChoices(round)
   for (const tower of [...choices].reverse()) {
     if (kind && tower !== kind) continue
-    ctx.strokeStyle = tower === 'archer' ? '#ffdc87' : tower === 'volley' ? '#f2ac91' : '#7bd9dc'
+    ctx.strokeStyle = tower === 'archer' ? '#ffdc87' : tower === 'drum' ? '#7bd9dc' : '#f2ac91'
     ctx.lineWidth = tower === 'archer' ? 13 : 25
-    ctx.setLineDash(tower === 'drum' ? [8, 6] : tower === 'volley' ? [3, 5] : [])
+    ctx.setLineDash(tower === 'drum' ? [8, 6] : tower === 'archer' ? [] : [3, 5])
     ctx.beginPath()
     for (const [a, b] of coverage[tower].segments) {
       ctx.moveTo((a[0] + .5) * tile, (a[1] + .5) * tile)

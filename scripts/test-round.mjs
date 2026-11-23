@@ -386,6 +386,65 @@ try {
     setItem: (key, value) => local.set(key, value),
   } })
   const { loadGame, saveGame, loadCheckpoint, saveCheckpoint, loadSound, saveSound } = require(join(output, 'save-game.js'))
+  {
+    const jingTrial = campaign.find(mission => mission.id === 'jing:5')
+    const crossbowTrial = createRound(20, jingTrial, 'crossbow')
+    const clear = playMission(jingTrial, { upgrade: true }, crossbowTrial)
+    assert.equal(clear.phase, 'won', 'Archer + Crossbow can clear the complete Jing Level 5 trial')
+    assert(clear.towers.some(tower => tower.kind === 'crossbow'))
+    const crossbowSite = site(2, 3)
+    const equipped = buildTower(crossbowTrial, crossbowSite, 'crossbow')
+    assert.equal(equipped.silver, startingSilver - towerPrice)
+    assert.equal(buildTower(createRound(20, jingTrial), crossbowSite, 'crossbow').towers.length, 0)
+    assert.equal(buildTower(crossbowTrial, 0, 'drum'), crossbowTrial)
+    assert.equal(upgradeTower(equipped, crossbowSite, 'power'), equipped)
+    assert.deepEqual(removeTower(equipped, crossbowSite), crossbowTrial)
+    const enemy = (id, kind, health, progress, routeIndex = 0) => ({ id, kind, health, progress, routeIndex, slowed: false })
+    const trialCombatState = (setup, enemies) => ({ ...startRound(setup), enemies, spawned: enemies.length, spawnTimer: 99 })
+    const mixed = trialCombatState(equipped, [
+      enemy(0, 'runner', 3, 1.4), enemy(1, 'veteran', 6, 1.4), enemy(2, 'commander', 10, 1.4, 1),
+    ])
+    const queuedBolt = tickRound(mixed, 1)
+    assert.equal(queuedBolt.shots.length, 1)
+    assert.equal(queuedBolt.shots[0].targetId, 1)
+    assert.equal(queuedBolt.shots[0].heavy, true)
+    assert(saveGame(queuedBolt, 3) && saveCheckpoint(queuedBolt, 3))
+    assert.deepEqual(loadGame(), { round: queuedBolt, speed: 3 })
+    assert.deepEqual(loadCheckpoint(), loadGame())
+    const crossbowRetry = retryRound(loadGame().round)
+    assert.equal(crossbowRetry.supportTower, 'crossbow')
+    assert.deepEqual(crossbowRetry.towers, equipped.towers)
+    assert.equal(crossbowRetry.silver, equipped.silver)
+    const spacedSite = buildTower(crossbowTrial, site(3, 1), 'crossbow')
+    const archerOnLong = buildTower(crossbowTrial, crossbowSite, 'archer')
+    const misfiledTrial = JSON.parse(local.get('3guotd.saved-game.v1'))
+    misfiledTrial.missionId = 'changban:3'
+    local.set('3guotd.saved-game.v1', JSON.stringify(misfiledTrial))
+    assert.equal(loadGame(), null, 'Jing trial loadout cannot load in Changban')
+
+    function runCombat(state, speed, steps) {
+      for (let tick = 0; tick < steps / speed; tick++) state = tickRound(state, speed)
+      return state
+    }
+    for (const speed of [1, 3]) {
+      const target = enemy(0, 'veteran', 20, 0.4)
+      const long = runCombat(trialCombatState(equipped, [target]), speed, 81)
+      const short = runCombat(trialCombatState(spacedSite, [target]), speed, 81)
+      assert.equal(long.enemies[0].health, 14, 'Long coverage permits two heavy bolts')
+      assert.equal(short.enemies[0].health, 17, 'Short coverage permits one heavy bolt')
+      const light = [enemy(0, 'infantry', 1, 1.5), enemy(1, 'infantry', 1, 1.6)]
+      const lightCrossbow = runCombat(trialCombatState(equipped, light), speed, 30)
+      const lightArcher = runCombat(trialCombatState(archerOnLong, light), speed, 30)
+      assert(lightArcher.waveStats.stopped > lightCrossbow.waveStats.stopped)
+      assert.equal(lightArcher.waveStats.earned, 14, 'Archer receives normal rewards for the two kills')
+      const lethal = runCombat(trialCombatState(equipped, [enemy(0, 'runner', 1, 1.5)]), speed, 12)
+      assert.equal(lethal.waveStats.earned, 7, 'A heavy overkill grants one reward')
+      assert.equal(lethal.waveStats.stopped, 1)
+    }
+    local.delete('3guotd.saved-game.v1')
+    local.delete('3guotd.checkpoint.v1')
+    console.log('Passed: Jing crossbow selects highest HP in range, fires twice on a long approach vs once on a short one, and preserves light-troop Archer utility at 1× and 3×. Heavy bolt save, Retry and overkill passed.')
+  }
   const trial = campaign.find(mission => mission.id === 'changban:3')
   const volleyWitness = playMission(trial, { upgrade: true }, createRound(20, trial, 'volley'))
   assert.equal(volleyWitness.phase, 'won', 'Archer + Volley can clear all Changban Level 3 waves from a fresh briefing')

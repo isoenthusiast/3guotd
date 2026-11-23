@@ -2,7 +2,8 @@ import { defaultRoutes, frontierApproach, isBuildable, route, sitePosition } fro
 import { campaign } from './campaign'
 
 import type { Point, Route } from './board'
-export type TowerKind = 'archer' | 'drum' | 'volley'
+export type TrialTower = 'volley' | 'crossbow'
+export type TowerKind = 'archer' | 'drum' | TrialTower
 export type Upgrade = 'reach' | 'power'
 export const waveOptions = [20, 40, 60, 80, 100] as const
 export const speedOptions = [1, 2, 3] as const
@@ -29,14 +30,23 @@ export const towerDetails = {
     name: 'Volley Platform', range: 1.8, extendedRange: 1.8,
     shotInterval: 2.1, clusterRadius: 1.15, maxTargets: 3,
   },
+  crossbow: {
+    name: 'Heavy Crossbow', range: 2.35, extendedRange: 2.35,
+    shotInterval: 2.6, damage: 3,
+  },
 } as const
 
-export function offersVolley(mission: Mission | null) {
-  return mission?.id === 'changban:3'
+export function trialTowerFor(mission: Mission | null): TrialTower | undefined {
+  if (mission?.id === 'changban:3') return 'volley'
+  if (mission?.id === 'jing:5') return 'crossbow'
+}
+
+export function isTrialTower(kind: unknown): kind is TrialTower {
+  return kind === 'volley' || kind === 'crossbow'
 }
 
 export function buildChoices(round: Round): readonly TowerKind[] {
-  return round.supportTower === 'volley' && offersVolley(round.mission) ? ['archer', 'volley'] : ['archer', 'drum']
+  return ['archer', round.supportTower ?? 'drum']
 }
 
 const wave = [
@@ -113,7 +123,7 @@ export const rewardCueTime = 0.7
 
 type Enemy = { id: number; kind: AttackerKind; progress: number; health: number; slowed: boolean; routeIndex?: number }
 export type Tower = { site: number; kind: TowerKind; reach: boolean; power: boolean; cooldown: number }
-type Shot = { from: Point; targetId: number; elapsed: number }
+type Shot = { from: Point; targetId: number; elapsed: number; heavy?: true }
 type Impact = { at: Point; elapsed: number; silver: number }
 type GateHit = { kind: Enemy['kind']; elapsed: number; routeIndex?: number }
 type WaveStats = { stopped: number; escaped: number; runnersEscaped: number; earned: number }
@@ -132,7 +142,7 @@ type Opening = Pick<Round, 'towers' | 'silver' | 'lives'>
 export const levelPrepMs = 10_000
 
 export type Round = {
-  supportTower?: 'volley'
+  supportTower?: TrialTower
   continuedStory?: true
   levelPrepRemainingMs?: number
   rulesVersion?: 2
@@ -161,7 +171,7 @@ export function createRound(totalWaves = 20, mission: Mission | null = null, sup
   const missionId = mission?.id
   if (missionId) mission = campaign.find(candidate => candidate.id === missionId) ?? mission
   return {
-    ...(supportTower === 'volley' && offersVolley(mission) && { supportTower }),
+    ...(supportTower && supportTower === trialTowerFor(mission) && { supportTower }),
     rulesVersion: 2, phase: 'setup', totalWaves: mission?.waves.length ?? totalWaves, mission, waveNumber: 1, towers: [], silver: startingSilver, opening: null,
     enemies: [], shots: [], impacts: [], gateHit: null, waveAge: 0, rebuildTime: 0,
     waveStats: emptyStats, previousWave: null, lives: initialLives, spawned: 0, spawnTimer: 0,
@@ -170,7 +180,7 @@ export function createRound(totalWaves = 20, mission: Mission | null = null, sup
 
 export function prepareNextLevel(round: Round, next: Mission, supportTower?: Round['supportTower']): Round {
   if (round.phase !== 'won' || next.battleId !== round.mission?.battleId || next.level !== round.mission.level + 1) return round
-  const retained = round.towers.filter(tower => tower.kind !== 'volley' || offersVolley(next))
+  const retained = round.towers.filter(tower => !isTrialTower(tower.kind))
   const reclaimed = round.towers.filter(tower => !retained.includes(tower)).reduce((sum, tower) => sum + towerRefund(tower), 0)
   return {
     ...createRound(20, next, supportTower), continuedStory: true, levelPrepRemainingMs: levelPrepMs,
@@ -258,7 +268,7 @@ export function buildTower(round: Round, site: number, kind: TowerKind): Round {
 
 export function upgradeTower(round: Round, site: number, branch: Upgrade): Round {
   const tower = round.towers.find(candidate => candidate.site === site)
-  if (!canSpend(round) || !tower || tower.kind === 'volley' || tower[branch] || round.silver < upgradePrice(tower)) return round
+  if (!canSpend(round) || !tower || isTrialTower(tower.kind) || tower[branch] || round.silver < upgradePrice(tower)) return round
   return {
     ...round,
     silver: round.silver - upgradePrice(tower),
@@ -333,8 +343,9 @@ export function advanceRound(round: Round, seconds: number, visualSeconds = seco
     if (!target || target.health <= 0) continue
 
     const elapsed = shot.elapsed + seconds
+    const damage = shot.heavy ? towerDetails.crossbow.damage : 1
     if (elapsed >= shotFlightTime) {
-      target.health--
+      target.health = Math.max(0, target.health - damage)
       const reward = target.health === 0 ? enemyDetails(target).reward : 0
       if (reward > 0) {
         silver += reward
@@ -344,7 +355,7 @@ export function advanceRound(round: Round, seconds: number, visualSeconds = seco
       impacts.push({ at: enemyPosition(target.progress, routeForEnemy(round, target)), elapsed: 0, silver: reward })
     } else {
       shots.push({ ...shot, elapsed })
-      incoming.set(target.id, (incoming.get(target.id) ?? 0) + 1)
+      incoming.set(target.id, (incoming.get(target.id) ?? 0) + damage)
     }
   }
   const enemies = moving.filter(enemy => {
@@ -372,8 +383,13 @@ export function advanceRound(round: Round, seconds: number, visualSeconds = seco
     const cooldown = Math.max(0, tower.cooldown - seconds)
     if (cooldown > 0) return { ...tower, cooldown }
 
-    const target = enemies.find(enemy => enemy.health > (incoming.get(enemy.id) ?? 0)
-      && inRange(tower, enemyPosition(enemy.progress, routeForEnemy(round, enemy))))
+    const eligible = (enemy: Enemy) => enemy.health > (incoming.get(enemy.id) ?? 0)
+      && inRange(tower, enemyPosition(enemy.progress, routeForEnemy(round, enemy)))
+    const heavy = tower.kind === 'crossbow'
+    const target = heavy
+      ? enemies.reduce<Enemy | undefined>((best, enemy) =>
+        (!best || enemy.health > best.health) && eligible(enemy) ? enemy : best, undefined)
+      : enemies.find(eligible)
     if (!target) return { ...tower, cooldown }
     let recipients = [target]
     if (tower.kind === 'volley') {
@@ -386,10 +402,10 @@ export function advanceRound(round: Round, seconds: number, visualSeconds = seco
       recipients = [target, ...nearby.slice(0, towerDetails.volley.maxTargets - 1)]
     }
     for (const enemy of recipients) {
-      shots.push({ from: sitePosition(tower.site), targetId: enemy.id, elapsed: 0 })
-      incoming.set(enemy.id, (incoming.get(enemy.id) ?? 0) + 1)
+      shots.push({ from: sitePosition(tower.site), targetId: enemy.id, elapsed: 0, ...(heavy && { heavy: true as const }) })
+      incoming.set(enemy.id, (incoming.get(enemy.id) ?? 0) + (heavy ? towerDetails.crossbow.damage : 1))
     }
-    const interval = tower.kind === 'volley' ? towerDetails.volley.shotInterval
+    const interval = isTrialTower(tower.kind) ? towerDetails[tower.kind].shotInterval
       : tower.power ? towerDetails.archer.fasterShotInterval : towerDetails.archer.shotInterval
     return { ...tower, cooldown: interval }
   })
