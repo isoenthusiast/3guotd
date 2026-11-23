@@ -159,8 +159,12 @@ export const campaign: readonly Mission[] = battles.flatMap(({ id, withdrawnSite
 export const changban = campaign.find(mission => mission.id === 'changban:1')!
 
 export function isMissionUnlocked(mission: Mission, clears: readonly string[]): boolean {
-  const index = campaign.findIndex(candidate => candidate.id === mission.id)
-  return index === 0 || (index > 0 && (clears.includes(mission.id) || clears.includes(campaign[index - 1].id)))
+  const prerequisite = missionPrerequisite(mission)
+  return mission.id === campaign[0].id || (!!prerequisite && (clears.includes(mission.id) || clears.includes(prerequisite.id)))
+}
+
+export function missionPrerequisite(mission: Mission): Mission | undefined {
+  return campaign[campaign.findIndex(candidate => candidate.id === mission.id) - 1]
 }
 
 export function nextMission(mission: Mission): Mission | undefined {

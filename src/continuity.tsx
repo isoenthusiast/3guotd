@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks'
-import { battles, campaign, isMissionUnlocked } from './game/campaign'
+import { battles, campaign, isMissionUnlocked, missionPrerequisite } from './game/campaign'
 import { loadCheckpoint, loadGame, saveCheckpoint, saveGame } from './game/save-game'
+import { towerDetails, trialTowerFor } from './game/round'
 import type { Mission, PlaySpeed, Round } from './game/round'
 
 export function recommendedMission(clears: readonly string[]): Mission {
@@ -72,16 +73,24 @@ export function useRecovery(round: Round, speed: PlaySpeed, hasRun: boolean) {
 export function CampaignProgress({ clears, selected, onSelect }: {
   clears: readonly string[]; selected: Mission; onSelect: (mission: Mission) => void
 }) {
+  const lockedTrial = campaign.find(level => level.battleId === selected.battleId
+    && trialTowerFor(level) && !isMissionUnlocked(level, clears))
+  const trial = trialTowerFor(lockedTrial ?? null)
+  const prerequisite = lockedTrial && missionPrerequisite(lockedTrial)
   return <section class="campaign-progress" aria-label="Campaign progress">
     <p>{campaign.filter(level => clears.includes(level.id)).length}/30 levels cleared · {campaignDestination(clears)}</p>
-    <ol>{battles.map((battle, index) => {
+    {lockedTrial && trial && prerequisite && <p class="locked-trial">{towerDetails[trial].name} trial · Level {lockedTrial.level}
+      <small>Locked · clear {prerequisite.title}, level {prerequisite.level}</small>
+    </p>}
+    <ol>{battles.map(battle => {
       const levels = campaign.filter(level => level.battleId === battle.id)
       const available = levels.find(level => !clears.includes(level.id) && isMissionUnlocked(level, clears))
         ?? levels.find(level => isMissionUnlocked(level, clears))
+      const prerequisite = missionPrerequisite(levels[0])
       const count = levels.filter(level => clears.includes(level.id)).length
       return <li key={battle.id} aria-current={selected.battleId === battle.id ? 'step' : undefined}>
         <button type="button" disabled={!available} onClick={() => available && onSelect(available)}>{battle.title} · {count}/5 cleared</button>
-        {!available && <small>Locked · clear {battles[index - 1]?.title}, level 5</small>}
+        {!available && prerequisite && <small>Locked · clear {prerequisite.title}, level {prerequisite.level}</small>}
       </li>
     })}</ol>
   </section>

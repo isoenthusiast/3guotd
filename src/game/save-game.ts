@@ -29,6 +29,7 @@ function decodeRound(value: unknown, mission: Round['mission']): Round | null {
     || (value.levelPrepRemainingMs !== undefined && (!value.continuedStory || !mission || value.phase !== 'setup'
       || value.waveNumber !== 1 || !integer(value.levelPrepRemainingMs) || value.levelPrepRemainingMs < 1
       || value.levelPrepRemainingMs > levelPrepMs))
+    || (value.trialRefund !== undefined && (!value.levelPrepRemainingMs || !integer(value.trialRefund) || value.trialRefund === 0))
     || (value.supportTower !== undefined && (!isTrialTower(value.supportTower) || value.rulesVersion !== 2 || value.supportTower !== trialTowerFor(mission)))
     || (value.rulesVersion !== undefined && value.rulesVersion !== 2)
     || !integer(value.waveNumber) || value.waveNumber < 1

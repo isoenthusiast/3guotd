@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/ho
 import { columns, rows, sitePosition } from './game/board'
 import {
   beaconArcher, buildChoices, isTrialTower, trialTowerFor, levelPrepMs, attackerName, enemyMaxHealth, baseUpgradePrice, buildTower, canBuildAt, canSpend, closedSites, createRound, enemiesRemaining, objectiveProgress, removeTower,
-  roundRoutes, prepareNextLevel, nextEntry, towerRefund, inRange, routeForEnemy, enemyPosition, startingSilver, secondUpgradeSurcharge,
+  roundRoutes, levelCarryover, prepareNextLevel, nextEntry, towerRefund, inRange, routeForEnemy, enemyPosition, startingSilver, secondUpgradeSurcharge,
   retryRound, speedOptions, startRound, tickRound, towerDetails, upgradePrice,
   upgradeTower, waveCueTime, roundFormation, waveOptions,
 } from './game/round'
@@ -218,6 +218,7 @@ function App() {
     || (mission.battleId === 'changban' && clears.includes('changban')))
   const upcomingClosures = (mission?.closedSites?.[round.waveNumber]?.length ?? 0) > closedSites(round).length
   const selectedClosing = selected !== null && mission?.closedSites?.[round.waveNumber]?.includes(selected)
+  const nextChapter = round.phase === 'won' && upcoming && upcoming.battleId !== mission?.battleId ? upcoming : undefined
   const setup = round.phase === 'setup'
   const [paused, setPaused] = useState(false)
   const preparingLevel = round.levelPrepRemainingMs !== undefined
@@ -308,11 +309,7 @@ function App() {
   if (running && firstPlacement && !paused && !alertActive) status = openingHint
   if (preparingLevel) {
     const seconds = Math.ceil(round.levelPrepRemainingMs! / 1000)
-    status = `${paused ? 'Paused · ' : ''}Wave in ${seconds}s`
-    if (activeSite === null) {
-      const carried = mission?.id === 'changban:4' || mission?.id === 'wuzhang:4' ? 'Standard towers kept' : 'Towers kept'
-      status += ` · ${carried} · +${startingSilver} silver`
-    }
+    status = `${paused ? 'Paused · ' : ''}Wave in ${seconds}s${round.trialRefund ? ` · +${round.trialRefund} trial refund` : ''}`
   }
   if (!preparingLevel && !finished && coverage && !firstPlacement && !paused && !alertActive) {
     status = `${selectedName} available · Choose a tower${shortfall || prices.some(value => value !== price) ? '' : ` · ${round.silver - price} silver left`}`
@@ -525,8 +522,10 @@ function App() {
     const selectedMission = screen === 'campaign' ? draftMission : null
     const trial = trialTowerFor(selectedMission)
     const selectedSupport = draftSupport === trial ? draftSupport : undefined
+    const continuingTrial = trial && round.phase === 'won' && upcoming?.id === selectedMission?.id
+    const carryover = continuingTrial ? levelCarryover(round) : undefined
     function startBattle() {
-      if (selectedMission && trial && round.phase === 'won' && upcoming?.id === selectedMission.id) {
+      if (selectedMission && continuingTrial) {
         enterBattle(prepareNextLevel(round, selectedMission, selectedSupport))
       } else enterBattle(createRound(draftWaves, selectedMission, selectedSupport))
     }
@@ -537,6 +536,9 @@ function App() {
         <h2 class="visually-hidden">Campaign</h2>
         <h3>{selectedMission.title} · Level {selectedMission.level}</h3>
         <p class="mission-order">{selectedMission.objective} · Hold for {selectedMission.waves.length} waves</p>
+        {carryover && <p class="campaign-carryover">Level cleared. Silver and standard towers with upgrades carry over.
+          {` +${startingSilver} silver grant.`}{carryover.trialRefund > 0 && ` +${carryover.trialRefund} silver trial refund.`}</p>}
+        {nextChapter?.id === selectedMission.id && <p class="campaign-carryover">New chapter starts with {startingSilver} silver and an empty board.</p>}
         {trial && <div class="map-setting trial-loadout">
           <label for="support-tower">Tower loadout</label>
           <select id="support-tower" value={selectedSupport ?? 'drum'}
@@ -767,7 +769,14 @@ function App() {
                 <small>{openingSummary}</small>
                 <small>Tower upgrades kept</small>
               </> : <strong>Wave-start snapshot unavailable</strong>}
-            </div> : towerSummary ?? <div class="command-location">{mission?.title ?? 'Shu frontier'}</div>}
+            </div> : (preparingLevel && mission && activeSite === null ? <div class="campaign-handoff">
+              <strong>{mission.title} · L{mission.level}</strong>
+              <small>Silver kept · +{startingSilver} grant</small>
+              <small>Towers &amp; upgrades kept</small>
+            </div> : nextChapter ? <div class="campaign-handoff">
+              <strong>Next · {nextChapter.title} · Level {nextChapter.level}</strong>
+              <small>Fresh board · {startingSilver} silver</small>
+            </div> : towerSummary ?? <div class="command-location">{mission?.title ?? 'Shu frontier'}</div>)}
           {!finished && <button class="battle-speed" type="button" aria-label={`Play speed ${speed}×`}
             onClick={() => setSpeed(value => speedOptions[(speedOptions.indexOf(value) + 1) % speedOptions.length])}>
             {speed}×</button>}

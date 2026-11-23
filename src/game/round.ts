@@ -164,6 +164,7 @@ export type Round = {
   supportTower?: TrialTower
   continuedStory?: true
   levelPrepRemainingMs?: number
+  trialRefund?: number
   rulesVersion?: 2
   phase: 'setup' | 'running' | 'won' | 'lost'
   totalWaves: number
@@ -197,13 +198,19 @@ export function createRound(totalWaves = 20, mission: Mission | null = null, sup
   }
 }
 
+export function levelCarryover(round: Round) {
+  const towers = round.towers.filter(tower => !isTrialTower(tower.kind))
+  const trialRefund = round.towers.filter(tower => isTrialTower(tower.kind))
+    .reduce((sum, tower) => sum + towerRefund(tower), 0)
+  return { towers, trialRefund, silver: round.silver + startingSilver + trialRefund }
+}
+
 export function prepareNextLevel(round: Round, next: Mission, supportTower?: Round['supportTower']): Round {
   if (round.phase !== 'won' || next.battleId !== round.mission?.battleId || next.level !== round.mission.level + 1) return round
-  const retained = round.towers.filter(tower => !isTrialTower(tower.kind))
-  const reclaimed = round.towers.filter(tower => !retained.includes(tower)).reduce((sum, tower) => sum + towerRefund(tower), 0)
+  const { towers, trialRefund, silver } = levelCarryover(round)
   return {
     ...createRound(20, next, supportTower), continuedStory: true, levelPrepRemainingMs: levelPrepMs,
-    towers: retained.map(tower => ({ ...tower, cooldown: 0 })), silver: round.silver + startingSilver + reclaimed,
+    towers: towers.map(tower => ({ ...tower, cooldown: 0 })), silver, ...(trialRefund > 0 && { trialRefund }),
   }
 }
 
@@ -460,7 +467,8 @@ export function tickRound(round: Round, speed: PlaySpeed): Round {
   if (round.phase === 'setup' && round.levelPrepRemainingMs !== undefined) {
     const remaining = round.levelPrepRemainingMs - 50
     if (remaining > 0) return { ...round, levelPrepRemainingMs: remaining }
-    return startRound({ ...round, levelPrepRemainingMs: undefined })
+    const { trialRefund, levelPrepRemainingMs, ...ready } = round
+    return startRound(ready)
   }
   for (let step = 0; step < speed && round.phase === 'running'; step++) {
     round = advanceRound(round, 0.05, 0.05 / speed)
