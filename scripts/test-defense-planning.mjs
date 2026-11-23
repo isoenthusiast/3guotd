@@ -35,7 +35,7 @@ try {
   if (!baseline) {
     assert.match(await cards.innerText(), /Hit · (entry|middle|gate)/)
     assert.match(await status.innerText(), /[A-I]\d+ · Tap Build Archer/)
-    assert.match(await button('Start wave').innerText(), /Infantry/)
+    assert.match(await page.locator('.wave-preview').getAttribute('aria-label'), /Infantry/)
   }
   if (!baseline) {
     const clipped = await page.locator('.command-row button').evaluateAll(controls => controls.flatMap(control => {
