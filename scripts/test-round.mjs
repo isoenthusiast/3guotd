@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { checkTowerBalance } from './tower-balance.mjs'
 
 const require = createRequire(import.meta.url)
 const output = mkdtempSync(join(tmpdir(), '3guotd-round-'))
@@ -13,11 +14,12 @@ try {
     '--module', 'commonjs', '--outDir', output, 'src/game/round.ts', 'src/game/campaign.ts', 'src/game/save-game.ts',
   ], { stdio: 'inherit' })
 
+  const model = require(join(output, 'round.js'))
   const {
     createRound, prepareNextLevel, beaconArcher, enemyMaxHealth, startRound, advanceRound, tickRound, canBuildAt, buildTower, upgradeTower, removeTower, retryRound,
     towerPrice, startingSilver, baseUpgradePrice, secondUpgradeSurcharge, towerRange, towerDetails,
     shotFlightTime, enemiesRemaining, enemyCount, enemyDetails, waveFormation, evacuatedGroups, roundFormation, roundRoutes,
-  } = require(join(output, 'round.js'))
+  } = model
   const { isBuildable, columns, rows, route, sitePosition } = require(join(output, 'board.js'))
   const site = (x, y) => y * columns + x
   const initial = createRound()
@@ -379,6 +381,8 @@ try {
   assert.ok(waveFormation(40).healthBonus > waveFormation(20).healthBonus)
   assert.ok(waveFormation(40).interval * waveFormation(40).sequence.length < 9 * 1.65,
     'Late formations increase pressure without extending their spawn duration')
+
+  checkTowerBalance(model, campaign, site)
 
   const local = new Map()
   Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: {
