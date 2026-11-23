@@ -72,7 +72,7 @@ try {
   await handoff.waitFor()
   assert.match(await handoff.innerText(), /Hold the Changban Road · L4/)
   assert.match(await handoff.innerText(), /Silver kept · \+90 grant/)
-  assert.match(await handoff.innerText(), /Towers & upgrades kept/)
+  assert.match(await handoff.innerText(), /Archer\/Drum \+ upgrades/)
   assert(await handoff.evaluate(el => {
     const row = el.closest('.command-row').getBoundingClientRect()
     const text = new Range()

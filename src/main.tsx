@@ -772,7 +772,7 @@ function App() {
             </div> : (preparingLevel && mission && activeSite === null ? <div class="campaign-handoff">
               <strong>{mission.title} · L{mission.level}</strong>
               <small>Silver kept · +{startingSilver} grant</small>
-              <small>Towers &amp; upgrades kept</small>
+              <small aria-label="Archer and Drum towers and their upgrades carry over">Archer/Drum + upgrades</small>
             </div> : nextChapter ? <div class="campaign-handoff">
               <strong>Next · {nextChapter.title} · Level {nextChapter.level}</strong>
               <small>Fresh board · {startingSilver} silver</small>
