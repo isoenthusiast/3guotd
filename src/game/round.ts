@@ -16,6 +16,7 @@ export const secondUpgradeSurcharge = 9
 export const initialLives = 3
 export const shotFlightTime = 0.25
 export const impactTime = 0.25
+export const trialImpactTime = 0.42
 
 export const towerDetails = {
   archer: {
@@ -141,8 +142,9 @@ export const rewardCueTime = 0.7
 
 type Enemy = { id: number; kind: AttackerKind; progress: number; health: number; slowed: boolean; routeIndex?: number }
 export type Tower = { site: number; kind: TowerKind; reach: boolean; power: boolean; cooldown: number }
-type Shot = { from: Point; targetId: number; elapsed: number; heavy?: true }
-type Impact = { at: Point; elapsed: number; silver: number }
+type Shot = { from: Point; targetId: number; elapsed: number; heavy?: true; volley?: true }
+type Impact = { at: Point; elapsed: number; silver: number } &
+  ({ cue?: undefined; targetId?: undefined } | { cue: 'volley' | 'crossbow'; targetId: number })
 type GateHit = { kind: Enemy['kind']; elapsed: number; routeIndex?: number }
 type WaveStats = { stopped: number; escaped: number; runnersEscaped: number; earned: number }
 type WaveReport = WaveStats & { waveNumber: number }
@@ -353,7 +355,7 @@ export function advanceRound(round: Round, seconds: number, visualSeconds = seco
   const targets = new Map(moving.map(enemy => [enemy.id, enemy]))
   const impacts = round.impacts
     .map(impact => ({ ...impact, elapsed: impact.elapsed + visualSeconds }))
-    .filter(impact => impact.elapsed < (impact.silver ? rewardCueTime : impactTime))
+    .filter(impact => impact.elapsed < (impact.silver ? rewardCueTime : impact.cue ? trialImpactTime : impactTime))
   const shots: Shot[] = []
   const incoming = new Map<number, number>()
   for (const shot of round.shots) {
@@ -370,7 +372,11 @@ export function advanceRound(round: Round, seconds: number, visualSeconds = seco
         waveStats.earned += reward
         waveStats.stopped++
       }
-      impacts.push({ at: enemyPosition(target.progress, routeForEnemy(round, target)), elapsed: 0, silver: reward })
+      const cue = shot.heavy ? 'crossbow' : shot.volley ? 'volley' : undefined
+      impacts.push({
+        at: enemyPosition(target.progress, routeForEnemy(round, target)), elapsed: 0, silver: reward,
+        ...(cue && { cue, targetId: target.id }),
+      })
     } else {
       shots.push({ ...shot, elapsed })
       incoming.set(target.id, (incoming.get(target.id) ?? 0) + damage)
@@ -422,7 +428,7 @@ export function advanceRound(round: Round, seconds: number, visualSeconds = seco
       recipients = [target, ...nearby.slice(0, towerDetails.volley.maxTargets - 1)]
     }
     for (const enemy of recipients) {
-      shots.push({ from: sitePosition(tower.site), targetId: enemy.id, elapsed: 0, ...(heavy && { heavy: true as const }) })
+      shots.push({ from: sitePosition(tower.site), targetId: enemy.id, elapsed: 0, ...(heavy && { heavy: true as const }), ...(tower.kind === 'volley' && { volley: true as const }) })
       incoming.set(enemy.id, (incoming.get(enemy.id) ?? 0) + (heavy ? towerDetails.crossbow.damage : 1))
     }
     const interval = tower.kind === 'archer'

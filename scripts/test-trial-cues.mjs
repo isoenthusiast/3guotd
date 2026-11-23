@@ -1,0 +1,88 @@
+import assert from 'node:assert/strict'
+import { chromium } from 'playwright'
+
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH })
+try {
+  const page = await browser.newPage({ viewport: { width: 320, height: 480 } })
+  // Vite development origin exposes the production renderer and simulation as modules.
+  await page.goto(process.argv[2] ?? 'http://localhost:5173/')
+  const results = await page.evaluate(async () => {
+    const { drawBattlefield, loadBattlefieldArt } = await import('/src/game-art.ts')
+    const { campaign } = await import('/src/game/campaign.ts')
+    const { createRound, startRound, tickRound, buildTower, enemyPosition, routeForEnemy } = await import('/src/game/round.ts')
+    await loadBattlefieldArt()
+    document.body.innerHTML = '<canvas width="576" height="832" style="width:225px"></canvas>'
+    const ctx = document.querySelector('canvas').getContext('2d')
+    const strokes = []
+    const health = []
+    const stroke = ctx.stroke.bind(ctx)
+    const fillRect = ctx.fillRect.bind(ctx)
+    ctx.stroke = (...args) => {
+      if (['#fff1a2', '#ffc7a8', '#b5efff', '#dcf6ec'].includes(ctx.strokeStyle)) {
+        const { e, f } = ctx.getTransform()
+        strokes.push([ctx.strokeStyle, e, f])
+      }
+      return stroke(...args)
+    }
+    ctx.fillRect = (...args) => {
+      if (ctx.fillStyle === '#e8f69b') health.push([strokes.length, ...args])
+      return fillRect(...args)
+    }
+    const cases = [
+      { chapter: 'changban:3', kind: 'volley', site: 14, routeProgress: [0.15, 0.25, 0.35, 4], health: [4, 3, 4, 3], color: '#fff1a2' },
+      { chapter: 'jing:5', kind: 'crossbow', site: 29, routeProgress: [1.4, 1.4, 1.4], health: [3, 6, 10], color: '#ffc7a8' },
+      { chapter: 'wuzhang:3', kind: 'beacon', site: 16, routeProgress: [0.15], health: [4], color: '#b5efff' },
+    ]
+    return cases.map(({ chapter, kind, site, routeProgress, health: hp, color }) => {
+      const mission = campaign.find(mission => mission.id === chapter)
+      let setup = buildTower(createRound(20, mission, kind), site, kind)
+      if (kind === 'beacon') setup = buildTower(setup, 17, 'archer')
+      let round = { ...startRound(setup), spawnTimer: 99, spawned: routeProgress.length,
+        enemies: routeProgress.map((progress, id) => ({
+          id, kind: ['infantry', 'runner', 'veteran', 'bowman'][id], progress,
+          routeIndex: kind === 'crossbow' && id === 2 ? 1 : 0, health: hp[id], slowed: false,
+        })) }
+      if (kind === 'beacon') {
+        const carriedDrum = buildTower(createRound(20, mission), 14, 'drum').towers[0]
+        round = tickRound({ ...round, towers: [...round.towers, carriedDrum] }, 1)
+      } else for (let frame = 0; frame < 7; frame++) round = tickRound(round, 1)
+      return { kind, towers: round.towers.length, hits: round.impacts.map(hit => [hit.cue, hit.targetId]),
+        losses: round.enemies.map(enemy => hp[enemy.id] - enemy.health),
+        expectedPositions: round.impacts.map(hit => {
+          const enemy = round.enemies.find(enemy => enemy.id === hit.targetId)
+          const [x, y] = kind === 'volley' && enemy
+            ? enemyPosition(enemy.progress, routeForEnemy(round, enemy)) : hit.at
+          return [32 + 64 * x, 42 + 64 * y]
+        }),
+        renders: [false, true].map(reducedMotion => {
+          strokes.length = 0
+          health.length = 0
+          drawBattlefield(ctx, round, null, { timeSeconds: 0, reducedMotion, reducedEffects: reducedMotion })
+          return { cues: strokes.filter(([strokeColor]) => strokeColor === color).map(([, x, y]) => [x, y]),
+            slow: strokes.some(([strokeColor]) => strokeColor === '#dcf6ec'),
+            healthAboveEffects: health.length > 0 && health.every(([before]) => before === strokes.length) }
+        }),
+      }
+    })
+  })
+  const [volley, bolt, beacon] = results
+  assert.deepEqual(volley.hits, [['volley', 0], ['volley', 1], ['volley', 2]])
+  assert.deepEqual(volley.losses, [1, 1, 1, 0])
+  assert.deepEqual(bolt.hits, [['crossbow', 1]])
+  assert.deepEqual(bolt.losses, [0, 3, 0])
+  for (const trial of [volley, bolt]) {
+    for (const render of trial.renders) {
+      assert.equal(render.cues.length, trial.expectedPositions.length)
+      render.cues.forEach(([x, y], i) => {
+        const [expectedX, expectedY] = trial.expectedPositions[i]
+        assert(Math.hypot(x - expectedX, y - expectedY) < 0.01)
+      })
+      assert(render.healthAboveEffects)
+    }
+  }
+  assert.equal(beacon.towers, 3)
+  for (const render of beacon.renders) assert(render.cues.length && render.slow && render.healthAboveEffects)
+  console.log('All three trial cues matched simulation targets at 1×. Static reduced-motion cues and foreground HP verified at a 320 px phone viewport.')
+} finally {
+  await browser.close()
+}

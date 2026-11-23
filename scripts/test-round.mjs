@@ -490,6 +490,7 @@ try {
       const lethal = runCombat(trialCombatState(equipped, [enemy(0, 'runner', 1, 1.5)]), speed, 12)
       assert.equal(lethal.waveStats.earned, 7, 'A heavy overkill grants one reward')
       assert.equal(lethal.waveStats.stopped, 1)
+      assert.deepEqual(lethal.impacts.map(hit => [hit.cue, hit.targetId]), [['crossbow', 0]])
     }
     local.delete('3guotd.saved-game.v1')
     local.delete('3guotd.checkpoint.v1')
@@ -521,6 +522,7 @@ try {
     const grouped = trialCombat(volley, packed, 'infantry', 1, speed)
     const singleTarget = trialCombat(archerTrial, packed, 'infantry', 1, speed)
     assert.equal(grouped.waveStats.stopped, 3)
+    assert.deepEqual(grouped.impacts.map(hit => [hit.cue, hit.targetId]), [['volley', 0], ['volley', 1], ['volley', 2]])
     assert(grouped.waveStats.stopped > singleTarget.waveStats.stopped)
     const archerHit = trialCombat(archerTrial, [0.15], 'veteran', 6, speed).enemies[0].health
     const volleyHit = trialCombat(volley, [0.15], 'veteran', 6, speed).enemies[0].health
@@ -534,6 +536,7 @@ try {
     enemies: [0.15, 0.25, 0.35].map((progress, id) => ({ id, kind: 'infantry', progress, health: 4, slowed: false })),
   }, 1)
   assert.equal(inFlight.shots.length, 3)
+  assert(inFlight.shots.every(shot => shot.volley === true))
   assert(saveGame(inFlight, 3) && saveCheckpoint(inFlight, 3))
   assert.deepEqual(loadGame(), { round: inFlight, speed: 3 })
   assert.deepEqual(loadCheckpoint(), loadGame())

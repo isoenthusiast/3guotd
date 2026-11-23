@@ -1,5 +1,5 @@
 import { columns, rows, sitePosition } from './game/board'
-import { attackerName, beaconArcher, buildChoices, isTrialTower, canBuildAt, closedSites, enemyPosition, impactTime, enemyMaxHealth, objectiveProgress, roundRoutes, routeForEnemy, shotFlightTime, towerRange } from './game/round'
+import { attackerName, beaconArcher, buildChoices, isTrialTower, canBuildAt, closedSites, enemyPosition, impactTime, trialImpactTime, enemyMaxHealth, objectiveProgress, roundRoutes, routeForEnemy, shotFlightTime, towerRange } from './game/round'
 import type { Round, TowerKind } from './game/round'
 
 import { drawAttacker } from './attacker-art'
@@ -292,27 +292,29 @@ export function drawBattlefield(
     }
   }
 
-  if (selected !== null) {
-    drawRoadCoverage(ctx, round, selected, options.previewKind)
-    const links = round.towers.filter(tower => tower.kind === 'beacon').map(tower => tower.site)
-    if (!active && round.supportTower === 'beacon' && canBuildAt(round, selected)) links.push(selected)
-    for (const site of links) {
-      const linked = beaconArcher(round.towers, site)
-      if (linked === undefined || (site !== selected && linked !== selected)) continue
-      const [x, y] = center(sitePosition(site))
-      const [ax, ay] = center(sitePosition(linked))
-      ctx.save()
-      ctx.lineWidth = 5
-      ctx.strokeStyle = '#fff4aa'
-      ctx.setLineDash([5, 6])
-      ctx.beginPath()
-      ctx.moveTo(x, y - 12)
-      ctx.lineTo(ax, ay - 12)
-      ctx.stroke()
-      ctx.setLineDash([])
-      ctx.strokeRect(ax - 24, ay - 25, 48, 47)
-      ctx.restore()
-    }
+  if (selected !== null) drawRoadCoverage(ctx, round, selected, options.previewKind)
+  const links = round.towers.filter(tower => tower.kind === 'beacon').map(tower => tower.site)
+  if (selected !== null && !active && round.supportTower === 'beacon' && canBuildAt(round, selected)) links.push(selected)
+  for (const site of links) {
+    const linked = beaconArcher(round.towers, site)
+    if (linked === undefined) continue
+    const focused = site === selected || linked === selected
+    const [x, y] = center(sitePosition(site))
+    const [ax, ay] = center(sitePosition(linked))
+    ctx.save()
+    ctx.strokeStyle = '#212c22'
+    ctx.lineWidth = focused ? 9 : 8
+    ctx.beginPath()
+    ctx.moveTo(x, y - 12)
+    ctx.lineTo(ax, ay - 12)
+    ctx.stroke()
+    ctx.lineWidth = 5
+    ctx.strokeStyle = focused ? '#fff4aa' : '#b5efff'
+    ctx.setLineDash([9, 7])
+    ctx.stroke()
+    ctx.setLineDash([])
+    ctx.strokeRect(ax - 24, ay - 25, 48, 47)
+    ctx.restore()
   }
 
   for (const tower of round.towers) {
@@ -397,7 +399,31 @@ export function drawBattlefield(
     ctx.fill()
   }
   for (const hit of round.impacts) {
-    const [x, y] = center(hit.at)
+    const landed = center(hit.at)
+    if (hit.cue && hit.elapsed < trialImpactTime) {
+      // The brackets follow surviving Volley recipients. A bolt marks its landing spot.
+      const [x, y] = hit.cue === 'volley' ? targets.get(hit.targetId) ?? landed : landed
+      ctx.save()
+      ctx.translate(x, y + 10)
+      ctx.beginPath()
+      if (hit.cue === 'volley') {
+        ctx.moveTo(-23, -10); ctx.lineTo(-15, 0); ctx.lineTo(-23, 10)
+        ctx.moveTo(23, -10); ctx.lineTo(15, 0); ctx.lineTo(23, 10)
+      } else {
+        ctx.moveTo(0, -14); ctx.lineTo(17, 0); ctx.lineTo(0, 14); ctx.lineTo(-17, 0); ctx.closePath()
+      }
+      ctx.lineJoin = 'round'
+      ctx.strokeStyle = '#2a231d'
+      ctx.lineWidth = 10
+      ctx.stroke()
+      ctx.strokeStyle = hit.cue === 'volley' ? '#fff1a2' : '#ffc7a8'
+      ctx.lineWidth = 5
+      ctx.stroke()
+      ctx.restore()
+      continue
+    }
+    if (hit.cue) continue
+    const [x, y] = landed
     const progress = hit.elapsed / impactTime
     if (progress < 1 && !reducedEffects) {
       ctx.globalAlpha = 1 - progress

@@ -46,9 +46,12 @@ function decodeRound(value: unknown, mission: Round['mission']): Round | null {
     && (enemy.routeIndex === undefined || (integer(enemy.routeIndex) && enemy.routeIndex < routeCount)))
     || !Array.isArray(shots) || !shots.every(shot => record(shot) && point(shot.from)
       && integer(shot.targetId) && amount(shot.elapsed)
-      && (shot.heavy === undefined || (shot.heavy === true && value.supportTower === 'crossbow')))
+      && (shot.heavy === undefined || (shot.heavy === true && value.supportTower === 'crossbow'))
+      && (shot.volley === undefined || (shot.volley === true && value.supportTower === 'volley')))
     || !Array.isArray(impacts) || !impacts.every(impact => record(impact) && point(impact.at)
-      && amount(impact.elapsed) && integer(impact.silver))) return null
+      && amount(impact.elapsed) && integer(impact.silver)
+      && (impact.cue === undefined || ((impact.cue === 'volley' || impact.cue === 'crossbow')
+        && impact.cue === value.supportTower && integer(impact.targetId))))) return null
 
   if (opening !== null && !(record(opening) && towers(opening.towers) && integer(opening.silver) && integer(opening.lives))) return null
   if (value.phase === 'running' && opening === null) return null
