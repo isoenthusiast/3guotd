@@ -165,6 +165,22 @@
         <dd>8, 12–16, 25</dd>
       </dl>
     </article>
+    <article id="imp-08">
+      <div class="item-heading">
+        <h3><span class="id">IMP-08</span>Build one reusable tower balance scenario</h3>
+        <span class="status">Accepted</span>
+      </div>
+      <dl>
+        <dt>Expected behavior</dt>
+        <dd>Extend the existing model tests with a shared equal-silver comparison. Run matched encounters that vary only spacing, the length of the approach, or the quality of the Archer site. Reuse the existing Volley, Heavy Crossbow, and Beacon fixtures as the baseline.</dd>
+        <dt>How to verify</dt>
+        <dd>The same runner reports leaks, kills, and remaining gate lives for baseline and trial layouts at 1× and 3×. Preserve the existing Volley, Crossbow, and Beacon tradeoffs, deterministic targeting on ties, and Drum boundary and overlap behavior.</dd>
+        <dt>Acceptance</dt>
+        <dd>SimaYi approved AUD-034 on <code>b86c99ec77c61573d01cd62bcb2380fc5c436e74</code>. Six equal-silver comparisons matched across speeds. Targeting ties, Drum boundary and overlap checks passed. The live web bundle matched the preceding release byte for byte.</dd>
+        <dt>Research ideas</dt>
+        <dd>11–15, 20–21</dd>
+      </dl>
+    </article>
   </main>
 </body>
 </html>
