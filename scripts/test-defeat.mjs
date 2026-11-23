@@ -52,6 +52,8 @@ try {
   await button('Back to battle').tap()
   assert.match(await breach.innerText(), /Entry 2 · Cavalry/)
   assert.match(await page.locator('.resources').innerText(), /13 silver\s+0 lives/)
+  await button('Archer, row 1, column 1').tap()
+  assert.doesNotMatch(await page.locator('.battle-readout').innerText(), /Second upgrade/)
   await retry.tap()
   await button('Start wave').waitFor()
   assert.match(await page.locator('.resources').innerText(), /43 silver\s+3 lives\s+Wave 2\/5/)
@@ -68,6 +70,8 @@ try {
   assert.match(await breach.innerText(), /Breach details unavailable/)
   assert.match(await rewind.innerText(), /snapshot unavailable/)
   assert(await retry.isDisabled())
+  assert.match(await page.getByRole('status').innerText(), /Retry unavailable/)
+  assert.doesNotMatch(await page.getByRole('status').innerText(), /Retry wave available/)
   console.log('Offline 320 × 480: split-route defeat details, Help and browser Back, exact Retry restoration, and legacy fallbacks passed.')
 } finally {
   await browser.close()
