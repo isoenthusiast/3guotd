@@ -205,18 +205,25 @@ export function drawBattlefield(
     roof(ctx, gateX, gateY - 19, 30, '#37383b')
   }
 
+  const volleyTrial = round.supportTower === 'volley'
+  const progress = objectiveProgress(round)
+  const drawGateLabels = () => {
+    if (round.gateHit) {
+      const lane = round.gateHit.routeIndex === undefined ? 'lane unrecorded' : `Entry ${round.gateHit.routeIndex + 1}`
+      cue(ctx, `${attackerName(round.gateHit.kind)} breach · ${lane}`,
+        columns * tile / 2, gateY - 83)
+    }
+    if (round.mission && progress > 0) {
+      cue(ctx, `${progress}/${round.mission.milestoneCount} ${round.mission.milestone}`,
+        columns * tile / 2, gateY - 111, 20)
+    }
+  }
   if (round.gateHit) {
     ctx.strokeStyle = '#ffa487'
     ctx.lineWidth = 6
     ctx.strokeRect(gateX - 27, gateY - 26, 54, 54)
-    const lane = round.gateHit.routeIndex === undefined ? 'lane unrecorded' : `Entry ${round.gateHit.routeIndex + 1}`
-    cue(ctx, `${attackerName(round.gateHit.kind)} breach · ${lane}`,
-      columns * tile / 2, gateY - 83)
   }
-  if (round.mission && objectiveProgress(round) > 0) {
-    cue(ctx, `${objectiveProgress(round)}/${round.mission.milestoneCount} ${round.mission.milestone}`,
-      columns * tile / 2, gateY - 111, 20)
-  }
+  if (!volleyTrial) drawGateLabels()
 
   for (const path of routes) {
     const [x, y] = center(path[0])
@@ -400,19 +407,22 @@ export function drawBattlefield(
   }
   const barWidth = 46
   const healthBars = new Map<number, [number, number]>()
-  const volleyTrial = round.supportTower === 'volley'
   for (const [id, [x, y]] of targets) {
     const inset = volleyTrial ? 40 : barWidth / 2 + 2
     const barX = Math.max(inset, Math.min(columns * tile - inset, x))
     let barY = y - 32
     if (volleyTrial) {
       const occupied = [...healthBars.values()].filter(([otherX]) => Math.abs(otherX - barX) < 80)
+      const avoidsGateLabels = (top: number) =>
+        !(progress > 0 && top + 16 > gateY - 131 && top - 4 < gateY - 104)
+        && !(round.gateHit && top + 16 > gateY - 105 && top - 4 < gateY - 76)
+      const fits = (top: number) => avoidsGateLabels(top) && occupied.every(([, otherY]) => Math.abs(otherY - top) >= 21)
       const preferred = Math.max(12, barY)
       barY = preferred
-      while (barY >= 12 && occupied.some(([, otherY]) => Math.abs(otherY - barY) < 21)) barY -= 21
+      while (barY >= 12 && !fits(barY)) barY -= 21
       if (barY < 12) {
         barY = preferred
-        while (occupied.some(([, otherY]) => Math.abs(otherY - barY) < 21)) barY += 21
+        while (!fits(barY)) barY += 21
       }
     }
     healthBars.set(id, [barX, barY])
@@ -428,6 +438,8 @@ export function drawBattlefield(
     ctx.lineTo(x, y - 15)
     ctx.stroke()
   }
+
+  if (volleyTrial) drawGateLabels()
 
   for (const hit of round.impacts) {
     const landed = center(hit.at)
