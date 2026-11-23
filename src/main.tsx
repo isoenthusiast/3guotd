@@ -49,11 +49,11 @@ function upgradeEffect(kind: Exclude<TowerKind, Round['supportTower']>, branch: 
   }
   if (kind === 'archer') {
     const { shotInterval, fasterShotInterval } = towerDetails.archer
-    return `${shotInterval} → ${fasterShotInterval} s per shot`
+    return `${shotInterval}→${fasterShotInterval}s per shot`
   }
   const { speedFactor, strongerSpeedFactor } = towerDetails.drum
   const slow = (factor: number) => Math.round((1 - factor) * 100)
-  return `${slow(speedFactor)}% → ${slow(strongerSpeedFactor)}% slower`
+  return `Slow ${slow(speedFactor)}→${slow(strongerSpeedFactor)}%`
 }
 
 function useBattlefieldArt() {
