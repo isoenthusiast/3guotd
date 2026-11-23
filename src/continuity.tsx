@@ -56,7 +56,7 @@ export function useRecovery(round: Round, speed: PlaySpeed, hasRun: boolean) {
       document.removeEventListener('visibilitychange', visibility)
     }
   }, [])
-  useEffect(() => { persist() }, [hasRun, speed, round.phase, round.waveNumber,
+  useEffect(() => { persist() }, [hasRun, speed, round.phase, round.waveNumber, round.longSupport,
     round.phase === 'setup' ? round.towers : null])
   return {
     manual, checkpoint, checkpointFailed,

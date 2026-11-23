@@ -220,7 +220,7 @@ export function drawBattlefield(
     roof(ctx, gateX, gateY - 19, 30, '#37383b')
   }
 
-  const volleyTrial = round.supportTower === 'volley'
+  const volleyTrial = round.supportTower === 'volley' || round.towers.some(tower => tower.kind === 'volley') || round.impacts.some(hit => hit.cue === 'volley')
   const progress = objectiveProgress(round)
   const drawGateLabels = () => {
     if (round.gateHit) {
@@ -316,7 +316,7 @@ export function drawBattlefield(
 
   if (selected !== null) drawRoadCoverage(ctx, round, selected, options.previewKind)
   const links = round.towers.filter(tower => tower.kind === 'beacon').map(tower => tower.site)
-  if (selected !== null && !active && round.supportTower === 'beacon' && canBuildAt(round, selected)) links.push(selected)
+  if (selected !== null && !active && buildChoices(round).includes('beacon') && canBuildAt(round, selected)) links.push(selected)
   for (const site of links) {
     const linked = beaconArcher(round.towers, site)
     if (linked === undefined) continue

@@ -63,8 +63,31 @@ export function beaconArcher(towers: readonly Tower[], site: number): number | u
   return selected
 }
 
+const longUnlocks = { volley: 2, crossbow: 4, beacon: 6 } as const
+const longTrials = ['volley', 'crossbow', 'beacon'] as const
+
+export function longBuildSlots(waveNumber: number): readonly Exclude<TowerKind, 'archer'>[] {
+  return ['drum', ...longTrials.filter(kind => waveNumber >= longUnlocks[kind])]
+}
+
+export function canFieldTrial(kind: TrialTower, mission: Mission | null, waveNumber: number, support?: TrialTower): boolean {
+  return mission ? kind === support : waveNumber >= longUnlocks[kind]
+}
+
+export function longUnlockAt(waveNumber: number): TrialTower | undefined {
+  return longTrials.find(kind => waveNumber === longUnlocks[kind])
+}
+
+export function selectLongSupport(round: Round, kind: string): Round {
+  if (round.mission || !canSpend(round)) return round
+  const choice = longBuildSlots(round.waveNumber).find(slot => slot === kind)
+  if (!choice || choice === (round.longSupport ?? 'drum')) return round
+  const { longSupport, ...state } = round
+  return choice === 'drum' ? state : { ...state, longSupport: choice }
+}
+
 export function buildChoices(round: Round): readonly TowerKind[] {
-  return ['archer', round.supportTower ?? 'drum']
+  return ['archer', (round.mission ? round.supportTower : round.longSupport) ?? 'drum']
 }
 
 const wave = [
@@ -137,6 +160,7 @@ const spawnInterval = 1.65
 const gateCueTime = 1.35
 export const rebuildWindow = 5
 export const waveCueTime = 1.15
+export const longUnlockCueTime = 3
 export const rewardCueTime = 0.7
 
 type Enemy = { id: number; kind: AttackerKind; progress: number; health: number; slowed: boolean; routeIndex?: number }
@@ -162,6 +186,8 @@ export const levelPrepMs = 10_000
 
 export type Round = {
   supportTower?: TrialTower
+  longSupport?: TrialTower
+  announceUnlock?: true
   continuedStory?: true
   levelPrepRemainingMs?: number
   trialRefund?: number
@@ -230,7 +256,7 @@ export function startRound(round: Round): Round {
 
 export function retryRound(round: Round): Round {
   if (!round.opening) return round
-  return { ...createRound(round.totalWaves, round.mission, round.supportTower), mission: round.mission, ...(round.continuedStory && { continuedStory: true as const }), rulesVersion: round.rulesVersion, waveNumber: round.waveNumber, previousWave: round.previousWave, ...round.opening }
+  return { ...createRound(round.totalWaves, round.mission, round.supportTower), mission: round.mission, ...(round.continuedStory && { continuedStory: true as const }), rulesVersion: round.rulesVersion, waveNumber: round.waveNumber, previousWave: round.previousWave, ...(round.longSupport && { longSupport: round.longSupport }), ...round.opening }
 }
 
 export function roundFormation(round: Round): Formation {
@@ -451,14 +477,18 @@ export function advanceRound(round: Round, seconds: number, visualSeconds = seco
     const remaining = towers.filter(tower => !closed.includes(tower.site))
     const refund = towers.reduce((amount, tower) => amount + (closed.includes(tower.site) ? towerRefund(tower) : 0), 0)
     return startRound({
-      ...next, towers: remaining.map(tower => ({ ...tower, cooldown: 0 })), silver: silver + refund, lives,
+      ...next, ...(round.longSupport && { longSupport: round.longSupport }),
+      ...(!round.mission && longUnlockAt(next.waveNumber) && { announceUnlock: true as const }),
+      towers: remaining.map(tower => ({ ...tower, cooldown: 0 })), silver: silver + refund, lives,
       previousWave: { ...waveStats, waveNumber: round.waveNumber },
       gateHit: needsRebuild ? null : gateHit, impacts: needsRebuild ? [] : impacts, rebuildTime: needsRebuild ? rebuildWindow : 0,
     })
   }
   const phase = lives === 0 ? 'lost' : cleared ? 'won' : 'running'
+  const { announceUnlock, ...state } = round
   return {
-    ...round, phase, towers, enemies, impacts, gateHit, waveAge, waveStats, silver, lives, spawned, spawnTimer,
+    ...state, phase, towers, enemies, impacts, gateHit, waveAge, waveStats, silver, lives, spawned, spawnTimer,
+    ...(announceUnlock && phase === 'running' && waveAge < longUnlockCueTime && { announceUnlock }),
     shots: shots.filter(shot => activeIds.has(shot.targetId)),
   }
 }

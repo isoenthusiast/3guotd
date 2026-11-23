@@ -430,6 +430,44 @@ try {
   } })
   const { loadGame, saveGame, loadCheckpoint, saveCheckpoint, loadSound, saveSound } = require(join(output, 'save-game.js'))
   {
+    const { buildChoices, longBuildSlots, selectLongSupport } = model
+    assert.deepEqual([1, 2, 3, 4, 5, 6].map(wave => longBuildSlots(wave).length), [1, 2, 2, 3, 3, 4])
+    assert.equal(selectLongSupport(initial, 'volley'), initial)
+    let state = { ...createRound(), waveNumber: 2, silver: 180 }
+    state = buildTower(selectLongSupport(state, 'volley'), site(1, 0), 'volley')
+    state = { ...state, waveNumber: 4 }
+    state = buildTower(selectLongSupport(state, 'crossbow'), site(1, 1), 'crossbow')
+    state = { ...state, waveNumber: 6 }
+    state = buildTower(selectLongSupport(state, 'beacon'), site(1, 2), 'beacon')
+    state = selectLongSupport(state, 'drum')
+    assert.deepEqual(buildChoices(state), ['archer', 'drum'])
+    const mixed = { ...startRound(state), announceUnlock: true, spawned: 1,
+      enemies: [{ id: 0, kind: 'infantry', progress: 0, health: 4, slowed: false }],
+      shots: [{ from: [1, 0], targetId: 0, elapsed: 0.1, volley: true },
+        { from: [1, 1], targetId: 0, elapsed: 0.05, heavy: true }],
+      impacts: [{ at: [2, 0], elapsed: 0.1, silver: 0, targetId: 0, cue: 'crossbow' }],
+    }
+    assert(saveGame(mixed, 1) && saveCheckpoint(mixed, 1))
+    assert.deepEqual(loadGame(), { round: mixed, speed: 1 })
+    assert.deepEqual(loadCheckpoint(), loadGame())
+    const retried = retryRound(selectLongSupport(mixed, 'volley'))
+    assert.equal(retried.announceUnlock, undefined)
+    assert.deepEqual(retried.towers, mixed.opening.towers)
+    assert.deepEqual(buildChoices(retried), ['archer', 'volley'])
+    assert.equal(retried.silver, mixed.opening.silver)
+    for (const invalid of [
+      { ...mixed, waveNumber: 1, announceUnlock: undefined },
+      { ...initial, longSupport: 'beacon' },
+      { ...initial, announceUnlock: true },
+    ]) {
+      assert(saveGame(invalid, 1))
+      assert.equal(loadGame(), null)
+    }
+    local.delete('3guotd.saved-game.v1')
+    local.delete('3guotd.checkpoint.v1')
+    console.log('Passed Long Battle gated unlocks, mixed active shots and towers across slot switches, and invalid unlock records.')
+  }
+  {
     const mission = campaign.find(mission => mission.id === 'wuzhang:3')
     const trial = createRound(20, mission, 'beacon')
     const cleared = playMission(mission, { upgrade: true, spacing: 8, minimum: 20 }, trial)

@@ -4,7 +4,7 @@ import { columns, rows, sitePosition } from './game/board'
 import {
   beaconArcher, buildChoices, isTrialTower, trialTowerFor, levelPrepMs, attackerName, enemyMaxHealth, baseUpgradePrice, buildTower, canBuildAt, canSpend, closedSites, createRound, enemiesRemaining, objectiveProgress, removeTower,
   roundRoutes, levelCarryover, prepareNextLevel, nextEntry, towerRefund, inRange, routeForEnemy, enemyPosition, startingSilver, secondUpgradeSurcharge,
-  retryRound, speedOptions, startRound, tickRound, towerDetails, upgradePrice,
+  retryRound, longBuildSlots, longUnlockAt, longUnlockCueTime, selectLongSupport, speedOptions, startRound, tickRound, towerDetails, upgradePrice,
   upgradeTower, waveCueTime, roundFormation, waveOptions,
 } from './game/round'
 import type { Mission, PlaySpeed, Round, TowerKind, Upgrade } from './game/round'
@@ -264,7 +264,7 @@ function App() {
   }, [activeSite, tower, mission, round.rulesVersion])
   const firstBuy = firstPlacement && coverage?.archer.reachesRoad
   const selectedName = activeSite === null ? '' : siteName(activeSite)
-  const linkedArcher = activeSite !== null && (tower?.kind === 'beacon' || (!tower && round.supportTower === 'beacon'))
+  const linkedArcher = activeSite !== null && (tower?.kind === 'beacon' || (!tower && choices.includes('beacon')))
     ? beaconArcher(round.towers, activeSite) : undefined
   const linkLabel = linkedArcher === undefined ? 'No Archer in reach' : `Archer ${siteName(linkedArcher)}`
   const towerSummary = tower && <div class="command-location tower-summary">
@@ -307,7 +307,10 @@ function App() {
       ? `Wave ${round.waveNumber} starts · ${waveCue}`
       : `${enemiesRemaining(round)} of ${formation.sequence.length} attackers`
   }
-  const alertActive = showWaveStart || (running && round.rebuildTime > 0)
+  const unlocked = running && round.announceUnlock && round.waveAge < longUnlockCueTime
+    ? longUnlockAt(round.waveNumber) : undefined
+  const unlockMessage = unlocked && `${towerDetails[unlocked].name} unlocked · Choose in Orders`
+  const alertActive = unlocked || showWaveStart || (running && round.rebuildTime > 0)
   if (running && firstPlacement && !paused && !alertActive) status = openingHint
   if (preparingLevel) {
     const seconds = Math.ceil(round.levelPrepRemainingMs! / 1000)
@@ -406,7 +409,8 @@ function App() {
       return
     }
     setSpeed(saved.speed)
-    enterBattle(saved.round, true)
+    const { announceUnlock, ...restored } = saved.round
+    enterBattle(restored, true)
   }
 
   function openMission(next: Mission) {
@@ -636,9 +640,9 @@ function App() {
         <p>Slows enemies inside its ring. Pair it with an Archer for extra shots. Blue lines mark slowed enemies. The Drum deals no damage.</p>
         <p>Wider reach extends the ring. Stronger slow raises the speed reduction from {Math.round(100 * (1 - towerDetails.drum.speedFactor))}% to {Math.round(100 * (1 - towerDetails.drum.strongerSpeedFactor))}%. Where Drums overlap, the strongest slow applies.</p>
         <PairingGuide />
-        {trialTowerFor(mission) === 'beacon' && <p>Watch Beacon · {towerDetails.beacon.price} silver. The dotted line points to the nearest Archer within {towerDetails.beacon.range} tiles. That Archer reloads in {towerDetails.beacon.archerInterval}s. Equal distances favor the earlier board tile. Beacons and Faster fire do not stack. A Beacon deals no damage.</p>}
-        {trialTowerFor(mission) === 'crossbow' && <p>Heavy Crossbow · {towerDetails.crossbow.price} silver. {towerRole('crossbow')}. A bolt deals {towerDetails.crossbow.damage} damage within {towerDetails.crossbow.range} tiles. Reloads in {towerDetails.crossbow.shotInterval}s. No upgrades in this trial.</p>}
-        {trialTowerFor(mission) === 'volley' && <p>Volley Platform · {towerDetails.volley.price} silver. {towerRole('volley')} enemies within {towerDetails.volley.clusterRadius} tiles of the first target. Range {towerDetails.volley.range} tiles. Reloads in {towerDetails.volley.shotInterval}s. No upgrades in this trial.</p>}
+        {(mission ? trialTowerFor(mission) === 'beacon' : longBuildSlots(round.waveNumber).includes('beacon')) && <p>Watch Beacon · {towerDetails.beacon.price} silver. The dotted line points to the nearest Archer within {towerDetails.beacon.range} tiles. That Archer reloads in {towerDetails.beacon.archerInterval}s. Equal distances favor the earlier board tile. Beacons and Faster fire do not stack. A Beacon deals no damage.</p>}
+        {(mission ? trialTowerFor(mission) === 'crossbow' : longBuildSlots(round.waveNumber).includes('crossbow')) && <p>Heavy Crossbow · {towerDetails.crossbow.price} silver. {towerRole('crossbow')}. A bolt deals {towerDetails.crossbow.damage} damage within {towerDetails.crossbow.range} tiles. Reloads in {towerDetails.crossbow.shotInterval}s. No upgrades in this trial.</p>}
+        {(mission ? trialTowerFor(mission) === 'volley' : longBuildSlots(round.waveNumber).includes('volley')) && <p>Volley Platform · {towerDetails.volley.price} silver. {towerRole('volley')} enemies within {towerDetails.volley.clusterRadius} tiles of the first target. Range {towerDetails.volley.range} tiles. Reloads in {towerDetails.volley.shotInterval}s. No upgrades in this trial.</p>}
       </>}
       <VisualComfortControls />
       </section>
@@ -656,6 +660,15 @@ function App() {
         {!previewing && lanes > 1 && round.spawned < formation.sequence.length && ` Next arrival: Entry ${nextEntry(round) + 1}.`}
         {' '}{running || preparingLevel ? paused ? 'Returns paused.' : 'Returns to play.' : ''}</p>
       <div class="orders-list">
+        {!mission && !finished && <div class="map-setting">
+          <label for="long-support">Second build slot</label>
+          <select id="long-support" value={round.longSupport ?? 'drum'} onChange={event => {
+            const kind = event.currentTarget.value
+            setRound(current => selectLongSupport(current, kind))
+          }}>
+            {longBuildSlots(round.waveNumber).map(kind => <option key={kind} value={kind}>{towerDetails[kind].name}</option>)}
+          </select>
+        </div>}
         <nav class="guide-links" aria-label="Field guide">
           <button type="button" onClick={() => navigate('enemies')}>Enemy Types</button>
           <button type="button" onClick={() => navigate('towers')}>Towers</button>
@@ -720,15 +733,15 @@ function App() {
             {lost ? <div class="defeat-breach">
               <strong>Last breach · {lastBreach}</strong>
               <div>{defeatAdvice}</div>
-            </div> : hudStatus && <span>{hudStatus}</span>}
+            </div> : (unlockMessage || hudStatus) && <span>{unlockMessage || hudStatus}</span>}
             {!finished && upcomingClosures && <span>{selectedClosing ? 'This tile' : '×'} closes next wave · refunded.</span>}
-            {!lost && slowed.length > 0 && <span class="drum-effect">Drum slowing {slowed.length} · {inArcherRange} in Archer range</span>}
+            {!lost && !unlockMessage && slowed.length > 0 && <span class="drum-effect">Drum slowing {slowed.length} · {inArcherRange} in Archer range</span>}
             {needsSilver && <span class="action-note">Need {shortfall} more silver.</span>}
             {showActions && upgradeable && !needsSilver && price > baseUpgradePrice && (!upgradeable.reach || !upgradeable.power) &&
               <span>Second upgrade · +{price - baseUpgradePrice} silver</span>}
           </div>
           <span class="visually-hidden" role="status" aria-atomic="true">{lost ? `Gate fell. Last breach. ${lastBreach}. ${defeatAdvice} ${opening ? 'Retry wave available.' : 'Retry unavailable. Wave-start snapshot missing.'}`
-            : breachAnnouncement || (preparingLevel ? 'Build or upgrade before the next level starts.' : `Wave ${round.waveNumber}. ${paused ? 'Paused.' : ''}`)}</span>
+            : unlockMessage || breachAnnouncement || (preparingLevel ? 'Build or upgrade before the next level starts.' : `Wave ${round.waveNumber}. ${paused ? 'Paused.' : ''}`)}</span>
           {setup && !preparingLevel && upgradeable && !upgradeable.reach && !upgradeable.power && !needsSilver &&
             <small>Next branch {baseUpgradePrice + secondUpgradeSurcharge}</small>}
           {canRefund && tower && <button type="button" class="refund" aria-label="Remove & refund" aria-description={`Returns ${towerRefund(tower)} silver`}

@@ -1,7 +1,7 @@
 import { campaign } from './campaign'
 import { campaign as legacyCampaign } from './legacy-campaign'
 import { columns, rows } from './board'
-import { attackerName, isTrialTower, trialTowerFor, levelPrepMs, roundFormation, speedOptions, waveOptions } from './round'
+import { canFieldTrial, longUnlockAt, attackerName, isTrialTower, trialTowerFor, levelPrepMs, roundFormation, speedOptions, waveOptions } from './round'
 import type { PlaySpeed, Round } from './round'
 
 const saveKey = '3guotd.saved-game.v1'
@@ -40,6 +40,12 @@ function decodeRound(value: unknown, mission: Round['mission']): Round | null {
     || !amount(value.waveAge) || !amount(value.rebuildTime) || !towers(value.towers)
     || !stats(value.waveStats)) return null
 
+  const waveNumber = value.waveNumber
+  const eligibleTrial = (kind: unknown) => isTrialTower(kind)
+    && canFieldTrial(kind, mission, waveNumber, isTrialTower(value.supportTower) ? value.supportTower : undefined)
+  if (value.longSupport !== undefined && (mission || !eligibleTrial(value.longSupport))) return null
+  if (value.announceUnlock !== undefined && (mission || value.phase !== 'running' || value.announceUnlock !== true
+    || !longUnlockAt(value.waveNumber))) return null
   const { enemies, shots, impacts, opening, gateHit, previousWave } = value
   const routeCount = mission?.routes.length ?? 1
   if (!Array.isArray(enemies) || !enemies.every(enemy => record(enemy) && integer(enemy.id)
@@ -47,12 +53,12 @@ function decodeRound(value: unknown, mission: Round['mission']): Round | null {
     && (enemy.routeIndex === undefined || (integer(enemy.routeIndex) && enemy.routeIndex < routeCount)))
     || !Array.isArray(shots) || !shots.every(shot => record(shot) && point(shot.from)
       && integer(shot.targetId) && amount(shot.elapsed)
-      && (shot.heavy === undefined || (shot.heavy === true && value.supportTower === 'crossbow'))
-      && (shot.volley === undefined || (shot.volley === true && value.supportTower === 'volley')))
+      && (shot.heavy === undefined || (shot.heavy === true && eligibleTrial('crossbow')))
+      && (shot.volley === undefined || (shot.volley === true && eligibleTrial('volley'))))
     || !Array.isArray(impacts) || !impacts.every(impact => record(impact) && point(impact.at)
       && amount(impact.elapsed) && integer(impact.silver)
       && (impact.cue === undefined || ((impact.cue === 'volley' || impact.cue === 'crossbow')
-        && impact.cue === value.supportTower && integer(impact.targetId))))) return null
+        && eligibleTrial(impact.cue) && integer(impact.targetId))))) return null
 
   if (opening !== null && !(record(opening) && towers(opening.towers) && integer(opening.silver) && integer(opening.lives))) return null
   if (value.phase === 'running' && opening === null) return null
@@ -62,7 +68,7 @@ function decodeRound(value: unknown, mission: Round['mission']): Round | null {
 
   const round = { ...value, mission } as Round
   if ([...round.towers, ...(round.opening?.towers ?? [])].some(tower =>
-    isTrialTower(tower.kind) && tower.kind !== round.supportTower)) return null
+    isTrialTower(tower.kind) && !eligibleTrial(tower.kind))) return null
   return round.spawned <= roundFormation(round).sequence.length ? round : null
 }
 

@@ -63,7 +63,7 @@ export function drawRoadCoverage(ctx: CanvasRenderingContext2D, round: Round, si
     ctx.stroke()
   }
   const [x, y] = sitePosition(site)
-  const beaconLink = round.supportTower === 'beacon' && beaconArcher(round.towers, site) !== undefined
+  const beaconLink = buildChoices(round).includes('beacon') && beaconArcher(round.towers, site) !== undefined
   if (kind ? !coverage[kind].reachesRoad : !beaconLink && choices.every(tower => !coverage[tower].reachesRoad)) {
     ctx.font = 'bold 17px system-ui'
     ctx.textAlign = 'center'
