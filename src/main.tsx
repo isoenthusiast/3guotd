@@ -465,10 +465,11 @@ function App() {
   if (screen === 'campaign' || screen === 'long') {
     const selectedMission = screen === 'campaign' ? draftMission : null
     const trial = trialTowerFor(selectedMission)
+    const selectedSupport = draftSupport === trial ? draftSupport : undefined
     function startBattle() {
       if (selectedMission && trial && round.phase === 'won' && upcoming?.id === selectedMission.id) {
-        enterBattle(prepareNextLevel(round, selectedMission, draftSupport))
-      } else enterBattle(createRound(draftWaves, selectedMission, draftSupport))
+        enterBattle(prepareNextLevel(round, selectedMission, selectedSupport))
+      } else enterBattle(createRound(draftWaves, selectedMission, selectedSupport))
     }
     return <main class="menu-screen setup-screen">
       {header}
@@ -479,7 +480,7 @@ function App() {
         <p class="mission-order">{selectedMission.objective} · Hold for {selectedMission.waves.length} waves</p>
         {trial && <div class="map-setting trial-loadout">
           <label for="support-tower">Tower loadout</label>
-          <select id="support-tower" value={draftSupport ?? 'drum'}
+          <select id="support-tower" value={selectedSupport ?? 'drum'}
             onChange={event => setDraftSupport(event.currentTarget.value === trial ? trial : undefined)}>
             <option value="drum">Archer + Drum</option>
             <option value={trial}>Archer + {trial === 'volley' ? 'Volley' : 'Crossbow'}</option>
