@@ -845,10 +845,11 @@ function MapPreview() {
           {buildChoices(round).map(kind => {
             const { price, name } = towerDetails[kind]
             const coverage = roadCoverage(roundRoutes(round), selected, kind)
+            const distance = coverage.roadTiles < 0.1 ? '<0.1' : Number(coverage.roadTiles.toFixed(1))
             return <button key={kind} class="purchase-card" type="button" disabled={round.silver < price}
               onClick={() => setRound(current => buildTower(current, selected, kind))}>
               <strong>Build {name}</strong><span>{price} silver</span>
-              <small>{coverage.reachesRoad ? `${coverage.roadTiles} road tiles` : 'Out of range'}</small>
+              <small>{coverage.reachesRoad ? `${distance} road tiles` : 'Out of range'}</small>
             </button>
           })}
         </section> : <div class="map-preview-note">Map prototype · {offline.status}</div>}

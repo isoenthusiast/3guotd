@@ -38,7 +38,8 @@ try {
   assert(bounds.x >= 8 && bounds.y >= 16 && bounds.x + bounds.width <= 312 && bounds.height / bounds.width > 1.4)
   const first = button('Empty tile, row 3, column 4')
   const adjacent = button('Empty tile, row 3, column 5')
-  for (const cell of [first, adjacent]) {
+  const edge = button('Empty tile, row 1, column 1')
+  for (const cell of [first, adjacent, edge]) {
     await cell.tap()
     assert.equal(await cell.getAttribute('aria-pressed'), 'true')
     assert.deepEqual(await board.boundingBox(), bounds)
@@ -48,9 +49,17 @@ try {
       const box = await control.boundingBox()
       assert(box.width >= 44 && box.height >= 44 && box.x >= 8 && box.x + box.width <= 312
         && box.y >= bounds.y + bounds.height && box.y + box.height <= 468)
+      assert(await control.evaluate(el => {
+        const outer = el.getBoundingClientRect()
+        const text = new Range()
+        text.selectNodeContents(el)
+        return [...text.getClientRects()].every(rect => !rect.width || rect.left >= outer.left - 1
+          && rect.right <= outer.right + 1 && rect.top >= outer.top - 1 && rect.bottom <= outer.bottom + 1)
+      }))
     }
   }
   assert.equal(await first.getAttribute('aria-pressed'), 'false')
+  assert.match(await page.getByRole('button', { name: /^Build Drum/ }).innerText(), /0.9 road tiles/)
   assert.equal(await button('Empty tile, row 1, column 3').count(), 0, 'The entry is never buildable')
   assert.equal(await button('Empty tile, row 13, column 7').count(), 0, 'The gate is never buildable')
   for (const site of ['Empty tile, row 3, column 4', 'Empty tile, row 5, column 6', 'Empty tile, row 2, column 2']) {
