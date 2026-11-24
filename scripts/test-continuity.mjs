@@ -58,7 +58,7 @@ try {
   await context.setOffline(true)
   await reload()
   await page.getByText('Ready offline', { exact: true }).waitFor()
-  assert.equal(await page.locator('.menu-actions').evaluate(el => getComputedStyle(el).display), 'flex')
+  assert.equal(await page.locator('.menu-actions').evaluate(el => getComputedStyle(el).display), 'grid')
   console.log('Passed: cache loss reported offline; reconnect/reload repaired missing CSS and icon; second offline reload styled.')
 
   for (const fontSize of [24, 32]) {
