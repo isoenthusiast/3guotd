@@ -31,7 +31,7 @@ export const hanzhongChallenge: Mission = {
   id: 'hanzhong-rider-ambush:1',
   battleId: 'hanzhong-rider-ambush',
   title: 'Hanzhong Rider Ambush',
-  briefing: '60 silver to deploy. Build before combat. Stop 3 cavalry and 2 runners.',
+  briefing: `${hanzhongChallengeSilver} silver to deploy. Build before combat. Face 3 cavalry and 2 runners.`,
   milestoneCount: 1,
   victory: 'Rider Ambush cleared.',
   waves: [{

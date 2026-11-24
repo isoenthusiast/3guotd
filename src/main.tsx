@@ -890,7 +890,7 @@ function PracticeBoard({ onBack, onChallenge, onOriginal, offlineStatus, active 
       <button class="edge-control" type="button" onClick={() => reset()}>Reset</button>
     </header>
     <div class="board-view">
-      <Battlefield round={round} selected={selected} suggested={null} onSelect={site => select(site === selected ? null : site)} wireframe={!onBack} />
+      {active && <Battlefield round={round} selected={selected} suggested={null} onSelect={site => select(site === selected ? null : site)} wireframe={!onBack} />}
     </div>
     <footer class="command-bar">
       <div class="command-status">
