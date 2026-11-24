@@ -13,7 +13,8 @@ import { loadBattlefieldArt } from './battlefield-art-assets'
 import { drawBattlefield, drawTower, tile } from './game-art'
 import { battles, campaign, isMissionUnlocked, nextMission } from './game/campaign'
 import { hanzhongChallenge, hanzhongChallengeSilver, hanzhongPreview } from './game/hanzhong-preview'
-import { practiceMap, practiceRound, practiceTowers } from './game/field-trials'
+import { practiceMap, practiceRound, practiceTowers, tickPractice } from './game/field-trials'
+import type { PracticeTower, SupportCue } from './game/field-trials'
 import { loadSound, saveSound } from './game/save-game'
 import { CampaignProgress, CampaignRecap, campaignDestination, recommendedMission, runLabel, useRecovery } from './continuity'
 import { OfflineDetails, useOfflineReadiness } from './offline-readiness'
@@ -105,9 +106,11 @@ function TowerPortrait({ kind, upgrade }: { kind: TowerKind; upgrade?: Upgrade }
   return <canvas ref={canvas} class="tower-portrait" width={80} height={80} aria-hidden="true" />
 }
 
-function Battlefield({ round, selected, suggested, onSelect, wireframe = false }: {
+function Battlefield({ round, selected, suggested, onSelect, wireframe = false, supportEnemy, supportArcher }: {
   suggested: number | null
   wireframe?: boolean
+  supportEnemy?: number
+  supportArcher?: number
   round: Round
   selected: number | null
   onSelect: (site: number | null) => void
@@ -122,11 +125,11 @@ function Battlefield({ round, selected, suggested, onSelect, wireframe = false }
     if (!ctx) return
     let frame = 0
     const paint = () => {
-      if (drawBattlefield(ctx, round, selected, { wireframe })) frame = requestAnimationFrame(paint)
+      if (drawBattlefield(ctx, round, selected, { wireframe, supportEnemy, supportArcher })) frame = requestAnimationFrame(paint)
     }
     paint()
     return () => cancelAnimationFrame(frame)
-  }, [round, selected, artReady, wireframe])
+  }, [round, selected, artReady, wireframe, supportEnemy, supportArcher])
 
   const closingSites = round.mission?.closedSites?.[round.waveNumber] ?? []
   const tabSite = selected ?? suggested ?? reachable.findIndex((_, site) => canBuildAt(round, site))
@@ -846,7 +849,14 @@ function PracticeBoard({ onBack, onChallenge, onOriginal, offlineStatus, active 
     ...createRound(20, mission),
     ...(challenge && { silver: hanzhongChallengeSilver }),
   })
-  const [round, setRound] = useState(() => onBack ? practiceRound('volley') : openingRound())
+  const [practiceTower, setPracticeTower] = useState<PracticeTower>('volley')
+  const [speed, setSpeed] = useState<PlaySpeed>(1)
+  const [{ round, cue }, setSession] = useState<{ round: Round; cue: SupportCue | null }>(() => ({
+    round: onBack ? practiceRound('volley') : openingRound(), cue: null,
+  }))
+  function setRound(update: (current: Round) => Round) {
+    setSession(current => ({ ...current, round: update(current.round) }))
+  }
   const [cleared, setCleared] = useState(() => {
     try { return challenge && localStorage.getItem(hanzhongClearKey) === 'true' }
     catch { return false }
@@ -860,21 +870,27 @@ function PracticeBoard({ onBack, onChallenge, onOriginal, offlineStatus, active 
   useEffect(() => {
     if (!active || !running || paused) return
     const timer = window.setInterval(() => {
-      if (!document.hidden) setRound(current => tickRound(current, 1))
+      if (document.hidden) return
+      if (onBack) setSession(current => tickPractice(current.round, speed, practiceTower, current.cue))
+      else setRound(current => tickRound(current, 1))
     }, 50)
     return () => window.clearInterval(timer)
-  }, [active, running, paused])
+  }, [active, running, paused, onBack, speed, practiceTower])
   useEffect(() => {
     if (!challenge || cleared || round.phase !== 'won') return
     setCleared(true)
     try { localStorage.setItem(hanzhongClearKey, 'true') } catch { /* Keep the current session playable. */ }
   }, [challenge, cleared, round.phase])
 
-  function reset(kind = round.supportTower) {
-    setRound(kind ? practiceRound(kind) : openingRound())
+  function reset(kind = practiceTower) {
+    setPracticeTower(kind)
+    setSession({ round: onBack ? practiceRound(kind) : openingRound(), cue: null })
     select(null)
     setPaused(false)
   }
+
+  const supportText = cue && (cue.kind === 'beacon' ? `Beacon · Archer ${siteName(cue.site)} reload · ${cue.before.toFixed(2)} → ${cue.after.toFixed(2)} s`
+    : `Drum · ${attackerName(cue.attacker)} #${cue.id + 1} · ${cue.before.toFixed(2)} → ${cue.after.toFixed(2)} tiles/s`)
 
   return <main class="battle-screen map-preview" style={active ? undefined : { display: 'none' }}>
     <header class="battle-header">
@@ -890,20 +906,22 @@ function PracticeBoard({ onBack, onChallenge, onOriginal, offlineStatus, active 
       <button class="edge-control" type="button" onClick={() => reset()}>Reset</button>
     </header>
     <div class="board-view">
-      {active && <Battlefield round={round} selected={selected} suggested={null} onSelect={site => select(site === selected ? null : site)} wireframe={!onBack} />}
+      {active && <Battlefield round={round} selected={selected} suggested={null} onSelect={site => select(site === selected ? null : site)}
+        wireframe={!onBack} supportEnemy={cue?.kind === 'drum' ? cue.id : undefined} supportArcher={cue?.kind === 'beacon' ? cue.site : undefined} />}
     </div>
     <footer class="command-bar">
       <div class="command-status">
         <div class="battle-readout" role="status">{round.phase === 'lost' ? mission.defeat
           : round.phase === 'won' ? mission.victory
-          : running ? paused ? 'Paused' : `${enemiesRemaining(round)} attackers remain`
+          : running ? supportText ? `${paused ? 'Paused · ' : ''}${supportText}` : paused ? 'Paused' : `${enemiesRemaining(round)} attackers remain`
           : occupied ? `${siteName(occupied.site)} · ${towerDetails[occupied.kind].name}`
           : selected !== null ? `${siteName(selected)} · Choose a tower` : challenge ? mission.briefing
-          : onBack ? 'Choose tower sites.' : 'Tap a site. Compare upper-bend coverage with slowing near the gate.'}</div>
-        {onBack && !occupied && <select class="practice-tower" aria-label="Trial tower" value={round.supportTower}
+          : onBack ? practiceTower === 'drum' ? 'Place a Drum by the road to slow attackers.' : 'Choose tower sites.'
+            : 'Tap a site. Compare upper-bend coverage with slowing near the gate.'}</div>
+        {onBack && !running && !occupied && <select class="practice-tower" aria-label="Trial tower" value={practiceTower}
           onChange={event => {
             const kind = event.currentTarget.value
-            if (isTrialTower(kind)) reset(kind)
+            if (isTrialTower(kind) || kind === 'drum') reset(kind)
           }}>
           {practiceTowers.map(kind => <option value={kind}>{towerDetails[kind].name}</option>)}
         </select>}
@@ -929,6 +947,8 @@ function PracticeBoard({ onBack, onChallenge, onOriginal, offlineStatus, active 
           {onChallenge && <button class="edge-control" type="button" onClick={onChallenge}>Rider Ambush</button>}
           <div class="map-preview-note">{onBack ? 'Changban practice' : challenge ? cleared ? 'Best: cleared' : 'One-wave challenge' : 'Map prototype'} · {offlineStatus}</div>
         </>}
+        {onBack && (setup || running) && <button class="battle-speed" type="button" aria-label={`Play speed ${speed}×`}
+          onClick={() => setSpeed(value => speedOptions[(speedOptions.indexOf(value) + 1) % speedOptions.length])}>{speed}×</button>}
         {setup ? <button class="battle-primary" type="button" onClick={() => setRound(startRound)}>Start wave</button>
           : running ? <button class="battle-primary" type="button" onClick={() => setPaused(value => !value)}>{paused ? 'Resume' : 'Pause'}</button>
           : onBack || challenge ? <button class="battle-primary" type="button" onClick={() => reset()}>Replay</button>

@@ -433,10 +433,10 @@ try {
   }
 
   {
-    const { practiceRound, practiceTowers, practiceMap } = require(join(output, 'field-trials.js'))
+    const { practiceRound, practiceTowers, practiceMap, tickPractice } = require(join(output, 'field-trials.js'))
     assert(!campaign.some(level => level.id === practiceMap.id))
     assert.deepEqual(practiceTowers.map(kind => model.buildChoices(practiceRound(kind))), [
-      ['archer', 'volley'], ['archer', 'crossbow'], ['archer', 'beacon'],
+      ['archer', 'volley'], ['archer', 'crossbow'], ['archer', 'beacon'], ['archer', 'drum'],
     ])
     const archer = buildTower(practiceRound('beacon'), site(5, 1), 'archer')
     const linked = buildTower(archer, site(4, 1), 'beacon')
@@ -446,7 +446,27 @@ try {
       assert(round.shots.length > 0, 'The practice Archer must actually fire')
       assert.equal(round.towers.find(tower => tower.kind === 'archer').cooldown, interval)
     }
-    console.log('Passed Field Trials isolation, independent loadouts, and the actual practice Beacon reload.')
+    for (const speed of [1, 3]) {
+      let beacon = { round: startRound(linked), cue: null }
+      let unlinked = { round: startRound(archer), cue: null }
+      for (let tick = 0; tick < 60 && !beacon.cue; tick++) {
+        beacon = tickPractice(beacon.round, speed, 'beacon', beacon.cue)
+        unlinked = tickPractice(unlinked.round, speed, 'beacon', unlinked.cue)
+      }
+      assert.deepEqual(beacon.cue, { kind: 'beacon', site: site(5, 1), before: 1.05, after: 0.6 })
+      assert.equal(unlinked.cue, null)
+      assert(beacon.round.shots.some(shot => shot.from[0] === 5 && shot.from[1] === 1))
+      const drum = buildTower(practiceRound('drum'), site(3, 1), 'drum')
+      let slow = { round: startRound(drum), cue: null }
+      for (let tick = 0; tick < 160 && !slow.cue; tick++) slow = tickPractice(slow.round, speed, 'drum', slow.cue)
+      assert.equal(slow.cue.kind, 'drum')
+      const marked = slow.round.enemies.find(enemy => enemy.id === slow.cue.id)
+      assert(marked.slowed && marked.kind === slow.cue.attacker)
+      assert.equal(slow.cue.before, enemyDetails(marked).speed)
+      assert(Math.abs(slow.cue.after - slow.cue.before * towerDetails.drum.speedFactor) < 1e-10)
+      assert.equal(tickPractice(startRound(practiceRound('drum')), speed, 'drum', null).cue, null)
+    }
+    console.log('Passed Field Trials isolation and actual Beacon and Drum support rates at 1× and 3×.')
   }
 
   const local = new Map()

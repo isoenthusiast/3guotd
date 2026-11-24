@@ -12,10 +12,16 @@ try {
   const url = process.argv[2] ?? 'http://localhost:4173/'
   await page.addInitScript(() => {
     window.combatStrokes = new Set()
+    window.combatLabels = new Set()
     const stroke = CanvasRenderingContext2D.prototype.stroke
     CanvasRenderingContext2D.prototype.stroke = function (...args) {
       window.combatStrokes.add(this.strokeStyle)
       return stroke.apply(this, args)
+    }
+    const fillText = CanvasRenderingContext2D.prototype.fillText
+    CanvasRenderingContext2D.prototype.fillText = function (text, ...args) {
+      if (this.canvas.closest('.battlefield')) window.combatLabels.add(String(text))
+      return fillText.call(this, text, ...args)
     }
   })
   await page.goto(url)
@@ -53,6 +59,46 @@ try {
     assert.match(await page.locator('.resources').innerText(), /90 silver/)
     assert.equal(await page.getByRole('button', { name: /^(Archer|Volley Platform|Heavy Crossbow|Watch Beacon), row/ }).count(), 0)
   }
+  const readout = page.locator('.battle-readout')
+  for (const speed of [1, 3]) {
+    await page.emulateMedia({ reducedMotion: speed === 3 ? 'reduce' : 'no-preference' })
+    if (speed === 3) {
+      await button('Play speed 1×').tap()
+      await button('Play speed 2×').tap()
+    }
+    await choose.selectOption('beacon')
+    await button('Reset').tap()
+    await button('Empty tile, row 2, column 6').tap()
+    await page.getByRole('button', { name: /^Build Archer/ }).tap()
+    await button('Empty tile, row 2, column 5').tap()
+    await page.getByRole('button', { name: /^Build Beacon/ }).tap()
+    await button('Start wave').tap()
+    await readout.getByText(/Archer F2 reload · 1.05 → 0.60 s/).waitFor()
+    await page.waitForFunction(() => window.combatLabels.has('F2'))
+    await button('Reset').tap()
+    await choose.selectOption('drum')
+    await button('Empty tile, row 2, column 4').tap()
+    await page.getByRole('button', { name: /^Build Drum/ }).tap()
+    await page.evaluate(() => window.combatLabels.clear())
+    await button('Start wave').tap()
+    await readout.getByText(/Infantry #\d+ · 1.60 → 0.45 tiles\/s/).waitFor()
+    await button('Pause').tap()
+    const cue = await readout.innerText()
+    const marked = cue.match(/#(\d+)/)?.[1]
+    assert(marked && await page.evaluate(id => window.combatLabels.has(id), marked))
+    await button('Empty tile, row 2, column 6').tap()
+    assert.equal(await readout.innerText(), cue)
+    const row = await page.locator('.command-status').boundingBox()
+    const label = await readout.boundingBox()
+    assert(label.y >= row.y && label.y + label.height <= row.y + row.height)
+    for (const control of await page.locator('.command-row button').all()) {
+      const box = await control.boundingBox()
+      assert(box.width >= 44 && box.height >= 44 && box.x >= 8 && box.x + box.width <= 312 && box.y + box.height <= height - 12)
+    }
+    assert.deepEqual(await page.locator('.battlefield').boundingBox(), board)
+    assert.deepEqual(await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.scrollHeight]), [320, height])
+    await button('Reset').tap()
+  }
   await page.goBack()
   await button('Long battle').tap()
   await button('Enter battle').tap()
@@ -81,7 +127,7 @@ try {
   assert.deepEqual(await snapshot(), campaign)
   await button('Continue').tap()
   assert.match(await page.locator('.resources').innerText(), /60 silver/)
-  console.log('All three Field Trials effects rendered offline on a fresh profile. Reset, two-card fit, Back, and campaign/Long Battle save isolation passed.')
+  console.log('Field Trials effects, 1×/3× support rates, reduced-motion marker, Reset, dock, Back, and save isolation passed offline.')
 } finally {
   await browser.close()
 }

@@ -510,7 +510,7 @@ export function advanceRound(round: Round, seconds: number, visualSeconds = seco
   }
 }
 
-export function tickRound(round: Round, speed: PlaySpeed): Round {
+export function tickRound(round: Round, speed: PlaySpeed, observeStep?: (before: Round, after: Round, seconds: number) => void): Round {
   if (round.phase === 'setup' && round.levelPrepRemainingMs !== undefined) {
     const remaining = round.levelPrepRemainingMs - 50
     if (remaining > 0) return { ...round, levelPrepRemainingMs: remaining }
@@ -518,7 +518,9 @@ export function tickRound(round: Round, speed: PlaySpeed): Round {
     return startRound(ready)
   }
   for (let step = 0; step < speed && round.phase === 'running'; step++) {
+    const before = round
     round = advanceRound(round, 0.05, 0.05 / speed)
+    observeStep?.(before, round, 0.05)
   }
   return round
 }

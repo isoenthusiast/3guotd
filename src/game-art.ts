@@ -11,7 +11,10 @@ export { loadBattlefieldArt } from './battlefield-art-assets'
 export { placementCoverage, roadCoverage } from './battlefield-scenery'
 
 export const tile = 64
-export type BattlefieldArtOptions = { timeSeconds?: number; previewKind?: TowerKind; reducedEffects?: boolean; reducedMotion?: boolean; wireframe?: boolean }
+export type BattlefieldArtOptions = {
+  timeSeconds?: number; previewKind?: TowerKind; reducedEffects?: boolean; reducedMotion?: boolean; wireframe?: boolean
+  supportEnemy?: number; supportArcher?: number
+}
 
 function cue(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, font = 22) {
   ctx.save()
@@ -365,6 +368,10 @@ export function drawBattlefield(
       }
     }
     drawTower(ctx, x, y, tower.kind)
+    if (tower.site === options.supportArcher) {
+      const [column, row] = sitePosition(tower.site)
+      cue(ctx, String.fromCharCode(65 + column) + (row + 1), x, y + 34, 25)
+    }
     ctx.fillStyle = '#fff0bb'
     if (tower.reach) ctx.fillRect(x - 10, y + 24, 8, 4)
     if (tower.power) ctx.fillRect(x + 2, y + 24, 8, 4)
@@ -394,6 +401,7 @@ export function drawBattlefield(
     if (path[i + 1][0] < path[i][0]) ctx.scale(-1, 1)
     drawAttacker(ctx, enemy.kind, enemy.progress, { reducedMotion })
     ctx.restore()
+    if (enemy.id === options.supportEnemy) cue(ctx, String(enemy.id + 1), x + 32, y, 25)
     if (enemy.kind === 'commander') {
       const waiting = round.enemies.some(other => other.id < enemy.id)
       cue(ctx, waiting ? 'WAIT · escort' : 'GO · escort clear', x, y < tile ? y + 52 : y - 47, 22)
