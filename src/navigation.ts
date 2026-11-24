@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'preact/hooks'
 
-type Screen = 'menu' | 'campaign' | 'long' | 'battle' | 'orders' | 'enemies' | 'towers'
+type Screen = 'menu' | 'field-trials' | 'campaign' | 'long' | 'battle' | 'orders' | 'enemies' | 'towers'
 type Overlay = 'restart' | 'restore' | 'new' | 'report'
 type Route = { screen: Screen; overlay: Overlay | null }
 

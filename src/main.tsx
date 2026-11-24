@@ -7,7 +7,7 @@ import {
   retryRound, longBuildSlots, longUnlockAt, longUnlockCueTime, selectLongSupport, speedOptions, startRound, tickRound, towerDetails, upgradePrice,
   upgradeTower, waveCueTime, roundFormation, waveOptions,
 } from './game/round'
-import type { Mission, PlaySpeed, Round, TowerKind, Upgrade } from './game/round'
+import type { Mission, PlaySpeed, Round, TowerKind, TrialTower, Upgrade } from './game/round'
 import { roadCoverage } from './battlefield-scenery'
 import { loadBattlefieldArt } from './battlefield-art-assets'
 import { drawBattlefield, drawTower, tile } from './game-art'
@@ -452,6 +452,8 @@ function App() {
     <span class="offline">{offline.status}</span>
   </header>
 
+  if (screen === 'field-trials') return <PracticeBoard onBack={back} />
+
   if (screen === 'menu') {
     return <main class={`menu-screen title-screen${hasRun ? ' has-run' : ''}`}>
       {header}
@@ -471,6 +473,7 @@ function App() {
         <button type="button" onClick={() => {
           navigate('long')
         }}>Long battle</button>
+        <button type="button" onClick={() => navigate('field-trials')}>Field Trials</button>
       </div>
       <div class="session-actions">
         <button type="button" disabled={!hasRun} onClick={() => {
@@ -812,9 +815,26 @@ function App() {
   )
 }
 
-function MapPreview() {
+const practiceTowers = ['volley', 'crossbow', 'beacon'] as const
+const practiceMap: Mission = {
+  ...campaign.find(mission => mission.id === 'changban:3')!,
+  id: 'field-trials:1',
+  battleId: 'field-trials',
+  title: 'Field Trials',
+  waves: [{ name: 'Practice column', sequence: ['infantry', 'infantry', 'infantry', 'veteran', 'runner'], interval: 0.28 }],
+  milestoneCount: 1,
+  victory: 'Formation cleared.',
+  defeat: 'The practice gate fell.',
+}
+
+function practiceRound(kind: TrialTower): Round {
+  return { ...createRound(20, practiceMap), supportTower: kind }
+}
+
+function PracticeBoard({ onBack }: { onBack?: () => void }) {
   const offline = useOfflineReadiness()
-  const [round, setRound] = useState(() => createRound(20, hanzhongPreview))
+  const [round, setRound] = useState(() => onBack ? practiceRound('volley') : createRound(20, hanzhongPreview))
+  const mission = onBack ? practiceMap : hanzhongPreview
   const [selected, select] = useState<number | null>(null)
   const [paused, setPaused] = useState(false)
   const setup = round.phase === 'setup'
@@ -829,31 +849,41 @@ function MapPreview() {
     return () => window.clearInterval(timer)
   }, [running, paused])
 
+  function reset(kind = round.supportTower) {
+    setRound(kind ? practiceRound(kind) : createRound(20, hanzhongPreview))
+    select(null)
+    setPaused(false)
+  }
+
   return <main class="battle-screen map-preview">
     <header class="battle-header">
-      <a class="edge-control" href="?" aria-label="Return to main game">Game</a>
+      {onBack ? <button class="edge-control" type="button" onClick={onBack}>Menu</button>
+        : <a class="edge-control" href="?" aria-label="Return to main game">Game</a>}
       <div class="hud">
-        <h1>{hanzhongPreview.title}</h1>
+        <h1>{mission.title}</h1>
         <div class="resources">
           <strong>{round.silver} silver</strong><span>{round.lives} lives</span><span>Wave {round.waveNumber}/{round.totalWaves}</span>
         </div>
       </div>
-      <button class="edge-control" type="button" onClick={() => {
-        setRound(createRound(20, hanzhongPreview))
-        select(null)
-        setPaused(false)
-      }}>Reset</button>
+      <button class="edge-control" type="button" onClick={() => reset()}>Reset</button>
     </header>
     <div class="board-view">
-      <Battlefield round={round} selected={selected} suggested={null} onSelect={site => select(site === selected ? null : site)} wireframe />
+      <Battlefield round={round} selected={selected} suggested={null} onSelect={site => select(site === selected ? null : site)} wireframe={!onBack} />
     </div>
     <footer class="command-bar">
       <div class="command-status">
-        <div class="battle-readout" role="status">{round.phase === 'lost' ? hanzhongPreview.defeat
-          : round.phase === 'won' ? hanzhongPreview.victory
+        <div class="battle-readout" role="status">{round.phase === 'lost' ? mission.defeat
+          : round.phase === 'won' ? mission.victory
           : running ? paused ? 'Paused' : `${enemiesRemaining(round)} attackers remain`
           : occupied ? `${siteName(occupied.site)} · ${towerDetails[occupied.kind].name}`
-          : selected !== null ? `${siteName(selected)} · Choose a tower` : 'Tap a site. Compare upper-bend coverage with slowing near the gate.'}</div>
+          : selected !== null ? `${siteName(selected)} · Choose a tower` : onBack ? 'Choose tower sites.' : 'Tap a site. Compare upper-bend coverage with slowing near the gate.'}</div>
+        {onBack && !occupied && <select class="practice-tower" aria-label="Trial tower" value={round.supportTower}
+          onChange={event => {
+            const kind = event.currentTarget.value
+            if (isTrialTower(kind)) reset(kind)
+          }}>
+          {practiceTowers.map(kind => <option value={kind}>{towerDetails[kind].name}</option>)}
+        </select>}
         {setup && occupied && <button class="refund" type="button"
           onClick={() => setRound(current => removeTower(current, occupied.site))}>Refund {towerRefund(occupied)}</button>}
       </div>
@@ -863,15 +893,19 @@ function MapPreview() {
             const { price, name } = towerDetails[kind]
             const coverage = roadCoverage(roundRoutes(round), selected, kind)
             const distance = coverage.roadTiles < 0.1 ? '<0.1' : Number(coverage.roadTiles.toFixed(1))
+            const linked = kind === 'beacon' ? beaconArcher(round.towers, selected) : undefined
+            const hint = kind === 'beacon' ? linked === undefined ? 'No Archer in reach' : `Archer ${siteName(linked)}`
+              : coverage.reachesRoad ? `${distance} road tiles` : 'Out of range'
             return <button key={kind} class="purchase-card" type="button" disabled={round.silver < price}
               onClick={() => setRound(current => buildTower(current, selected, kind))}>
-              <strong>Build {name}</strong><span>{price} silver</span>
-              <small>{coverage.reachesRoad ? `${distance} road tiles` : 'Out of range'}</small>
+              <strong>Build {isTrialTower(kind) ? trialNames[kind] : name}</strong><span>{price} silver</span>
+              <small>{hint}</small>
             </button>
           })}
-        </section> : <div class="map-preview-note">Map prototype · {offline.status}</div>}
+        </section> : <div class="map-preview-note">{onBack ? 'Changban practice' : 'Map prototype'} · {offline.status}</div>}
         {setup ? <button class="battle-primary" type="button" onClick={() => setRound(startRound)}>Start wave</button>
           : running ? <button class="battle-primary" type="button" onClick={() => setPaused(value => !value)}>{paused ? 'Resume' : 'Pause'}</button>
+          : onBack ? <button class="battle-primary" type="button" onClick={() => reset()}>Replay</button>
           : round.phase === 'lost' ? <button class="battle-primary" type="button" onClick={() => {
             setRound(retryRound)
             select(null)
@@ -882,4 +916,4 @@ function MapPreview() {
 }
 
 const preview = new URLSearchParams(location.search).get('map-preview') === 'hanzhong'
-render(preview ? <MapPreview /> : <App />, document.getElementById('app')!)
+render(preview ? <PracticeBoard /> : <App />, document.getElementById('app')!)
