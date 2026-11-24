@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 
 export function checkTowerBalance(model, campaign, site) {
-  const { createRound, buildTower, upgradeTower, startRound, tickRound, towerDetails, enemyDetails, enemyPosition, roundFormation, upgradePrice } = model
+  const { createRound, buildTower, upgradeTower, startRound, tickRound, towerDetails, enemyDetails, enemyPosition,
+    roundFormation, upgradePrice, enemyMaxHealth, longMilestoneWave } = model
   const findMission = id => campaign.find(mission => mission.id === id)
   const attacker = (id, kind, health, progress) => ({ id, kind, health, progress, slowed: false })
   const column = (kind, health, positions) => positions.map((progress, id) => attacker(id, kind, health, progress))
@@ -57,6 +58,32 @@ export function checkTowerBalance(model, campaign, site) {
     }
   }
   console.log('Passed Archer bend, firing-lane, and second-site choices with equal starting silver at 1× and 3×.')
+
+  const common = [site(3, 2), site(4, 4), site(6, 4), site(4, 7), site(3, 9)]
+  const turnSites = [site(1, 4), site(5, 10)]
+  const milestoneResults = []
+  for (const waveNumber of [longMilestoneWave - 1, longMilestoneWave]) {
+    const opening = { ...createRound(20), waveNumber, totalWaves: waveNumber, silver: 6 * archerPrice }
+    const formation = roundFormation(opening)
+    const health = formation.sequence.reduce((sum, kind) => sum + enemyMaxHealth(opening, kind), 0)
+    milestoneResults.push(health)
+    for (const speed of [1, 3]) {
+      const kills = turnSites.map(turn => {
+        let ready = opening
+        for (const placement of [...common, turn]) ready = buildTower(ready, placement, 'archer')
+        assert.equal(ready.towers.length, 6)
+        assert.equal(ready.silver, 0)
+        let round = startRound(ready)
+        for (let tick = 0; tick < 2400 && round.phase === 'running'; tick++) round = tickRound(round, speed)
+        assert.equal(round.phase, 'won', 'Both layouts must survive with the normal three lives')
+        assert.equal(round.waveStats.stopped + round.waveStats.escaped, formation.sequence.length)
+        return round.waveStats.stopped
+      })
+      assert.deepEqual(kills, waveNumber === longMilestoneWave ? [5, 6] : [8, 7])
+    }
+  }
+  assert.deepEqual(milestoneResults, [55, 56])
+  console.log('Passed Wave 7 and 8 placement crossover at 180 silver and normal gate lives at 1× and 3×.')
 
   const volleySite = site(5, 1)
   const volley = [

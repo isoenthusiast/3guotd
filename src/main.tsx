@@ -4,7 +4,7 @@ import { columns, rows, sitePosition } from './game/board'
 import {
   beaconArcher, buildChoices, isTrialTower, trialTowerFor, levelPrepMs, attackerName, enemyMaxHealth, baseUpgradePrice, buildTower, canBuildAt, canSpend, closedSites, createRound, enemiesRemaining, objectiveProgress, removeTower,
   roundRoutes, levelCarryover, prepareNextLevel, nextEntry, towerRefund, inRange, routeForEnemy, enemyPosition, startingSilver, secondUpgradeSurcharge,
-  retryRound, longBuildSlots, longUnlockAt, longUnlockCueTime, selectLongSupport, speedOptions, startRound, tickRound, towerDetails, upgradePrice,
+  retryRound, longBuildSlots, longMilestoneWave, longUnlockAt, longUnlockCueTime, selectLongSupport, speedOptions, startRound, tickRound, towerDetails, upgradePrice,
   upgradeTower, waveCueTime, roundFormation, waveOptions,
 } from './game/round'
 import type { Mission, PlaySpeed, Round, TowerKind, Upgrade } from './game/round'
@@ -61,6 +61,12 @@ function upgradeEffect(kind: Exclude<TowerKind, Round['supportTower']>, branch: 
   const { speedFactor, strongerSpeedFactor } = towerDetails.drum
   const slow = (factor: number) => Math.round((1 - factor) * 100)
   return `Slow ${slow(speedFactor)}→${slow(strongerSpeedFactor)}%`
+}
+
+function formationCounts(formation: ReturnType<typeof roundFormation>) {
+  const counts = new Map<typeof formation.sequence[number], number>()
+  for (const kind of formation.sequence) counts.set(kind, (counts.get(kind) ?? 0) + 1)
+  return [...counts]
 }
 
 function useBattlefieldArt() {
@@ -284,9 +290,11 @@ function App() {
   }
   const openingHint = activeSite === null ? 'Tap the gold + for an Archer site.'
     : firstBuy ? `${selectedName} · Tap Build Archer to guard the gold road.` : 'Choose a site closer to the road.'
-  const forecast = new Map<typeof formation.sequence[number], number>()
-  for (const kind of formation.sequence) forecast.set(kind, (forecast.get(kind) ?? 0) + 1)
-  const counts = [...forecast]
+  const counts = formationCounts(formation)
+  const milestone = round.rulesVersion === 3 && round.waveNumber === longMilestoneWave
+  const nextMilestone = round.rulesVersion === 3 && round.waveNumber === longMilestoneWave - 1
+    ? roundFormation({ ...round, waveNumber: longMilestoneWave }) : null
+  const milestoneCue = nextMilestone ? ` · Next: ${nextMilestone.name.toLowerCase()}` : ''
   const compactNames = {
     infantry: 'Inf', runner: 'Run', veteran: 'Vet', veteranRunner: 'Vet run',
     bowman: 'Bow', cavalry: 'Cav', commander: 'Cmd',
@@ -312,7 +320,7 @@ function App() {
       ? `Rebuild · ${Math.ceil(round.rebuildTime)}s before attackers arrive`
       : showWaveStart
       ? `Wave ${round.waveNumber} starts · ${waveCue}`
-      : `${enemiesRemaining(round)} of ${formation.sequence.length} attackers${nextSpaced}`
+      : `${enemiesRemaining(round)} of ${formation.sequence.length} attackers${nextSpaced}${milestoneCue}`
   }
   const unlocked = running && round.announceUnlock && round.waveAge < longUnlockCueTime
     ? longUnlockAt(round.waveNumber) : undefined
@@ -667,6 +675,7 @@ function App() {
       </header>
       <p>{mission?.title ?? 'Shu frontier'} · Wave {round.waveNumber} of {round.totalWaves}</p>
       <p class="orders-intel">Wave {round.waveNumber} · {formation.name}. {fullCounts}{previewing && firstEntrance}{nextSpaced}.
+        {nextMilestone && ` Next: ${nextMilestone.name} · ${formationCounts(nextMilestone).map(([kind, count]) => `${count} × ${attackerName(kind)}`).join(' · ')}. Try covering a later bend.`}
         {!previewing && lanes > 1 && round.spawned < formation.sequence.length && ` Next arrival: Entry ${nextEntry(round) + 1}.`}
         {' '}{running || preparingLevel ? paused ? 'Returns paused.' : 'Returns to play.' : ''}</p>
       <div class="orders-list">
@@ -736,10 +745,11 @@ function App() {
       <footer class="command-bar">
         <div class="command-status">
           <div class="battle-readout">
-            {previewing && <div class="wave-preview" aria-label={`Wave ${round.waveNumber}: ${formation.spacing ? formation.spacing + ' · ' : ''}${fullCounts}${firstEntrance}${nextSpaced}`}>
+            {previewing && <div class="wave-preview" aria-label={`Wave ${round.waveNumber}: ${milestone ? formation.name + ' · ' : formation.spacing ? formation.spacing + ' · ' : ''}${fullCounts}${firstEntrance}${nextSpaced}${milestoneCue}`}>
+              {milestone && 'Escort · '}
               {formation.spacing && `${formation.spacing} · `}
               {counts.map(([kind, count]) => `${count} ${compactNames[kind]}`).join(' · ')}
-              {firstEntrance}{nextSpaced}
+              {firstEntrance}{nextSpaced}{milestoneCue}
             </div>}
             {lost ? <div class="defeat-breach">
               <strong>Last breach · {lastBreach}</strong>
@@ -756,7 +766,7 @@ function App() {
           </div>
           <span class="visually-hidden" role="status" aria-atomic="true">{lost ? `Gate fell. Last breach. ${lastBreach}. ${defeatAdvice} ${opening ? 'Retry wave available.' : 'Retry unavailable. Wave-start snapshot missing.'}`
             : unlockMessage ? `${unlockMessage}. ${breachAnnouncement}`.trim()
-              : breachAnnouncement || (preparingLevel ? 'Build or upgrade before the next level starts.' : `Wave ${round.waveNumber}. ${formation.spacing ? formation.name + '. ' : ''}${paused ? 'Paused.' : ''}`)}</span>
+              : breachAnnouncement || (preparingLevel ? 'Build or upgrade before the next level starts.' : `Wave ${round.waveNumber}. ${formation.spacing || milestone ? formation.name + '. ' : ''}${nextMilestone ? `Next: ${nextMilestone.name}. ` : ''}${paused ? 'Paused.' : ''}`)}</span>
           {setup && !preparingLevel && upgradeable && !upgradeable.reach && !upgradeable.power && !needsSilver &&
             <small>Next branch {baseUpgradePrice + secondUpgradeSurcharge}</small>}
           {canRefund && tower && <button type="button" class="refund" aria-label="Remove & refund" aria-description={`Returns ${towerRefund(tower)} silver`}

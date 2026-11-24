@@ -157,6 +157,14 @@ export function waveFormation(number: number): Formation {
   }
 }
 
+export const longMilestoneWave = 8
+const longMilestone: Formation = {
+  name: 'Commander escort',
+  sequence: ['veteran', 'commander', 'veteran', 'veteran', 'commander', 'veteran'],
+  interval: 1.75,
+  healthBonus: waveFormation(longMilestoneWave - 1).healthBonus,
+}
+
 const spawnInterval = 1.65
 const gateCueTime = 1.35
 export const rebuildWindow = 5
@@ -193,7 +201,7 @@ export type Round = {
   continuedStory?: true
   levelPrepRemainingMs?: number
   trialRefund?: number
-  rulesVersion?: 2
+  rulesVersion?: 2 | 3
   phase: 'setup' | 'running' | 'won' | 'lost'
   totalWaves: number
   mission: Mission | null
@@ -221,7 +229,7 @@ export function createRound(totalWaves = 20, mission: Mission | null = null, sup
   return {
     ...(supportTower && supportTower === trialTowerFor(mission) && { supportTower }),
     ...(useVolleySpacing && mission?.id === 'changban:3' && supportTower === 'volley' && { volleySpacing: true as const }),
-    rulesVersion: 2, phase: 'setup', totalWaves: mission?.waves.length ?? totalWaves, mission, waveNumber: 1, towers: [], silver: startingSilver, opening: null,
+    rulesVersion: mission ? 2 : 3, phase: 'setup', totalWaves: mission?.waves.length ?? totalWaves, mission, waveNumber: 1, towers: [], silver: startingSilver, opening: null,
     enemies: [], shots: [], impacts: [], gateHit: null, waveAge: 0, rebuildTime: 0,
     waveStats: emptyStats, previousWave: null, lives: initialLives, spawned: 0, spawnTimer: 0,
   }
@@ -263,8 +271,9 @@ export function retryRound(round: Round): Round {
 }
 
 export function roundFormation(round: Round): Formation {
+  if (round.rulesVersion === 3 && round.waveNumber === longMilestoneWave) return longMilestone
   const formation = round.mission?.waves[round.waveNumber - 1]
-    ?? (round.rulesVersion === 2 ? waveFormation(round.waveNumber) : formations[(round.waveNumber - 1) % formations.length])
+    ?? (round.rulesVersion !== undefined ? waveFormation(round.waveNumber) : formations[(round.waveNumber - 1) % formations.length])
   if (round.volleySpacing) {
     if (round.waveNumber === 1) return { ...formation, name: 'Clustered infantry', spacing: 'Clustered', interval: 0.2, healthBonus: -2 }
     if (round.waveNumber === 2) return { ...formation, name: 'Spaced column', spacing: 'Spaced', interval: 1.6, healthBonus: -2 }

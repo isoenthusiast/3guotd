@@ -720,7 +720,7 @@ try {
     assert.equal(transition.rulesVersion, undefined)
     assert.equal(transition.mission, mission)
     const restarted = createRound(resumed.totalWaves, resumed.mission)
-    assert.equal(restarted.rulesVersion, 2)
+    assert.equal(restarted.rulesVersion, mission ? 2 : 3)
     assert.equal(restarted.mission, mission ? campaign.find(level => level.id === mission.id) : null)
     if (mission) {
       assert.equal(nextMission(mission), nextMission(restarted.mission))
@@ -732,6 +732,30 @@ try {
   }
   assert.equal(nextMission({ ...campaign[0], id: 'unknown' }), undefined)
   console.log('Passed: legacy saves resume/retry with old rules, restart with current rules, and navigate by mission ID.')
+  for (const rulesVersion of [2, 3]) {
+    const preceding = startRound({ ...createRound(20), rulesVersion, waveNumber: 7, longSupport: 'crossbow' })
+    const milestone = tickRound({ ...preceding, spawned: roundFormation(preceding).sequence.length }, 1)
+    assert.equal(milestone.waveNumber, 8)
+    assert.equal(milestone.rulesVersion, rulesVersion)
+    const formation = roundFormation(milestone)
+    assert.equal(formation.name.startsWith('Commander escort'), rulesVersion === 3)
+    assert.equal(formation.sequence.length, rulesVersion === 3 ? 6 : 9)
+    const inFlight = tickRound(milestone, 1)
+    assert(saveGame(inFlight, 1))
+    const restored = loadGame().round
+    assert.deepEqual(restored, inFlight)
+    assert.equal(restored.longSupport, 'crossbow')
+    assert.equal(retryRound(restored).rulesVersion, rulesVersion)
+    assert.deepEqual(roundFormation(retryRound(restored)), formation)
+    const arrivals = [restored.enemies[0].kind]
+    let running = restored
+    for (let tick = 0; arrivals.length < formation.sequence.length && tick < 600; tick++) {
+      running = tickRound(running, 1)
+      if (running.spawned > arrivals.length) arrivals.push(running.enemies.at(-1).kind)
+    }
+    assert.deepEqual(arrivals, formation.sequence)
+  }
+  console.log('Passed Long Battle Wave 8 spawn order, save, Retry, and prior-schedule preservation.')
   const volleyMission = campaign.find(mission => mission.id === 'changban:3')
   const newVolleyRun = createRound(20, volleyMission, 'volley')
   const oldVolleyOpening = { ...newVolleyRun }

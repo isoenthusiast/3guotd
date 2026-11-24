@@ -126,6 +126,59 @@ try {
   assert.deepEqual(retried.round.towers, recorded.round.opening.towers)
   assert.equal(retried.round.silver, recorded.round.opening.silver)
   assert.equal(retried.round.announceUnlock, undefined)
+  // Continue the real run through the next tactical milestone.
+  await button('Continue').tap()
+  await button('Start wave').tap()
+  let forecastSeen = false
+  for (let tick = 0; tick < 240; tick++) {
+    await page.clock.runFor(200)
+    const hud = await page.locator('.resources').innerText()
+    wave = Number(hud.match(/Wave (\d+)\//)[1])
+    if (wave === 8) break
+    assert.equal(await button('Retry wave').count(), 0, 'Reach Wave 8 without injecting a win')
+    if (wave === 7 && !forecastSeen) {
+      await button('Battle orders').tap()
+      assert.match(await page.locator('.orders-intel').innerText(), /Next: Commander escort · 4 × Veteran · 2 × Pursuit commander/)
+      assert.equal(await slot.inputValue(), 'crossbow')
+      await button('Back to battle').tap()
+      await page.clock.runFor(2100)
+      assert.match(await readout.innerText(), /Next: commander escort/)
+      forecastSeen = true
+    }
+    if (placed.length < orderedSites.length && Number(hud.match(/(\d+) silver/)[1]) >= 30) await buy('archer')
+  }
+  assert(forecastSeen)
+  assert.equal(wave, 8)
+  assert.match(await readout.innerText(), /Wave 8 starts · Commander escort/)
+  await page.clock.runFor(100)
+  const escort = await save()
+  assert.equal(escort.round.rulesVersion, 3)
+  assert.equal(escort.round.enemies[0]?.kind, 'veteran')
+  await page.reload()
+  await button('Restore saved game').tap()
+  await button('Battle orders').tap()
+  assert.match(await page.locator('.orders-intel').innerText(), /Wave 8 · Commander escort. 4 × Veteran · 2 × Pursuit commander/)
+  await button('Retry wave').tap()
+  assert.match(await page.locator('.wave-preview').innerText(), /Escort · 4 Vet · 2 Cmd/)
+  assert.deepEqual(await board.boundingBox(), bounds)
+  assert.deepEqual(await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.scrollHeight]), [320, 480])
+  const escortRetry = await save()
+  assert.deepEqual(escortRetry.round.towers, escort.round.opening.towers)
+  assert.equal(escortRetry.round.silver, escort.round.opening.silver)
+  assert.equal(escortRetry.round.longSupport, 'crossbow')
+  await page.evaluate(({ escortRetry, saveKey }) => {
+    escortRetry.round.rulesVersion = 2
+    localStorage.setItem(saveKey, JSON.stringify(escortRetry))
+  }, { escortRetry, saveKey })
+  await page.reload()
+  await button('Restore saved game').tap()
+  assert.doesNotMatch(await page.locator('.wave-preview').innerText(), /Escort|Cmd/)
+  await button('Battle orders').tap()
+  assert.match(await page.locator('.orders-intel').innerText(), /Wave 8 · Runner rush/)
+  assert.equal(await slot.inputValue(), 'crossbow')
+  await button('Back to battle').tap()
+  await button('Main menu').tap()
+
   // A pre-feature save uses its existing wave number and defaults to Drum.
   await page.evaluate(({ retried, saveKey }) => {
     retried.round.towers = retried.round.towers.filter(tower => ['archer', 'drum'].includes(tower.kind))
@@ -157,7 +210,7 @@ try {
     const row = el.closest('.command-status').getBoundingClientRect()
     return text.top >= row.top && text.bottom <= row.bottom
   }))
-  console.log('Offline clean-profile Long Battle reached Wave 6, built all three trial towers, and passed unlock, slot, save, Retry, and legacy checks at 320 × 480.')
+  console.log('Offline Long Battle reached Wave 8, built all three trial towers, and passed escort forecast, unlock, slot, save, Retry, and legacy checks at 320 × 480.')
 } finally {
   await browser.close()
 }
