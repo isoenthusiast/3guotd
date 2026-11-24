@@ -7,12 +7,13 @@ import {
   retryRound, longBuildSlots, longUnlockAt, longUnlockCueTime, selectLongSupport, speedOptions, startRound, tickRound, towerDetails, upgradePrice,
   upgradeTower, waveCueTime, roundFormation, waveOptions,
 } from './game/round'
-import type { Mission, PlaySpeed, Round, TowerKind, TrialTower, Upgrade } from './game/round'
+import type { Mission, PlaySpeed, Round, TowerKind, Upgrade } from './game/round'
 import { roadCoverage } from './battlefield-scenery'
 import { loadBattlefieldArt } from './battlefield-art-assets'
 import { drawBattlefield, drawTower, tile } from './game-art'
 import { battles, campaign, isMissionUnlocked, nextMission } from './game/campaign'
 import { hanzhongPreview } from './game/hanzhong-preview'
+import { practiceMap, practiceRound, practiceTowers } from './game/field-trials'
 import { loadSound, saveSound } from './game/save-game'
 import { CampaignProgress, CampaignRecap, campaignDestination, recommendedMission, runLabel, useRecovery } from './continuity'
 import { OfflineDetails, useOfflineReadiness } from './offline-readiness'
@@ -813,22 +814,6 @@ function App() {
       </footer>
     </main>
   )
-}
-
-const practiceTowers = ['volley', 'crossbow', 'beacon'] as const
-const practiceMap: Mission = {
-  ...campaign.find(mission => mission.id === 'changban:3')!,
-  id: 'field-trials:1',
-  battleId: 'field-trials',
-  title: 'Field Trials',
-  waves: [{ name: 'Practice column', sequence: ['infantry', 'infantry', 'infantry', 'veteran', 'runner'], interval: 0.28 }],
-  milestoneCount: 1,
-  victory: 'Formation cleared.',
-  defeat: 'The practice gate fell.',
-}
-
-function practiceRound(kind: TrialTower): Round {
-  return { ...createRound(20, practiceMap), supportTower: kind }
 }
 
 function PracticeBoard({ onBack }: { onBack?: () => void }) {

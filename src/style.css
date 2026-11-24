@@ -130,7 +130,8 @@ button:focus-visible { outline: 2px solid #ffedaf; outline-offset: 2px; }
 .title-screen .menu-art { height: clamp(9rem, 42dvh, 21rem); object-position: center; border-radius: 0; }
 .title-screen > p, .title-screen .menu-confirm { margin-inline: 1rem; }
 .title-screen .menu-actions, .title-screen .session-actions { margin: .65rem 1rem; }
-.title-screen .menu-actions { display: flex; flex-direction: column; }
+.title-screen .menu-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.title-screen .menu-actions .primary { grid-column: 1 / -1; }
 .title-screen .menu-actions button { font: bold 1.2rem Georgia,serif; }
 .session-actions { display: flex; flex-wrap: wrap; gap: .15rem .5rem; border-top: 1px solid #ab9167; }
 .session-actions button { border: 0; background: transparent; font-size: .82rem; }
@@ -301,11 +302,8 @@ button:focus-visible { outline: 2px solid #ffedaf; outline-offset: 2px; }
 .title-screen.has-run .menu-art {
   height: clamp(3rem, calc(100dvh - 26rem - env(safe-area-inset-top) - env(safe-area-inset-bottom)), 15rem);
 }
-.title-screen.has-run .menu-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-}
-.title-screen.has-run .menu-actions button:first-child { grid-column: 1 / -1; }
+.title-screen.has-run .menu-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.title-screen.has-run .menu-actions button:not(.primary) { font-size: .95rem; }
 .title-screen .session-actions { display: grid; grid-template-columns: 1fr 1fr; }
 
 .cell[data-suggested="true"] {

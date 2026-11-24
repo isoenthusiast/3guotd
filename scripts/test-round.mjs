@@ -11,7 +11,7 @@ const output = mkdtempSync(join(tmpdir(), '3guotd-round-'))
 try {
   execFileSync(process.execPath, [
     require.resolve('typescript/bin/tsc'), '--ignoreConfig', '--target', 'es2022',
-    '--module', 'commonjs', '--outDir', output, 'src/game/round.ts', 'src/game/campaign.ts', 'src/game/save-game.ts', 'src/game/hanzhong-preview.ts',
+    '--module', 'commonjs', '--outDir', output, 'src/game/round.ts', 'src/game/campaign.ts', 'src/game/save-game.ts', 'src/game/hanzhong-preview.ts', 'src/game/field-trials.ts',
   ], { stdio: 'inherit' })
 
   const model = require(join(output, 'round.js'))
@@ -421,6 +421,23 @@ try {
       assert.equal(replay(hanzhongPreview, [...layout, [1, 1, 'archer']]).phase, 'won')
     }
     console.log('Passed Hanzhong prototype path and equal-silver bend tradeoffs, with a full clear from either opening plus one Archer.')
+  }
+
+  {
+    const { practiceRound, practiceTowers, practiceMap } = require(join(output, 'field-trials.js'))
+    assert(!campaign.some(level => level.id === practiceMap.id))
+    assert.deepEqual(practiceTowers.map(kind => model.buildChoices(practiceRound(kind))), [
+      ['archer', 'volley'], ['archer', 'crossbow'], ['archer', 'beacon'],
+    ])
+    const archer = buildTower(practiceRound('beacon'), site(5, 1), 'archer')
+    const linked = buildTower(archer, site(4, 1), 'beacon')
+    for (const [layout, interval] of [[archer, towerDetails.archer.shotInterval], [linked, towerDetails.beacon.archerInterval]]) {
+      let round = startRound(layout)
+      for (let step = 0; step < 40 && !round.shots.length; step++) round = tickRound(round, 1)
+      assert(round.shots.length > 0, 'The practice Archer must actually fire')
+      assert.equal(round.towers.find(tower => tower.kind === 'archer').cooldown, interval)
+    }
+    console.log('Passed Field Trials isolation, independent loadouts, and the actual practice Beacon reload.')
   }
 
   const local = new Map()
