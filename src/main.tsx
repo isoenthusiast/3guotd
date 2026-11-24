@@ -935,9 +935,10 @@ function PracticeBoard({ onBack, onChallenge, onOriginal, offlineStatus, active 
             const coverage = roadCoverage(roundRoutes(round), selected, kind)
             const distance = coverage.roadTiles < 0.1 ? '<0.1' : Number(coverage.roadTiles.toFixed(1))
             const linked = kind === 'beacon' ? beaconArcher(round.towers, selected) : undefined
-            const hint = kind === 'beacon' ? linked === undefined ? 'No Archer in reach' : `Archer ${siteName(linked)}`
+            const hint = kind === 'beacon' ? linked === undefined ? 'No link' : `Archer ${siteName(linked)}`
               : coverage.reachesRoad ? `${distance} road tiles` : 'Out of range'
             return <button key={kind} class="purchase-card" type="button" disabled={round.silver < price}
+              aria-description={kind === 'beacon' && linked === undefined ? 'No Archer in reach' : undefined}
               onClick={() => setRound(current => buildTower(current, selected, kind))}>
               <strong>Build {isTrialTower(kind) ? trialNames[kind] : name}</strong><span>{price} silver</span>
               <small>{hint}</small>

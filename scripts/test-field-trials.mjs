@@ -69,6 +69,16 @@ try {
     await choose.selectOption('beacon')
     await button('Reset').tap()
     await button('Empty tile, row 2, column 6').tap()
+    const unlinked = page.getByRole('button', { name: /^Build Beacon/ })
+    assert.match(await unlinked.innerText(), /No link/)
+    assert.equal(await unlinked.getAttribute('aria-description'), 'No Archer in reach')
+    assert(await unlinked.evaluate(control => {
+      const box = control.getBoundingClientRect()
+      const text = document.createRange()
+      text.selectNodeContents(control)
+      return [...text.getClientRects()].every(rect => !rect.width ||
+        (rect.top >= box.top - 1 && rect.bottom <= box.bottom + 1 && rect.left >= box.left - 1 && rect.right <= box.right + 1))
+    }), 'Unlinked Beacon label fits in the short dock')
     await page.getByRole('button', { name: /^Build Archer/ }).tap()
     await button('Empty tile, row 2, column 5').tap()
     await page.getByRole('button', { name: /^Build Beacon/ }).tap()
