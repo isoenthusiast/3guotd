@@ -1,6 +1,6 @@
 import { campaign } from './campaign'
 import { sitePosition } from './board'
-import { beaconArcher, createRound, enemyDetails, tickRound, towerDetails } from './round'
+import { beaconArcher, createRound, enemyDetails, reloadTime, tickRound, towerDetails } from './round'
 import type { AttackerKind, Mission, PlaySpeed, Round } from './round'
 
 export const practiceTowers = ['volley', 'crossbow', 'beacon', 'drum'] as const
@@ -43,7 +43,8 @@ export function tickPractice(round: Round, speed: PlaySpeed, tower: PracticeTowe
       const archer = after.towers.find(candidate => candidate.kind === 'archer' && links.includes(candidate.site)
         && after.shots.some(shot => shot.elapsed === 0 && shot.from.every((coordinate, axis) =>
           coordinate === sitePosition(candidate.site)[axis])))
-      if (archer) cue = { kind: 'beacon', site: archer.site, before: towerDetails.archer.shotInterval, after: archer.cooldown }
+      if (archer) cue = { kind: 'beacon', site: archer.site,
+        before: reloadTime(towerDetails.archer.shotInterval, seconds), after: reloadTime(archer.cooldown, seconds) }
     }
   })
   return { round: next, cue }

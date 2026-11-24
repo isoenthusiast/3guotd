@@ -373,6 +373,19 @@ export function inRange(tower: Tower, [x, y]: Point): boolean {
   return Math.hypot(x - towerX, y - towerY) <= towerRange(tower.kind, tower.reach)
 }
 
+function cooldownAfter(cooldown: number, seconds: number) {
+  return Math.max(0, cooldown - seconds)
+}
+
+export function reloadTime(cooldown: number, seconds: number): number {
+  let steps = 0
+  while (cooldown > 0) {
+    cooldown = cooldownAfter(cooldown, seconds)
+    steps++
+  }
+  return steps * seconds
+}
+
 export function advanceRound(round: Round, seconds: number, visualSeconds = seconds): Round {
   if (round.phase !== 'running') return round
   if (round.rebuildTime > 0) {
@@ -454,7 +467,7 @@ export function advanceRound(round: Round, seconds: number, visualSeconds = seco
     .map(tower => beaconArcher(round.towers, tower.site)))
   const towers = round.towers.map(tower => {
     if (tower.kind === 'drum' || tower.kind === 'beacon') return tower
-    const cooldown = Math.max(0, tower.cooldown - seconds)
+    const cooldown = cooldownAfter(tower.cooldown, seconds)
     if (cooldown > 0) return { ...tower, cooldown }
 
     const eligible = (enemy: Enemy) => enemy.health > (incoming.get(enemy.id) ?? 0)

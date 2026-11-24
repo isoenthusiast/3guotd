@@ -453,7 +453,7 @@ try {
         beacon = tickPractice(beacon.round, speed, 'beacon', beacon.cue)
         unlinked = tickPractice(unlinked.round, speed, 'beacon', unlinked.cue)
       }
-      assert.deepEqual(beacon.cue, { kind: 'beacon', site: site(5, 1), before: 1.05, after: 0.6 })
+      assert.deepEqual(beacon.cue, { kind: 'beacon', site: site(5, 1), before: 1.05, after: 0.65 })
       assert.equal(unlinked.cue, null)
       assert(beacon.round.shots.some(shot => shot.from[0] === 5 && shot.from[1] === 1))
       const drum = buildTower(practiceRound('drum'), site(3, 1), 'drum')

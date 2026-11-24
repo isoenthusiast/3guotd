@@ -73,7 +73,7 @@ try {
     await button('Empty tile, row 2, column 5').tap()
     await page.getByRole('button', { name: /^Build Beacon/ }).tap()
     await button('Start wave').tap()
-    await readout.getByText(/Archer F2 reload · 1.05 → 0.60 s/).waitFor()
+    await readout.getByText(/Archer F2 reload · 1.05 → 0.65 s/).waitFor()
     await page.waitForFunction(() => window.combatLabels.has('F2'))
     await button('Reset').tap()
     await choose.selectOption('drum')
