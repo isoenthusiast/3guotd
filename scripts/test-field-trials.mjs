@@ -3,8 +3,11 @@ import { chromium } from 'playwright'
 
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH })
 try {
-  const context = await browser.newContext({ viewport: { width: 320, height: 480 }, isMobile: true, hasTouch: true })
+  const height = process.argv.includes('--short') ? 420 : 480
+  const context = await browser.newContext({ viewport: { width: 320, height }, isMobile: true, hasTouch: true })
   const page = await context.newPage()
+  const cdp = await context.newCDPSession(page)
+  await cdp.send('Emulation.setSafeAreaInsetsOverride', { insets: { top: 16, bottom: 12, left: 8, right: 8 } })
   const button = name => page.getByRole('button', { name, exact: true })
   const url = process.argv[2] ?? 'http://localhost:4173/'
   await page.addInitScript(() => {
@@ -20,6 +23,10 @@ try {
   await context.setOffline(true)
   await page.reload()
   assert.deepEqual(await page.evaluate(() => Object.keys(localStorage)), [])
+  for (const control of await page.locator('.title-screen button:enabled').all()) {
+    const box = await control.boundingBox()
+    assert(box.y >= 16 && box.y + box.height <= height - 12)
+  }
   await button('Field Trials').tap()
   const board = await page.locator('.battlefield').boundingBox()
   const choose = page.getByLabel('Trial tower')
@@ -35,7 +42,7 @@ try {
     } else await button('Empty tile, row 2, column 6').tap()
     assert.equal(await page.locator('.purchase-card').count(), 2)
     assert.deepEqual(await page.locator('.battlefield').boundingBox(), board)
-    assert.deepEqual(await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.scrollHeight]), [320, 480])
+    assert.deepEqual(await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.scrollHeight]), [320, height])
     await page.getByRole('button', { name: new RegExp(`^Build ${label}`) }).tap()
     await page.locator(".cells button[aria-pressed=true]").tap()
     await page.evaluate(() => window.combatStrokes.clear())

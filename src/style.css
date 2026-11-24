@@ -450,3 +450,7 @@ button:focus-visible { outline: 2px solid #ffedaf; outline-offset: 2px; }
 .map-preview .edge-control { display: grid; place-items: center; }
 .map-preview-note { flex: 1; align-self: center; padding-inline: 4px; font-size: .73rem; }
 .practice-tower { min-height: 44px; max-width: 55%; font: inherit; }
+
+@media (max-height: 440px) {
+  .title-screen .menu-art { height: 21dvh; }
+}
