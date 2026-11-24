@@ -24,3 +24,19 @@ export const hanzhongPreview: Mission = {
     { name: 'Mixed column', sequence: ['infantry', 'veteran', 'runner', 'cavalry'], interval: 1.35 },
   ],
 }
+
+export const hanzhongChallengeSilver = 60
+export const hanzhongChallenge: Mission = {
+  ...hanzhongPreview,
+  id: 'hanzhong-rider-ambush:1',
+  battleId: 'hanzhong-rider-ambush',
+  title: 'Hanzhong Rider Ambush',
+  briefing: '60 silver to deploy. Build before combat. Stop 3 cavalry and 2 runners.',
+  milestoneCount: 1,
+  victory: 'Rider Ambush cleared.',
+  waves: [{
+    name: 'Rider ambush',
+    sequence: ['cavalry', 'runner', 'cavalry', 'runner', 'cavalry'],
+    interval: 1.35,
+  }],
+}

@@ -12,7 +12,7 @@ import { roadCoverage } from './battlefield-scenery'
 import { loadBattlefieldArt } from './battlefield-art-assets'
 import { drawBattlefield, drawTower, tile } from './game-art'
 import { battles, campaign, isMissionUnlocked, nextMission } from './game/campaign'
-import { hanzhongPreview } from './game/hanzhong-preview'
+import { hanzhongChallenge, hanzhongChallengeSilver, hanzhongPreview } from './game/hanzhong-preview'
 import { practiceMap, practiceRound, practiceTowers } from './game/field-trials'
 import { loadSound, saveSound } from './game/save-game'
 import { CampaignProgress, CampaignRecap, campaignDestination, recommendedMission, runLabel, useRecovery } from './continuity'
@@ -467,7 +467,7 @@ function App() {
     <span class="offline">{offline.status}</span>
   </header>
 
-  if (screen === 'field-trials') return <PracticeBoard onBack={back} />
+  if (screen === 'field-trials') return <PracticeBoard onBack={back} offlineStatus={offline.status} />
 
   if (screen === 'menu') {
     return <main class={`menu-screen title-screen${hasRun ? ' has-run' : ''}`}>
@@ -831,33 +831,55 @@ function App() {
   )
 }
 
-function PracticeBoard({ onBack }: { onBack?: () => void }) {
-  const offline = useOfflineReadiness()
-  const [round, setRound] = useState(() => onBack ? practiceRound('volley') : createRound(20, hanzhongPreview))
-  const mission = onBack ? practiceMap : hanzhongPreview
+const hanzhongClearKey = '3guotd.hanzhong-rider-ambush.cleared.v1'
+
+function PracticeBoard({ onBack, onChallenge, onOriginal, offlineStatus, active = true }: {
+  onBack?: () => void
+  onChallenge?: () => void
+  onOriginal?: () => void
+  offlineStatus: string
+  active?: boolean
+}) {
+  const challenge = !!onOriginal
+  const mission = onBack ? practiceMap : challenge ? hanzhongChallenge : hanzhongPreview
+  const openingRound = () => ({
+    ...createRound(20, mission),
+    ...(challenge && { silver: hanzhongChallengeSilver }),
+  })
+  const [round, setRound] = useState(() => onBack ? practiceRound('volley') : openingRound())
+  const [cleared, setCleared] = useState(() => {
+    try { return challenge && localStorage.getItem(hanzhongClearKey) === 'true' }
+    catch { return false }
+  })
   const [selected, select] = useState<number | null>(null)
   const [paused, setPaused] = useState(false)
   const setup = round.phase === 'setup'
   const running = round.phase === 'running'
   const occupied = round.towers.find(tower => tower.site === selected)
-  const open = selected !== null && canSpend(round) && !occupied
+  const open = selected !== null && canSpend(round) && (!challenge || setup) && !occupied
   useEffect(() => {
-    if (!running || paused) return
+    if (!active || !running || paused) return
     const timer = window.setInterval(() => {
       if (!document.hidden) setRound(current => tickRound(current, 1))
     }, 50)
     return () => window.clearInterval(timer)
-  }, [running, paused])
+  }, [active, running, paused])
+  useEffect(() => {
+    if (!challenge || cleared || round.phase !== 'won') return
+    setCleared(true)
+    try { localStorage.setItem(hanzhongClearKey, 'true') } catch { /* Keep the current session playable. */ }
+  }, [challenge, cleared, round.phase])
 
   function reset(kind = round.supportTower) {
-    setRound(kind ? practiceRound(kind) : createRound(20, hanzhongPreview))
+    setRound(kind ? practiceRound(kind) : openingRound())
     select(null)
     setPaused(false)
   }
 
-  return <main class="battle-screen map-preview">
+  return <main class="battle-screen map-preview" style={active ? undefined : { display: 'none' }}>
     <header class="battle-header">
       {onBack ? <button class="edge-control" type="button" onClick={onBack}>Menu</button>
+        : onOriginal ? <button class="edge-control" type="button" onClick={onOriginal}>Back</button>
         : <a class="edge-control" href="?" aria-label="Return to main game">Game</a>}
       <div class="hud">
         <h1>{mission.title}</h1>
@@ -876,7 +898,8 @@ function PracticeBoard({ onBack }: { onBack?: () => void }) {
           : round.phase === 'won' ? mission.victory
           : running ? paused ? 'Paused' : `${enemiesRemaining(round)} attackers remain`
           : occupied ? `${siteName(occupied.site)} · ${towerDetails[occupied.kind].name}`
-          : selected !== null ? `${siteName(selected)} · Choose a tower` : onBack ? 'Choose tower sites.' : 'Tap a site. Compare upper-bend coverage with slowing near the gate.'}</div>
+          : selected !== null ? `${siteName(selected)} · Choose a tower` : challenge ? mission.briefing
+          : onBack ? 'Choose tower sites.' : 'Tap a site. Compare upper-bend coverage with slowing near the gate.'}</div>
         {onBack && !occupied && <select class="practice-tower" aria-label="Trial tower" value={round.supportTower}
           onChange={event => {
             const kind = event.currentTarget.value
@@ -902,10 +925,13 @@ function PracticeBoard({ onBack }: { onBack?: () => void }) {
               <small>{hint}</small>
             </button>
           })}
-        </section> : <div class="map-preview-note">{onBack ? 'Changban practice' : 'Map prototype'} · {offline.status}</div>}
+        </section> : <>
+          {onChallenge && <button class="edge-control" type="button" onClick={onChallenge}>Rider Ambush</button>}
+          <div class="map-preview-note">{onBack ? 'Changban practice' : challenge ? cleared ? 'Best: cleared' : 'One-wave challenge' : 'Map prototype'} · {offlineStatus}</div>
+        </>}
         {setup ? <button class="battle-primary" type="button" onClick={() => setRound(startRound)}>Start wave</button>
           : running ? <button class="battle-primary" type="button" onClick={() => setPaused(value => !value)}>{paused ? 'Resume' : 'Pause'}</button>
-          : onBack ? <button class="battle-primary" type="button" onClick={() => reset()}>Replay</button>
+          : onBack || challenge ? <button class="battle-primary" type="button" onClick={() => reset()}>Replay</button>
           : round.phase === 'lost' ? <button class="battle-primary" type="button" onClick={() => {
             setRound(retryRound)
             select(null)
@@ -915,5 +941,34 @@ function PracticeBoard({ onBack }: { onBack?: () => void }) {
   </main>
 }
 
-const preview = new URLSearchParams(location.search).get('map-preview') === 'hanzhong'
-render(preview ? <PracticeBoard /> : <App />, document.getElementById('app')!)
+function HanzhongBoards() {
+  const offline = useOfflineReadiness()
+  const isChallenge = () => new URLSearchParams(location.search).get('map-preview') === 'hanzhong-challenge'
+  const [challenge, setChallenge] = useState(isChallenge)
+  const [opened, setOpened] = useState(challenge)
+  useEffect(() => {
+    const handleBack = () => setChallenge(isChallenge())
+    window.addEventListener('popstate', handleBack)
+    return () => window.removeEventListener('popstate', handleBack)
+  }, [])
+  function enterChallenge() {
+    if (isChallenge()) return
+    history.pushState({ hanzhongChallenge: true }, '', '?map-preview=hanzhong-challenge')
+    setOpened(true)
+    setChallenge(true)
+  }
+  function returnToOriginal() {
+    if (history.state?.hanzhongChallenge) history.back()
+    else {
+      history.replaceState(null, '', '?map-preview=hanzhong')
+      setChallenge(false)
+    }
+  }
+  return <>
+    <PracticeBoard active={!challenge} onChallenge={enterChallenge} offlineStatus={offline.status} />
+    {opened && <PracticeBoard active={challenge} onOriginal={returnToOriginal} offlineStatus={offline.status} />}
+  </>
+}
+
+const preview = new URLSearchParams(location.search).get('map-preview')
+render(preview === 'hanzhong' || preview === 'hanzhong-challenge' ? <HanzhongBoards /> : <App />, document.getElementById('app')!)

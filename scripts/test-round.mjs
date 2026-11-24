@@ -386,8 +386,10 @@ try {
   checkTowerBalance(model, campaign, site)
 
   {
-    const { hanzhongPreview } = require(join(output, 'hanzhong-preview.js'))
+    const { hanzhongPreview, hanzhongChallenge, hanzhongChallengeSilver } = require(join(output, 'hanzhong-preview.js'))
     assert(!campaign.some(mission => mission.id === hanzhongPreview.id))
+    assert(!campaign.some(mission => mission.id === hanzhongChallenge.id))
+    assert.equal(hanzhongChallenge.routes, hanzhongPreview.routes)
     const [path] = hanzhongPreview.routes
     assert.equal(path[0][1], 0)
     assert.equal(path.at(-1)[1], rows - 1)
@@ -399,13 +401,13 @@ try {
     }
     const early = [[3, 2, 'archer'], [5, 4, 'archer']]
     const late = [[4, 9, 'archer'], [5, 8, 'drum']]
-    function replay(mission, layout) {
-      let round = createRound(20, mission)
+    function replay(mission, layout, silver = startingSilver, speed = 1) {
+      let round = { ...createRound(20, mission), silver }
       for (const [x, y, kind] of layout) round = buildTower(round, site(x, y), kind)
       assert.equal(round.towers.length, layout.length, 'Every prototype placement must be legal')
-      assert.equal(round.silver, startingSilver - layout.length * towerDetails.archer.price)
+      assert.equal(round.silver, silver - layout.length * towerDetails.archer.price)
       round = startRound(round)
-      for (let tick = 0; round.phase === 'running' && tick < 1800; tick++) round = tickRound(round, 1)
+      for (let tick = 0; round.phase === 'running' && tick < 1800; tick++) round = tickRound(round, speed)
       assert.notEqual(round.phase, 'running')
       return round
     }
@@ -419,6 +421,13 @@ try {
     }
     for (const layout of [early, late]) {
       assert.equal(replay(hanzhongPreview, [...layout, [1, 1, 'archer']]).phase, 'won')
+    }
+    for (const speed of [1, 3]) {
+      const purse = hanzhongChallengeSilver
+      const original = [early, late].map(layout => replay({ ...hanzhongPreview, waves: [infantry] }, layout, purse, speed))
+      const ambush = [early, late].map(layout => replay(hanzhongChallenge, layout, purse, speed))
+      assert.deepEqual(original.map(round => round.waveStats.stopped), [3, 2])
+      assert.deepEqual(ambush.map(round => [round.phase, round.waveStats.stopped]), [['lost', 2], ['won', 3]])
     }
     console.log('Passed Hanzhong prototype path and equal-silver bend tradeoffs, with a full clear from either opening plus one Archer.')
   }
