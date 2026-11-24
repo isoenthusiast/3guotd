@@ -68,7 +68,7 @@ try {
   await activate(button('Battle orders'))
   if (!baseline) {
     assert.match(await page.locator('.orders-intel').innerText(), /Infantry/)
-    assert.match(await page.locator('.orders-list').innerText(), /Wave start: 1 tower \(upgrades kept\), 15 silver, 3 lives/)
+    assert.match(await page.locator('.orders-list').innerText(), /Wave start · 1 tower · 15 silver · 3 lives · upgrades kept/)
   }
   await activate(button('Back to battle'))
   await button('Pause').waitFor()
