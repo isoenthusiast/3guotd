@@ -947,9 +947,13 @@ function HanzhongBoards() {
   const [challenge, setChallenge] = useState(isChallenge)
   const [opened, setOpened] = useState(challenge)
   useEffect(() => {
-    const handleBack = () => setChallenge(isChallenge())
-    window.addEventListener('popstate', handleBack)
-    return () => window.removeEventListener('popstate', handleBack)
+    const restoreHistory = () => {
+      const next = isChallenge()
+      if (next) setOpened(true)
+      setChallenge(next)
+    }
+    window.addEventListener('popstate', restoreHistory)
+    return () => window.removeEventListener('popstate', restoreHistory)
   }, [])
   function enterChallenge() {
     if (isChallenge()) return
