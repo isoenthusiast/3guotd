@@ -187,6 +187,7 @@ export const levelPrepMs = 10_000
 
 export type Round = {
   supportTower?: TrialTower
+  volleySpacing?: true
   longSupport?: TrialTower
   announceUnlock?: true
   continuedStory?: true
@@ -213,12 +214,13 @@ export type Round = {
   spawnTimer: number
 }
 
-export function createRound(totalWaves = 20, mission: Mission | null = null, supportTower?: Round['supportTower']): Round {
+export function createRound(totalWaves = 20, mission: Mission | null = null, supportTower?: Round['supportTower'], useVolleySpacing = true): Round {
   // Explicit restarts adopt current rules; retry and wave transitions retain the snapshot's rules.
   const missionId = mission?.id
   if (missionId) mission = campaign.find(candidate => candidate.id === missionId) ?? mission
   return {
     ...(supportTower && supportTower === trialTowerFor(mission) && { supportTower }),
+    ...(useVolleySpacing && mission?.id === 'changban:3' && supportTower === 'volley' && { volleySpacing: true as const }),
     rulesVersion: 2, phase: 'setup', totalWaves: mission?.waves.length ?? totalWaves, mission, waveNumber: 1, towers: [], silver: startingSilver, opening: null,
     enemies: [], shots: [], impacts: [], gateHit: null, waveAge: 0, rebuildTime: 0,
     waveStats: emptyStats, previousWave: null, lives: initialLives, spawned: 0, spawnTimer: 0,
@@ -257,13 +259,13 @@ export function startRound(round: Round): Round {
 
 export function retryRound(round: Round): Round {
   if (!round.opening) return round
-  return { ...createRound(round.totalWaves, round.mission, round.supportTower), mission: round.mission, ...(round.continuedStory && { continuedStory: true as const }), rulesVersion: round.rulesVersion, waveNumber: round.waveNumber, previousWave: round.previousWave, ...(round.longSupport && { longSupport: round.longSupport }), ...round.opening }
+  return { ...createRound(round.totalWaves, round.mission, round.supportTower, round.volleySpacing === true), mission: round.mission, ...(round.continuedStory && { continuedStory: true as const }), rulesVersion: round.rulesVersion, waveNumber: round.waveNumber, previousWave: round.previousWave, ...(round.longSupport && { longSupport: round.longSupport }), ...round.opening }
 }
 
 export function roundFormation(round: Round): Formation {
   const formation = round.mission?.waves[round.waveNumber - 1]
     ?? (round.rulesVersion === 2 ? waveFormation(round.waveNumber) : formations[(round.waveNumber - 1) % formations.length])
-  if (round.mission?.id === 'changban:3' && round.supportTower === 'volley') {
+  if (round.volleySpacing) {
     if (round.waveNumber === 1) return { ...formation, name: 'Clustered infantry', spacing: 'Clustered', interval: 0.2, healthBonus: -2 }
     if (round.waveNumber === 2) return { ...formation, name: 'Spaced column', spacing: 'Spaced', interval: 1.6, healthBonus: -2 }
   }
@@ -477,7 +479,7 @@ export function advanceRound(round: Round, seconds: number, visualSeconds = seco
   })
   const cleared = spawned === formation.sequence.length && enemies.length === 0
   if (lives > 0 && cleared && round.waveNumber < round.totalWaves) {
-    const next = { ...createRound(round.totalWaves, round.mission, round.supportTower), mission: round.mission, ...(round.continuedStory && { continuedStory: true as const }), rulesVersion: round.rulesVersion, waveNumber: round.waveNumber + 1 }
+    const next = { ...createRound(round.totalWaves, round.mission, round.supportTower, round.volleySpacing === true), mission: round.mission, ...(round.continuedStory && { continuedStory: true as const }), rulesVersion: round.rulesVersion, waveNumber: round.waveNumber + 1 }
     const closed = closedSites(next)
     const needsRebuild = closed.length > closedSites(round).length
     const remaining = towers.filter(tower => !closed.includes(tower.site))

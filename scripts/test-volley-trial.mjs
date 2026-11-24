@@ -157,6 +157,18 @@ try {
     await assertWaveCueFits(/^Spaced/)
     assert.deepEqual(await board.boundingBox(), bounds)
     assert.deepEqual(await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.scrollHeight]), [320, 480])
+
+    await page.evaluate(record => {
+      delete record.round.volleySpacing
+      localStorage.setItem('3guotd.saved-game.v1', JSON.stringify(record))
+    }, saved)
+    await page.reload()
+    await button('Restore saved game').tap()
+    await button('Resume').waitFor()
+    await button('Battle orders').tap()
+    await button('Retry wave').tap()
+    await assertWaveCueFits(/^6 Inf$/)
+    assert.match(await page.locator('.resources').innerText(), /60 silver/)
   }
 
   // Reach the same briefing through the natural story-completion entry point.
@@ -165,6 +177,7 @@ try {
     const drum = { kind: 'drum', site: 16, power: false, reach: true, cooldown: 1 }
     record.missionId = `${trial.chapter}:${trial.level - 1}`
     delete record.round.supportTower
+    delete record.round.volleySpacing
     Object.assign(record.round, {
       phase: 'won', totalWaves: trial.previousWaves, waveNumber: trial.previousWaves, towers: [drum], opening: null,
       enemies: [], shots: [], impacts: [], spawned: 0,

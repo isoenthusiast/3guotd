@@ -732,6 +732,34 @@ try {
   }
   assert.equal(nextMission({ ...campaign[0], id: 'unknown' }), undefined)
   console.log('Passed: legacy saves resume/retry with old rules, restart with current rules, and navigate by mission ID.')
+  const volleyMission = campaign.find(mission => mission.id === 'changban:3')
+  const newVolleyRun = createRound(20, volleyMission, 'volley')
+  const oldVolleyOpening = { ...newVolleyRun }
+  delete oldVolleyOpening.volleySpacing
+  const oldVolleyRun = tickRound(startRound(oldVolleyOpening), 1)
+  assert.equal(oldVolleyRun.enemies[0].health, 4)
+  for (const slot of [oldVolleyRun, tickRound(startRound(newVolleyRun), 1)]) {
+    const revised = slot.volleySpacing === true
+    assert(saveGame(slot, 1))
+    const restored = loadGame().round
+    const health = revised ? 2 : 4
+    assert.equal(restored.enemies[0].health, health)
+    assert.equal(enemyMaxHealth(restored, 'infantry'), health)
+    const nextSpawn = tickRound({ ...restored, spawnTimer: 0 }, 1)
+    assert.deepEqual(nextSpawn.enemies.map(enemy => enemy.health), [health, health])
+    const retry = retryRound(restored)
+    assert.equal(roundFormation(retry).interval, revised ? 0.2 : volleyMission.waves[0].interval)
+    const nextWave = tickRound({ ...restored, enemies: [], spawned: roundFormation(restored).sequence.length }, 1)
+    assert.equal(nextWave.waveNumber, 2)
+    assert.equal(roundFormation(nextWave).interval, revised ? 1.6 : volleyMission.waves[1].interval)
+  }
+  assert(saveGame(newVolleyRun, 1))
+  const invalidSpacing = JSON.parse(local.get('3guotd.saved-game.v1'))
+  invalidSpacing.round.volleySpacing = false
+  local.set('3guotd.saved-game.v1', JSON.stringify(invalidSpacing))
+  assert.equal(loadGame(), null)
+  saveGame(oldVolleyRun, 1)
+  console.log('Passed: old and new Changban Volley saves preserve their formation, HP, Retry, and wave transition.')
   const manualBytes = local.get('3guotd.saved-game.v1')
   assert.equal(loadCheckpoint(), null)
   assert.equal(saveCheckpoint(arrivals, 3), true)
