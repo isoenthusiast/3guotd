@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 
 export function checkTowerBalance(model, campaign, site) {
-  const { createRound, buildTower, upgradeTower, startRound, tickRound, towerDetails, enemyDetails, enemyPosition, roundFormation } = model
+  const { createRound, buildTower, upgradeTower, startRound, tickRound, towerDetails, enemyDetails, enemyPosition, roundFormation, upgradePrice } = model
   const findMission = id => campaign.find(mission => mission.id === id)
   const attacker = (id, kind, health, progress) => ({ id, kind, health, progress, slowed: false })
   const column = (kind, health, positions) => positions.map((progress, id) => attacker(id, kind, health, progress))
@@ -25,6 +25,38 @@ export function checkTowerBalance(model, campaign, site) {
     assert.equal(round.lives, opening.lives - round.waveStats.escaped)
     return { leaks: round.waveStats.escaped, kills: round.waveStats.stopped, gateLives: round.lives }
   }
+
+  const archerPrice = towerDetails.archer.price
+  const archerChoices = [
+    { mission: 'village-watch:1', label: 'reach down to the bend', existing: site(5, 9), extra: site(2, 1), kills: [0, 2, 0, 0] },
+    { mission: 'jing:1', label: 'fast fire beside the approach', existing: site(5, 4), extra: site(1, 1), kills: [0, 0, 3, 0] },
+    { mission: 'village-watch:1', label: 'another Archer at a separate firing point', existing: site(4, 3), extra: site(2, 1), kills: [0, 1, 1, 3] },
+  ]
+  for (const fixture of archerChoices) {
+    const mission = findMission(fixture.mission)
+    const initial = { ...createRound(20, mission), silver: 2 * archerPrice, lives: 20, totalWaves: 1 }
+    const existing = buildTower(initial, fixture.existing, 'archer')
+    assert.equal(existing.silver, archerPrice, 'Every option starts with the same purse and Archer')
+    const choices = [
+      existing,
+      upgradeTower(existing, fixture.existing, 'reach'),
+      upgradeTower(existing, fixture.existing, 'power'),
+      buildTower(existing, fixture.extra, 'archer'),
+    ]
+    const branchCost = upgradePrice(existing.towers[0])
+    assert.deepEqual(choices.map(choice => choice.silver), [archerPrice, archerPrice - branchCost, archerPrice - branchCost, 0])
+    for (const speed of [1, 3]) {
+      const kills = choices.map(choice => {
+        let round = startRound(choice)
+        for (let tick = 0; tick < 2400 && round.phase === 'running'; tick++) round = tickRound(round, speed)
+        assert.equal(round.phase, 'won')
+        assert.equal(round.waveStats.stopped + round.waveStats.escaped, roundFormation(round).sequence.length)
+        return round.waveStats.stopped
+      })
+      assert.deepEqual(kills, fixture.kills, `${fixture.label} at ${speed}×`)
+    }
+  }
+  console.log('Passed Archer bend, firing-lane, and second-site choices with equal starting silver at 1× and 3×.')
 
   const volleySite = site(5, 1)
   const volley = [

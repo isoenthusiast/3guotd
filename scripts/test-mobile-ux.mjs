@@ -20,6 +20,18 @@ async function checkPhone(width, height, previousBoardWidth, insets = { top: 0, 
         && box.left >= safe.left && box.right <= innerWidth - safe.right + 0.01
     }, insets)
 
+    const checkCardLabel = async (control, expected) => {
+      assert.match(await control.innerText(), expected)
+      assert(await control.evaluate(element => {
+        const box = element.getBoundingClientRect()
+        const range = document.createRange()
+        range.selectNodeContents(element)
+        return [...range.getClientRects()].every(rect => !rect.width ||
+          (rect.top >= box.top - 1 && rect.bottom <= box.bottom + 1 &&
+            rect.left >= box.left - 1 && rect.right <= box.right + 1))
+      }), `Label fits for ${await control.innerText()}`)
+    }
+
     const checkMenu = async () => {
       assert(await fits(page.locator('.title-screen h1')), 'Title clears the top safe area')
       for (const control of await page.locator('.title-screen button:enabled').all()) {
@@ -76,7 +88,7 @@ async function checkPhone(width, height, previousBoardWidth, insets = { top: 0, 
     assert.equal(await marked.count(), 1)
     await marked.tap()
     assert(await fits(card('Archer')))
-    assert.match(await card('Archer').innerText(), /Build Archer/)
+    await checkCardLabel(card('Archer'), /Build Archer\s+30 silver\s+Hit · (entry|middle|gate)/)
     await checkFrame()
     for (const label of ['Empty tile, row 1, column 3', 'Empty tile, row 13, column 6']) {
       const nearLandmark = button(label)
@@ -109,6 +121,10 @@ async function checkPhone(width, height, previousBoardWidth, insets = { top: 0, 
     await button('Remove & refund').tap()
     await checkFrame()
     await button('Start wave').tap()
+    await page.getByRole('button', { name: /^Archer, row/ }).first().tap()
+    await checkCardLabel(page.getByRole('button', { name: /^Longer range/ }), /Longer range\s+18 silver\s+2\.5-tile reach/)
+    await checkCardLabel(page.getByRole('button', { name: /^Faster fire/ }), /Faster fire\s+18 silver\s+0\.75 s \/ shot/)
+    await checkFrame()
     await button('Pause').tap()
     await checkFrame()
     assert(await fits(button('Resume')))
@@ -156,7 +172,7 @@ async function checkPhone(width, height, previousBoardWidth, insets = { top: 0, 
     await button('Retry wave').tap()
     await page.getByRole('button', { name: /^Archer, row/ }).first().tap()
     assert.equal(await page.getByRole('button', { name: /Faster fire/ }).count(), 0)
-    assert.match(await page.getByRole('button', { name: /Longer range/ }).innerText(), /27 silver/)
+    await checkCardLabel(page.getByRole('button', { name: /Longer range/ }), /27 silver\s+2\.5-tile reach/)
     await checkFrame()
     assert.deepEqual(errors, [])
     console.log(`Passed offline placement, purchase, refund, and stable board at ${width} × ${height}.`)

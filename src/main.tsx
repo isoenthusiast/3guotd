@@ -277,6 +277,11 @@ function App() {
   function branchEffect(branch: Upgrade) {
     return boosted && branch === 'power' ? `${towerDetails.archer.fasterShotInterval}s unlinked` : upgradeKind ? upgradeEffect(upgradeKind, branch) : ''
   }
+  function dockUpgradeEffect(branch: Upgrade) {
+    if (upgradeKind !== 'archer') return branchEffect(branch)
+    if (branch === 'reach') return `${towerDetails.archer.extendedRange}-tile reach`
+    return boosted ? branchEffect(branch) : `${towerDetails.archer.fasterShotInterval} s / shot`
+  }
   const openingHint = activeSite === null ? 'Tap the gold + for an Archer site.'
     : firstBuy ? `${selectedName} · Tap Build Archer to guard the gold road.` : 'Choose a site closer to the road.'
   const forecast = new Map<typeof formation.sequence[number], number>()
@@ -763,20 +768,18 @@ function App() {
               {upgradeable && installedUpgrades && upgradeKind ? <>
                 {appliedUpgrades.length === 1 && towerSummary}
                 {upgradeBranches.filter(option => !upgradeable[option]).map(option => (
-                  <button key={option} type="button" class="purchase-card" disabled={shortfall > 0}
-                    title={branchEffect(option)} onClick={() => buy(current => upgradeTower(current, upgradeable.site, option))}>
+                  <button key={option} type="button" class="purchase-card upgrade-card" disabled={shortfall > 0}
+                    aria-description={branchEffect(option)} onClick={() => buy(current => upgradeTower(current, upgradeable.site, option))}>
                     <strong>{installedUpgrades[option]}</strong>
                     <span>{price} silver</span>
-                    {appliedUpgrades.length === 0 && option === 'reach'
-                      ? <small class="tower-role">{towerRole(upgradeKind)}</small>
-                      : <small>{branchEffect(option)}</small>}
+                    <small class="tower-role">{dockUpgradeEffect(option)}</small>
                   </button>
               ))}</> : choices.map(kind => (
                 <button key={kind} type="button" class={`purchase-card build-card${firstBuy && kind === 'archer' ? ' first-buy' : ''}`} disabled={round.silver < towerDetails[kind].price}
                   title={towerRole(kind)}
                   aria-description={round.silver < towerDetails[kind].price
                     ? `${towerRole(kind)}. Need ${towerDetails[kind].price - round.silver} more silver`
-                    : towerRole(kind)}
+                    : kind === 'archer' ? 'Adds a shooter that deals damage along its covered road.' : towerRole(kind)}
                   onClick={() => buy(current => buildTower(current, activeSite, kind))}>
                   <TowerPortrait kind={kind} />
                   <span><strong>Build {isTrialTower(kind) ? trialNames[kind] : towerDetails[kind].name}</strong>
