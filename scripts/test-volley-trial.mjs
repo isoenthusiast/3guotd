@@ -67,13 +67,24 @@ try {
     assert(await card(trial.card).isEnabled())
     await page.locator('.cells [aria-pressed="true"]').tap()
   }
+  const assertWaveCueFits = async pattern => {
+    const preview = page.locator('.wave-preview')
+    assert.match(await preview.innerText(), pattern)
+    assert(await preview.evaluate(el => el.scrollWidth <= el.clientWidth && el.scrollHeight <= el.clientHeight))
+  }
+  if (trial.kind === 'volley') {
+    await assertWaveCueFits(/Clustered.*Next: spaced/)
+    assert.match(await page.locator('.resources').innerText(), /90 silver/)
+  }
   const bounds = await board.boundingBox()
   await button('Select marked site').tap()
   assert.deepEqual(await board.boundingBox(), bounds)
   assert.equal(await page.locator('.build-card').count(), 2)
+  if (trial.kind === 'volley') await assertWaveCueFits(/Clustered.*Next: spaced/)
   assert.equal(await card('Drum').count(), 0)
   assert.match(await card(trial.card).innerText(), new RegExp(`${price} silver`))
   await button('Battle orders').tap()
+  if (trial.kind === 'volley') assert.match(await page.locator('.orders-intel').innerText(), /Clustered infantry.*Next: spaced/)
   await button('Towers').tap()
   await page.getByText(new RegExp(`^${trial.name} · ${price} silver`)).waitFor()
   await button('Back to orders').tap()
@@ -114,6 +125,7 @@ try {
     remainingSilver -= 30
   } else await card(trial.card).tap()
   await button('Start wave').tap()
+  if (trial.kind === 'volley') assert.match(await page.locator('.battle-readout').innerText(), /Clustered infantry/)
   await button('Pause').tap()
   const saved = await save()
   assert.equal(saved.round.supportTower, trial.kind)
@@ -127,6 +139,25 @@ try {
   assert.match(await page.locator('.resources').innerText(), new RegExp(`${remainingSilver} silver`))
   assert.equal(await page.getByRole('button', { name: new RegExp(`^${trial.name}, row`) }).count(), 1)
   assert.deepEqual(await board.boundingBox(), bounds)
+
+  if (trial.kind === 'volley') {
+    // Restore a checkpoint immediately before the last hit of Wave 1.
+    await page.evaluate(record => {
+      const enemy = { id: 0, kind: 'infantry', health: 1, progress: 0.5, slowed: false }
+      Object.assign(record.round, { spawned: 6, enemies: [enemy], shots: [], waveAge: 2, spawnTimer: 0 })
+      record.round.towers[0].cooldown = 0
+      localStorage.setItem('3guotd.saved-game.v1', JSON.stringify(record))
+    }, structuredClone(saved))
+    await page.reload()
+    await button('Restore saved game').tap()
+    await button('Resume').tap()
+    await page.getByText('Wave 2 starts · Spaced column', { exact: true }).waitFor({ timeout: 5000 })
+    await button('Battle orders').tap()
+    await button('Retry wave').tap()
+    await assertWaveCueFits(/^Spaced/)
+    assert.deepEqual(await board.boundingBox(), bounds)
+    assert.deepEqual(await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.scrollHeight]), [320, 480])
+  }
 
   // Reach the same briefing through the natural story-completion entry point.
   await button('Main menu').tap()

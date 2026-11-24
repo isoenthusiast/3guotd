@@ -44,7 +44,7 @@ function siteName(site: number) {
 
 const trialNames = { volley: 'Volley', crossbow: 'Crossbow', beacon: 'Beacon' } as const
 const trialBrief = {
-  volley: `Volley hits up to ${towerDetails.volley.maxTargets} nearby enemies. Try a bend where the column bunches. Volley is recalled for full silver after this level.`,
+  volley: `Volley hits up to ${towerDetails.volley.maxTargets} nearby enemies. Wave 1 clusters. Wave 2 spreads out. Try Volley at a bend and Archer against spaced targets. Volley is recalled for full silver after this level.`,
   crossbow: 'Heavy Crossbow targets the enemy with the most HP in range. Place it by a long stretch so it can reload before that enemy leaves.',
   beacon: `Watch Beacon boosts the nearest Archer within ${towerDetails.beacon.range} tiles. Link it to an Archer that covers useful road. The Beacon is refunded after this level.`,
 } as const
@@ -286,6 +286,7 @@ function App() {
     infantry: 'Inf', runner: 'Run', veteran: 'Vet', veteranRunner: 'Vet run',
     bowman: 'Bow', cavalry: 'Cav', commander: 'Cmd',
   }
+  const nextSpaced = formation.spacing === 'Clustered' ? ' · Next: spaced' : ''
   const fullCounts = counts.map(([kind, count]) => `${count} × ${attackerName(kind)}`).join(' · ')
   const lanes = roundRoutes(round).length
   const previewing = setup || preparingLevel
@@ -299,14 +300,14 @@ function App() {
   const showWaveStart = running && round.waveAge < (speed === 3 ? 2 : waveCueTime)
   if (running) {
     const first = formation.sequence[0]
-    const waveCue = round.continuedStory
+    const waveCue = formation.spacing ? formation.name : round.continuedStory
       ? `First: ${attackerName(first)} · ${enemyMaxHealth(round, first)} HP`
       : formation.name
     status = paused ? 'Paused' : round.rebuildTime > 0
       ? `Rebuild · ${Math.ceil(round.rebuildTime)}s before attackers arrive`
       : showWaveStart
       ? `Wave ${round.waveNumber} starts · ${waveCue}`
-      : `${enemiesRemaining(round)} of ${formation.sequence.length} attackers`
+      : `${enemiesRemaining(round)} of ${formation.sequence.length} attackers${nextSpaced}`
   }
   const unlocked = running && round.announceUnlock && round.waveAge < longUnlockCueTime
     ? longUnlockAt(round.waveNumber) : undefined
@@ -660,7 +661,7 @@ function App() {
         <button type="button" onClick={back}>Back to battle</button>
       </header>
       <p>{mission?.title ?? 'Shu frontier'} · Wave {round.waveNumber} of {round.totalWaves}</p>
-      <p class="orders-intel">Wave {round.waveNumber} · {formation.name}. {fullCounts}{previewing && firstEntrance}.
+      <p class="orders-intel">Wave {round.waveNumber} · {formation.name}. {fullCounts}{previewing && firstEntrance}{nextSpaced}.
         {!previewing && lanes > 1 && round.spawned < formation.sequence.length && ` Next arrival: Entry ${nextEntry(round) + 1}.`}
         {' '}{running || preparingLevel ? paused ? 'Returns paused.' : 'Returns to play.' : ''}</p>
       <div class="orders-list">
@@ -730,9 +731,10 @@ function App() {
       <footer class="command-bar">
         <div class="command-status">
           <div class="battle-readout">
-            {previewing && <div class="wave-preview" aria-label={`Wave ${round.waveNumber}: ${fullCounts}${firstEntrance}`}>
+            {previewing && <div class="wave-preview" aria-label={`Wave ${round.waveNumber}: ${formation.spacing ? formation.spacing + ' · ' : ''}${fullCounts}${firstEntrance}${nextSpaced}`}>
+              {formation.spacing && `${formation.spacing} · `}
               {counts.map(([kind, count]) => `${count} ${compactNames[kind]}`).join(' · ')}
-              {firstEntrance}
+              {firstEntrance}{nextSpaced}
             </div>}
             {lost ? <div class="defeat-breach">
               <strong>Last breach · {lastBreach}</strong>
@@ -749,7 +751,7 @@ function App() {
           </div>
           <span class="visually-hidden" role="status" aria-atomic="true">{lost ? `Gate fell. Last breach. ${lastBreach}. ${defeatAdvice} ${opening ? 'Retry wave available.' : 'Retry unavailable. Wave-start snapshot missing.'}`
             : unlockMessage ? `${unlockMessage}. ${breachAnnouncement}`.trim()
-              : breachAnnouncement || (preparingLevel ? 'Build or upgrade before the next level starts.' : `Wave ${round.waveNumber}. ${paused ? 'Paused.' : ''}`)}</span>
+              : breachAnnouncement || (preparingLevel ? 'Build or upgrade before the next level starts.' : `Wave ${round.waveNumber}. ${formation.spacing ? formation.name + '. ' : ''}${paused ? 'Paused.' : ''}`)}</span>
           {setup && !preparingLevel && upgradeable && !upgradeable.reach && !upgradeable.power && !needsSilver &&
             <small>Next branch {baseUpgradePrice + secondUpgradeSurcharge}</small>}
           {canRefund && tower && <button type="button" class="refund" aria-label="Remove & refund" aria-description={`Returns ${towerRefund(tower)} silver`}

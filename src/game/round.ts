@@ -107,6 +107,7 @@ export const attackers = {
 
 export type AttackerKind = keyof typeof attackers
 export type Formation = {
+  spacing?: 'Clustered' | 'Spaced'
   name: string
   sequence: readonly AttackerKind[]
   interval?: number
@@ -260,8 +261,13 @@ export function retryRound(round: Round): Round {
 }
 
 export function roundFormation(round: Round): Formation {
-  return round.mission?.waves[round.waveNumber - 1]
+  const formation = round.mission?.waves[round.waveNumber - 1]
     ?? (round.rulesVersion === 2 ? waveFormation(round.waveNumber) : formations[(round.waveNumber - 1) % formations.length])
+  if (round.mission?.id === 'changban:3' && round.supportTower === 'volley') {
+    if (round.waveNumber === 1) return { ...formation, name: 'Clustered infantry', spacing: 'Clustered', interval: 0.2, healthBonus: -2 }
+    if (round.waveNumber === 2) return { ...formation, name: 'Spaced column', spacing: 'Spaced', interval: 1.6, healthBonus: -2 }
+  }
+  return formation
 }
 
 export function objectiveProgress(round: Round): number {

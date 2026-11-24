@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 
 export function checkTowerBalance(model, campaign, site) {
-  const { createRound, buildTower, upgradeTower, startRound, tickRound, towerDetails, enemyDetails, enemyPosition } = model
+  const { createRound, buildTower, upgradeTower, startRound, tickRound, towerDetails, enemyDetails, enemyPosition, roundFormation } = model
   const findMission = id => campaign.find(mission => mission.id === id)
   const attacker = (id, kind, health, progress) => ({ id, kind, health, progress, slowed: false })
   const column = (kind, health, positions) => positions.map((progress, id) => attacker(id, kind, health, progress))
@@ -34,6 +34,35 @@ export function checkTowerBalance(model, campaign, site) {
     mission: 'changban:3', condition, expectedKills, support: 'volley', enemies: column('infantry', 1, positions),
     baseline: [[volleySite, 'archer']], trial: [[volleySite, 'volley']],
   }))
+  const changban = findMission('changban:3')
+  const changbanSetup = createRound(20, changban, 'volley')
+  const clustered = roundFormation(changbanSetup)
+  const spaced = roundFormation({ ...changbanSetup, waveNumber: 2 })
+  assert.deepEqual([clustered.spacing, spaced.spacing], ['Clustered', 'Spaced'])
+  assert(clustered.interval < spaced.interval)
+  assert.equal(changbanSetup.silver, createRound(20, changban, 'drum').silver)
+  const layouts = ['archer', 'volley'].map(kind => [[volleySite, kind], [site(1, 7), 'archer']])
+  assert.equal(cost(layouts[0]), cost(layouts[1]))
+  const compareSpacing = (mission, waveNumber, speed) => layouts.map(layout => {
+    // Allow the entire roster to resolve even when the deliberately small defense leaks.
+    let round = { ...createRound(20, mission, 'volley'), waveNumber, totalWaves: waveNumber,
+      lives: 20, silver: cost(layout), supportTower: 'volley' }
+    for (const [towerSite, kind] of layout) round = buildTower(round, towerSite, kind)
+    assert.equal(round.silver, 0)
+    round = startRound(round)
+    for (let tick = 0; round.phase === 'running' && tick < 2400; tick++) round = tickRound(round, speed)
+    assert.equal(round.phase, 'won')
+    assert.equal(round.waveStats.stopped + round.waveStats.escaped, roundFormation(round).sequence.length)
+    return round.waveStats.stopped
+  })
+  for (const speed of [1, 3]) {
+    assert.deepEqual(compareSpacing(changban, 1, speed), [1, 2], 'Volley wins the live clustered wave')
+    assert.deepEqual(compareSpacing(changban, 2, speed), [8, 6], 'Archer wins the live spaced wave')
+    const spacingOnly = { ...changban, id: 'spacing-fixture', waves: [{ ...clustered, interval: spaced.interval }] }
+    assert.deepEqual(compareSpacing(spacingOnly, 1, speed), [6, 5], 'Spacing alone reverses the result')
+  }
+  console.log('Passed Changban Volley spacing at equal silver and 1×/3×, including a matched-roster spacing control.')
+
   const crossbow = [
     ['long exposure', site(2, 3), [0, 1]],
     ['short exposure', site(3, 1), [0, 0]],
