@@ -110,7 +110,8 @@ async function checkPhone(width, height, previousBoardWidth, insets = { top: 0, 
     await checkFrame()
     assert.match(await card('Archer').innerText(), /Out of range/)
     for (const kind of ['Archer', 'Drum', 'Archer']) {
-      await page.locator('button.useful-site').first().tap()
+      const guidedSite = page.locator('[data-suggested="true"]')
+      await (await guidedSite.count() ? guidedSite : page.locator('button.useful-site').first()).tap()
       await checkFrame()
       assert(await fits(card(kind)))
       await card(kind).tap()
