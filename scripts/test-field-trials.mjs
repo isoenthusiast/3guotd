@@ -36,12 +36,28 @@ try {
   await button('Field Trials').tap()
   const board = await page.locator('.battlefield').boundingBox()
   const choose = page.getByLabel('Trial tower')
+  const card = label => page.getByRole('button', { name: new RegExp(`^Build ${label}`) })
+  const silver = async () => Number((await page.locator('.resources strong').innerText()).match(/^(\d+) silver$/)[1])
+  async function checkPriceAndRefund(label) {
+    const purchase = card(label)
+    const displayedPrice = Number((await purchase.innerText()).match(/\b(\d+) silver\b/)[1])
+    const before = await silver()
+    await purchase.tap()
+    assert.equal(before - await silver(), displayedPrice, `${label} purchase matches its card`)
+    const refund = page.getByRole('button', { name: /^Refund \d+$/ })
+    const displayedRefund = Number((await refund.innerText()).match(/^Refund (\d+)$/)[1])
+    const purchased = await silver()
+    await refund.tap()
+    assert.equal(await silver() - purchased, displayedRefund, `${label} refund matches its card`)
+    assert.equal(await silver(), before, `${label} refund restores the original purse`)
+  }
   for (const [kind, label, color] of [
     ['volley', 'Volley', '#fff1a2'], ['crossbow', 'Crossbow', '#ffc7a8'], ['beacon', 'Beacon', '#b5efff'],
   ]) {
     await choose.selectOption(kind)
     if (kind === 'beacon') {
       await button('Empty tile, row 2, column 6').tap()
+      await checkPriceAndRefund('Archer')
       await page.getByRole('button', { name: /^Build Archer/ }).tap()
       await button('Empty tile, row 2, column 5').tap()
       assert.match(await page.getByRole('button', { name: /^Build Beacon/ }).innerText(), /Archer F2/)
@@ -49,7 +65,8 @@ try {
     assert.equal(await page.locator('.purchase-card').count(), 2)
     assert.deepEqual(await page.locator('.battlefield').boundingBox(), board)
     assert.deepEqual(await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.scrollHeight]), [320, height])
-    await page.getByRole('button', { name: new RegExp(`^Build ${label}`) }).tap()
+    await checkPriceAndRefund(label)
+    await card(label).tap()
     await page.locator(".cells button[aria-pressed=true]").tap()
     await page.evaluate(() => window.combatStrokes.clear())
     await button('Start wave').tap()
@@ -59,6 +76,24 @@ try {
     assert.match(await page.locator('.resources').innerText(), /90 silver/)
     assert.equal(await page.getByRole('button', { name: /^(Archer|Volley Platform|Heavy Crossbow|Watch Beacon), row/ }).count(), 0)
   }
+  await choose.selectOption('drum')
+  await button('Empty tile, row 2, column 4').tap()
+  await checkPriceAndRefund('Drum')
+  await card('Drum').tap()
+  for (const label of ['Empty tile, row 2, column 5', 'Empty tile, row 2, column 6']) {
+    await button(label).tap()
+    await card('Archer').tap()
+  }
+  const unaffordable = button('Empty tile, row 2, column 8')
+  await unaffordable.tap()
+  const blocked = card('Drum')
+  assert(await blocked.isDisabled())
+  const attempted = await blocked.boundingBox()
+  await page.touchscreen.tap(attempted.x + attempted.width / 2, attempted.y + attempted.height / 2)
+  assert.equal(await silver(), 0)
+  assert.equal(await unaffordable.getAttribute('aria-pressed'), 'true')
+  assert.equal(await page.getByRole('button', { name: /^Drum, row/ }).count(), 1)
+  await button('Reset').tap()
   const readout = page.locator('.battle-readout')
   for (const speed of [1, 3]) {
     await page.emulateMedia({ reducedMotion: speed === 3 ? 'reduce' : 'no-preference' })
@@ -137,6 +172,7 @@ try {
   assert.deepEqual(await snapshot(), campaign)
   await button('Continue').tap()
   assert.match(await page.locator('.resources').innerText(), /60 silver/)
+  console.log('All five prices and refunds matched the silver ledger. An unaffordable touch spent nothing.')
   console.log('Field Trials effects, 1×/3× support rates, reduced-motion marker, Reset, dock, Back, and save isolation passed offline.')
 } finally {
   await browser.close()

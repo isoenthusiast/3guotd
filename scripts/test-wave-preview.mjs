@@ -3,9 +3,12 @@ import { chromium } from 'playwright'
 
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH })
 try {
-  for (const level of [1, 3]) {
+  for (const { chapter, level, wave, laneCount } of [
+    { chapter: 'village-watch', level: 1, wave: 1, laneCount: 1 },
+    { chapter: 'red-cliffs', level: 3, wave: 1, laneCount: 2 },
+    { chapter: 'red-cliffs', level: 3, wave: 2, laneCount: 2 },
+  ]) {
     for (const speed of [1, 3]) {
-      const chapter = level === 3 ? 'red-cliffs' : 'village-watch'
       const context = await browser.newContext({ viewport: { width: 320, height: 480 }, hasTouch: true, isMobile: true })
       const page = await context.newPage()
       const button = name => page.getByRole('button', { name, exact: true })
@@ -22,9 +25,23 @@ try {
       await page.locator('#battle').selectOption(chapter)
       await page.locator('#level').selectOption(`${chapter}:${level}`)
       await button('Enter battle').tap()
+      if (wave > 1) {
+        // Change the wave number only. The production game still supplies the preview and every spawn.
+        await button('Main menu').tap()
+        await button('Save game').tap()
+        await page.evaluate(waveNumber => {
+          const key = '3guotd.saved-game.v1'
+          const save = JSON.parse(localStorage.getItem(key))
+          save.round.waveNumber = waveNumber
+          localStorage.setItem(key, JSON.stringify(save))
+        }, wave)
+        await page.reload()
+        await button('Restore saved game').tap()
+      }
       const bounds = await board.boundingBox()
       const label = await forecast.getAttribute('aria-label')
-      await button('Select marked site').tap()
+      if (wave === 1) await button('Select marked site').tap()
+      else await page.getByRole('button', { name: /^Empty tile,/ }).first().tap()
       assert.deepEqual(await board.boundingBox(), bounds)
       assert.deepEqual(await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.scrollHeight]), [320, 480])
       assert(await forecast.evaluate(el => {
@@ -56,10 +73,14 @@ try {
       const counts = new Map()
       for (const enemy of round.enemies) counts.set(enemy.kind, (counts.get(enemy.kind) ?? 0) + 1)
       const actual = [...counts].map(([kind, count]) => `${count} × ${kinds[kind]}`).join(' · ')
-      const firstEntry = level === 3 ? ` · Entry ${round.enemies[0].routeIndex + 1} first` : ''
+      const firstEntry = laneCount > 1 ? ` · Entry ${round.enemies[0].routeIndex + 1} first` : ''
       assert.equal(breakdown, actual + firstEntry)
+      const ordered = [...round.enemies].sort((a, b) => a.id - b.id)
+      assert.deepEqual(ordered.map(enemy => enemy.id), ordered.map((_, index) => index))
+      const firstLane = laneCount > 1 ? Number(breakdown.match(/Entry (\d+) first$/)[1]) - 1 : 0
+      assert.deepEqual(ordered.map(enemy => enemy.routeIndex), ordered.map((_, index) => (firstLane + index) % laneCount))
       await context.close()
-      console.log(`${chapter} ${level} at ${speed}×: ${breakdown} matched actual spawns, offline at 320 × 480.`)
+      console.log(`${chapter} Level ${level} Wave ${wave} at ${speed}×: ${breakdown} matched actual spawns and entrance order offline.`)
     }
   }
 } finally {

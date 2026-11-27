@@ -438,6 +438,19 @@ try {
     assert.deepEqual(practiceTowers.map(kind => model.buildChoices(practiceRound(kind))), [
       ['archer', 'volley'], ['archer', 'crossbow'], ['archer', 'beacon'], ['archer', 'drum'],
     ])
+    for (const kind of ['archer', ...practiceTowers]) {
+      const opening = practiceRound(kind === 'archer' ? 'drum' : kind)
+      const placement = site(5, 1)
+      const price = towerDetails[kind].price
+      const short = { ...opening, silver: price - 1 }
+      assert.equal(buildTower(short, placement, kind), short, `${kind} at one short must leave the state intact`)
+      const exact = { ...opening, silver: price }
+      const purchased = buildTower(exact, placement, kind)
+      assert.equal(purchased.silver, 0)
+      assert.equal(purchased.towers.length, 1)
+      assert.equal(purchased.towers[0].kind, kind)
+      assert.deepEqual(removeTower(purchased, placement), exact)
+    }
     const archer = buildTower(practiceRound('beacon'), site(5, 1), 'archer')
     const linked = buildTower(archer, site(4, 1), 'beacon')
     for (const [layout, interval] of [[archer, towerDetails.archer.shotInterval], [linked, towerDetails.beacon.archerInterval]]) {
