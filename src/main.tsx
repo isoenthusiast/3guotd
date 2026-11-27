@@ -106,11 +106,12 @@ function TowerPortrait({ kind, upgrade }: { kind: TowerKind; upgrade?: Upgrade }
   return <canvas ref={canvas} class="tower-portrait" width={80} height={80} aria-hidden="true" />
 }
 
-function Battlefield({ round, selected, suggested, onSelect, wireframe = false, supportEnemy, supportArcher }: {
+function Battlefield({ round, selected, suggested, onSelect, wireframe = false, supportEnemy, supportArcher, keepSuggested = false }: {
   suggested: number | null
   wireframe?: boolean
   supportEnemy?: number
   supportArcher?: number
+  keepSuggested?: boolean
   round: Round
   selected: number | null
   onSelect: (site: number | null) => void
@@ -147,7 +148,7 @@ function Battlefield({ round, selected, suggested, onSelect, wireframe = false, 
           const label = tower ? towerDetails[tower.kind].name : 'Empty tile'
           return (
             <button key={site} ref={button => { cells.current[site] = button }}
-              type="button" class={tower ? 'cell' : reachable[site] ? 'cell empty-cell useful-site' : 'cell empty-cell'} data-suggested={site === suggested && selected === null ? 'true' : undefined}
+              type="button" class={tower ? 'cell' : reachable[site] ? 'cell empty-cell useful-site' : 'cell empty-cell'} data-suggested={site === suggested && (selected === null || keepSuggested && selected !== suggested) ? 'true' : undefined}
               aria-description={[
                 tower ? 'Occupied' : 'Available to build',
                 !tower && reachable[site] && 'Archer can reach the road',
@@ -218,6 +219,7 @@ function App() {
   const previousAudio = useRef<Round | null>(null)
   const [round, setRound] = useState(createRound)
   const [clears, setClears] = useState(loadClears)
+  const [openingGuide, setOpeningGuide] = useState<'active' | 'dismissed' | null>(null)
   const [selected, setSelected] = useState<number | null>(null)
   const [speed, setSpeed] = useState<PlaySpeed>(1)
   const recovery = useRecovery(round, speed, hasRun)
@@ -251,18 +253,20 @@ function App() {
   const spendingOpen = canSpend(round)
   const canRefund = setup && round.towers.length > 0
   const showActions = activeSite !== null && spendingOpen && (!tower || !!upgradeable && (!upgradeable.reach || !upgradeable.power))
-  const firstPlacement = (setup || running) && round.waveNumber === 1 && !preparingLevel && round.towers.length === 0
+  const guiding = openingGuide === 'active' && initialSetup && mission?.id === 'village-watch:1'
+  const guideHasArcher = guiding && round.towers.some(defense => defense.kind === 'archer')
+  const firstPlacement = openingGuide !== 'dismissed' && (setup || running) && round.waveNumber === 1 && !preparingLevel && round.towers.length === 0
   const suggested = useMemo(() => {
-    if (!firstPlacement) return null
+    if (!firstPlacement && (!guiding || guideHasArcher)) return null
     let best: number | null = null
     let mostRoad = 0
     for (let site = 0; site < siteCount; site++) {
-      if (!canBuildAt(round, site)) continue
+      if (!canBuildAt(round, site) || round.towers.some(defense => defense.site === site)) continue
       const { roadTiles } = roadCoverage(roundRoutes(round), site, 'archer')
       if (roadTiles > mostRoad) { best = site; mostRoad = roadTiles }
     }
     return best
-  }, [firstPlacement, mission, round.rulesVersion])
+  }, [firstPlacement, guiding, guideHasArcher, mission, round.rulesVersion, round.towers])
   const slowed = round.enemies.filter(enemy => enemy.slowed)
   const inArcherRange = slowed.filter(enemy => round.towers.some(defense => defense.kind === 'archer'
     && inRange(defense, enemyPosition(enemy.progress, routeForEnemy(round, enemy))))).length
@@ -291,6 +295,10 @@ function App() {
     if (branch === 'reach') return `${towerDetails.archer.extendedRange}-tile reach`
     return boosted ? branchEffect(branch) : `${towerDetails.archer.fasterShotInterval} s / shot`
   }
+  const guideCue = guiding ? guideHasArcher ? 'Tap Start to begin the wave.'
+    : suggested !== null && activeSite === suggested
+      ? `${siteName(suggested)} · Tap Build Archer · ${towerDetails.archer.price} silver`
+      : 'Tap the gold + to select the marked site.' : ''
   const openingHint = activeSite === null ? 'Tap the gold + for an Archer site.'
     : firstBuy ? `${selectedName} · Tap Build Archer to guard the gold road.` : 'Choose a site closer to the road.'
   const counts = formationCounts(formation)
@@ -409,6 +417,7 @@ function App() {
 
   function enterBattle(next: Round, restore = false) {
     setRound(next)
+    setOpeningGuide(!restore && !clears.includes('village-watch:1') && next.mission?.id === 'village-watch:1' && next.phase === 'setup' ? 'active' : null)
     setHasRun(true)
     setPaused(restore && (next.phase === 'running' || next.levelPrepRemainingMs !== undefined))
     selectTile(null)
@@ -743,7 +752,7 @@ function App() {
         <button type="button" class="edge-control" aria-label="Battle orders" onClick={() => navigate('orders')}>Orders<small>Help</small></button>
       </header>
       <div class="board-view">
-        <Battlefield round={round} selected={activeSite} suggested={suggested} onSelect={site => selectTile(site === activeSite ? null : site)} />
+        <Battlefield round={round} selected={activeSite} suggested={suggested} keepSuggested={guiding} onSelect={site => selectTile(site === activeSite ? null : site)} />
       </div>
       <footer class="command-bar">
         <div class="command-status">
@@ -754,7 +763,7 @@ function App() {
               {counts.map(([kind, count]) => `${count} ${compactNames[kind]}`).join(' · ')}
               {firstEntrance}{nextSpaced}{milestoneCue}
             </div>}
-            {lost ? <div class="defeat-breach">
+            {guideCue ? <span class="opening-guide">{guideCue}</span> : lost ? <div class="defeat-breach">
               <strong>Last breach · {lastBreach}</strong>
               <div>{defeatAdvice}</div>
             </div> : unlockMessage ? <>
@@ -767,9 +776,10 @@ function App() {
             {!unlockMessage && showActions && upgradeable && !needsSilver && price > baseUpgradePrice && (!upgradeable.reach || !upgradeable.power) &&
               <span>Second upgrade · +{price - baseUpgradePrice} silver</span>}
           </div>
-          <span class="visually-hidden" role="status" aria-atomic="true">{lost ? `Gate fell. Last breach. ${lastBreach}. ${defeatAdvice} ${opening ? 'Retry wave available.' : 'Retry unavailable. Wave-start snapshot missing.'}`
+          <span class="visually-hidden" role="status" aria-atomic="true">{guideCue || (lost ? `Gate fell. Last breach. ${lastBreach}. ${defeatAdvice} ${opening ? 'Retry wave available.' : 'Retry unavailable. Wave-start snapshot missing.'}`
             : unlockMessage ? `${unlockMessage}. ${breachAnnouncement}`.trim()
-              : breachAnnouncement || (preparingLevel ? 'Build or upgrade before the next level starts.' : `Wave ${round.waveNumber}. ${formation.spacing || milestone ? formation.name + '. ' : ''}${nextMilestone ? `Next: ${nextMilestone.name}. ` : ''}${paused ? 'Paused.' : ''}`)}</span>
+              : breachAnnouncement || (preparingLevel ? 'Build or upgrade before the next level starts.' : `Wave ${round.waveNumber}. ${formation.spacing || milestone ? formation.name + '. ' : ''}${nextMilestone ? `Next: ${nextMilestone.name}. ` : ''}${paused ? 'Paused.' : ''}`))}</span>
+          {guiding && <button class="edge-control guide-dismiss" type="button" onClick={() => setOpeningGuide('dismissed')}>Skip tips</button>}
           {setup && !preparingLevel && upgradeable && !upgradeable.reach && !upgradeable.power && !needsSilver &&
             <small>Next branch {baseUpgradePrice + secondUpgradeSurcharge}</small>}
           {canRefund && tower && <button type="button" class="refund" aria-label="Remove & refund" aria-description={`Returns ${towerRefund(tower)} silver`}
@@ -824,7 +834,10 @@ function App() {
             {speed}×</button>}
           {running || preparingLevel ? <button class="battle-primary" type="button" onClick={() => setPaused(value => !value)}>
             {paused ? 'Resume' : 'Pause'}</button>
-            : setup ? <button class="battle-primary" type="button" aria-label="Start wave" onClick={() => setRound(startRound)}>Start</button>
+            : setup ? <button class="battle-primary" type="button" aria-label="Start wave" onClick={() => {
+              if (guiding) setOpeningGuide('dismissed')
+              setRound(startRound)
+            }}>Start</button>
             : round.phase === 'won' && upcoming && upcoming.battleId !== mission?.battleId ? <button class="battle-primary" type="button" onClick={() => openMission(upcoming)}>Next battle</button>
             : round.phase === 'lost' ? <button class="battle-primary" type="button" aria-describedby="retry-restores" disabled={!opening} onClick={retryWave}>Retry wave</button>
             : <button class="battle-primary" type="button" onClick={back}>Main menu</button>}

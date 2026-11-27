@@ -455,3 +455,6 @@ button:focus-visible { outline: 2px solid #ffedaf; outline-offset: 2px; }
 @media (max-height: 440px) {
   .title-screen .menu-art { height: 21dvh; }
 }
+
+.opening-guide { color: #ffdc9a; font-weight: 600; }
+.guide-dismiss { flex: none; white-space: nowrap; }
