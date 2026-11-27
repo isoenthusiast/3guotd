@@ -122,31 +122,27 @@ function Battlefield({ round, selected, suggested, onSelect, wireframe = false, 
   useLayoutEffect(() => {
     const element = canvas.current
     if (!element) return
-    let resolution: MediaQueryList
+    let previousRatio = window.devicePixelRatio || 1
     const measure = () => {
       const bounds = element.getBoundingClientRect()
       if (!bounds.width || !bounds.height) return
+      previousRatio = window.devicePixelRatio || 1
       // Preserve the previous bitmap where native density would reduce detail.
-      const scale = Math.min(window.devicePixelRatio || 1, 3)
+      const scale = Math.min(previousRatio, 3)
       const width = Math.max(columns * tile, Math.round(bounds.width * scale))
       const height = Math.max(rows * tile, Math.round(bounds.height * scale))
       setBitmap(previous => previous.width === width && previous.height === height ? previous : { width, height })
     }
-    const watchResolution = () => {
-      resolution?.removeEventListener('change', watchResolution)
-      resolution = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`)
-      resolution.addEventListener('change', watchResolution)
-      measure()
-    }
     const observer = new ResizeObserver(measure)
-    try { observer.observe(element, { box: 'device-pixel-content-box' }) }
-    catch { observer.observe(element) }
-    window.addEventListener('resize', measure)
-    watchResolution()
+    observer.observe(element)
+    measure()
+    // A DPR-only change can leave the CSS dimensions and resize events unchanged.
+    const monitor = window.setInterval(() => {
+      if (!document.hidden && previousRatio !== (window.devicePixelRatio || 1)) measure()
+    }, 500)
     return () => {
       observer.disconnect()
-      window.removeEventListener('resize', measure)
-      resolution.removeEventListener('change', watchResolution)
+      window.clearInterval(monitor)
     }
   }, [])
   const cells = useRef<(HTMLButtonElement | null)[]>([])
