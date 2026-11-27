@@ -458,3 +458,7 @@ button:focus-visible { outline: 2px solid #ffedaf; outline-offset: 2px; }
 
 .opening-guide { color: #ffdc9a; font-weight: 600; }
 .guide-dismiss { flex: none; white-space: nowrap; }
+
+.tower-guide-entry { border-bottom: 1px solid #56634e; padding-bottom: .65rem; }
+.tower-guide-entry h3 { margin: .5rem 0 .25rem; font: 700 1rem Georgia, serif; }
+.tower-guide-entry button { min-width: 44px; min-height: 44px; padding: .35rem .65rem; }

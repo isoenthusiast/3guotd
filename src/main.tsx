@@ -206,7 +206,7 @@ function loadClears(): string[] {
 function App() {
   const reportDialog = useRef<HTMLDialogElement>(null)
   const offline = useOfflineReadiness()
-  const { screen, overlay: confirmation, navigate, back } = useGameNavigation()
+  const { screen, overlay: confirmation, trial, navigate, back } = useGameNavigation()
   const [hasRun, setHasRun] = useState(false)
   const [sound, setSound] = useState(loadSound)
   const [notice, setNotice] = useState('')
@@ -481,7 +481,9 @@ function App() {
     <span class="offline">{offline.status}</span>
   </header>
 
-  if (screen === 'field-trials') return <PracticeBoard onBack={back} offlineStatus={offline.status} />
+  if (screen === 'field-trials' || screen === 'guide-trial') return <PracticeBoard key={screen + trial}
+    onBack={back} backLabel={screen === 'guide-trial' ? 'Back to Towers' : 'Menu'}
+    initialPracticeTower={trial} offlineStatus={offline.status} />
 
   if (screen === 'menu') {
     return <main class={`menu-screen title-screen${hasRun ? ' has-run' : ''}`}>
@@ -666,15 +668,42 @@ function App() {
       {enemyPage ? <>
         <EnemyGuide round={round} />
       </> : <>
-        <h2>Archer · {towerDetails.archer.price} silver</h2>
-        <p>Shoots one enemy at a time. Cover both sides of a bend. Upgrade range to reach farther or fire rate to land more shots.</p>
-        <h2>Drum · {towerDetails.drum.price} silver</h2>
-        <p>Slows enemies inside its ring. Pair it with an Archer for extra shots. Blue lines mark slowed enemies. The Drum deals no damage.</p>
-        <p>Wider reach extends the ring. Stronger slow raises the speed reduction from {Math.round(100 * (1 - towerDetails.drum.speedFactor))}% to {Math.round(100 * (1 - towerDetails.drum.strongerSpeedFactor))}%. Where Drums overlap, the strongest slow applies.</p>
-        <PairingGuide />
-        {(mission ? trialTowerFor(mission) === 'beacon' : longBuildSlots(round.waveNumber).includes('beacon')) && <p>Watch Beacon · {towerDetails.beacon.price} silver. The dotted line points to the nearest Archer within {towerDetails.beacon.range} tiles. That Archer reloads in {towerDetails.beacon.archerInterval}s. Equal distances favor the earlier board tile. Beacons and Faster fire do not stack. A Beacon deals no damage.</p>}
-        {(mission ? trialTowerFor(mission) === 'crossbow' : longBuildSlots(round.waveNumber).includes('crossbow')) && <p>Heavy Crossbow · {towerDetails.crossbow.price} silver. {towerRole('crossbow')}. A bolt deals {towerDetails.crossbow.damage} damage within {towerDetails.crossbow.range} tiles. Reloads in {towerDetails.crossbow.shotInterval}s. No upgrades in this trial.</p>}
-        {(mission ? trialTowerFor(mission) === 'volley' : longBuildSlots(round.waveNumber).includes('volley')) && <p>Volley Platform · {towerDetails.volley.price} silver. {towerRole('volley')} enemies within {towerDetails.volley.clusterRadius} tiles of the first target. Range {towerDetails.volley.range} tiles. Reloads in {towerDetails.volley.shotInterval}s. No upgrades in this trial.</p>}
+        <p>Try any tower in Field Trials without campaign clears.</p>
+        <h2>Damage</h2>
+        <article class="tower-guide-entry">
+          <h3>Archer · {towerDetails.archer.price} silver</h3>
+          <p>Shoots one enemy at a time. Cover both sides of a bend. Upgrade range to reach farther or fire rate to land more shots.</p>
+          <p>Available in Campaign, Long Battle, and every Field Trial.</p>
+          <button type="button" onClick={() => navigate('guide-trial', null, 'volley')}>Try Archer</button>
+        </article>
+        <article class="tower-guide-entry">
+          <h3>Volley Platform · {towerDetails.volley.price} silver</h3>
+          <p>Hits up to {towerDetails.volley.maxTargets} clustered enemies. Try a bend where the column bunches.</p>
+          <p>Campaign trial at Changban Level 3. Unlocks in Long Battle Wave 2.</p>
+          <button type="button" onClick={() => navigate('guide-trial', null, 'volley')}>Try Volley Platform</button>
+        </article>
+        <article class="tower-guide-entry">
+          <h3>Heavy Crossbow · {towerDetails.crossbow.price} silver</h3>
+          <p>{towerRole('crossbow')}. A bolt deals {towerDetails.crossbow.damage} damage within {towerDetails.crossbow.range} tiles.</p>
+          <p>Campaign trial at Jing Level 5. Unlocks in Long Battle Wave 4.</p>
+          <button type="button" onClick={() => navigate('guide-trial', null, 'crossbow')}>Try Heavy Crossbow</button>
+        </article>
+        <h2>Slowing</h2>
+        <article class="tower-guide-entry">
+          <h3>Drum · {towerDetails.drum.price} silver</h3>
+          <p>Slows enemies inside its ring. Pair it with an Archer for extra shots. Blue lines mark slowed enemies. The Drum deals no damage.</p>
+          <p>Wider reach extends the ring. Stronger slow raises the speed reduction from {Math.round(100 * (1 - towerDetails.drum.speedFactor))}% to {Math.round(100 * (1 - towerDetails.drum.strongerSpeedFactor))}%. Where Drums overlap, the strongest slow applies.</p>
+          <p>Available in Campaign and Long Battle.</p>
+          <button type="button" onClick={() => navigate('guide-trial', null, 'drum')}>Try Drum</button>
+          <PairingGuide />
+        </article>
+        <h2>Support</h2>
+        <article class="tower-guide-entry">
+          <h3>Watch Beacon · {towerDetails.beacon.price} silver</h3>
+          <p>Speeds up the nearest Archer within {towerDetails.beacon.range} tiles. The dotted line shows the link. Equal distances favor the earlier board tile. Beacons and Faster fire do not stack.</p>
+          <p>Campaign trial at Wuzhang Level 3. Unlocks in Long Battle Wave 6.</p>
+          <button type="button" onClick={() => navigate('guide-trial', null, 'beacon')}>Try Watch Beacon</button>
+        </article>
       </>}
       <VisualComfortControls />
       </section>
@@ -851,8 +880,10 @@ function App() {
 
 const hanzhongClearKey = '3guotd.hanzhong-rider-ambush.cleared.v1'
 
-function PracticeBoard({ onBack, onChallenge, onOriginal, offlineStatus, active = true }: {
+function PracticeBoard({ onBack, backLabel = 'Menu', initialPracticeTower = 'volley', onChallenge, onOriginal, offlineStatus, active = true }: {
   onBack?: () => void
+  backLabel?: string
+  initialPracticeTower?: PracticeTower
   onChallenge?: () => void
   onOriginal?: () => void
   offlineStatus: string
@@ -864,10 +895,10 @@ function PracticeBoard({ onBack, onChallenge, onOriginal, offlineStatus, active 
     ...createRound(20, mission),
     ...(challenge && { silver: hanzhongChallengeSilver }),
   })
-  const [practiceTower, setPracticeTower] = useState<PracticeTower>('volley')
+  const [practiceTower, setPracticeTower] = useState<PracticeTower>(initialPracticeTower)
   const [speed, setSpeed] = useState<PlaySpeed>(1)
   const [{ round, cue }, setSession] = useState<{ round: Round; cue: SupportCue | null }>(() => ({
-    round: onBack ? practiceRound('volley') : openingRound(), cue: null,
+    round: onBack ? practiceRound(initialPracticeTower) : openingRound(), cue: null,
   }))
   function setRound(update: (current: Round) => Round) {
     setSession(current => ({ ...current, round: update(current.round) }))
@@ -909,7 +940,7 @@ function PracticeBoard({ onBack, onChallenge, onOriginal, offlineStatus, active 
 
   return <main class="battle-screen map-preview" style={active ? undefined : { display: 'none' }}>
     <header class="battle-header">
-      {onBack ? <button class="edge-control" type="button" onClick={onBack}>Menu</button>
+      {onBack ? <button class="edge-control" type="button" onClick={onBack}>{backLabel}</button>
         : onOriginal ? <button class="edge-control" type="button" onClick={onOriginal}>Back</button>
         : <a class="edge-control" href="?" aria-label="Return to main game">Game</a>}
       <div class="hud">

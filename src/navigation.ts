@@ -1,18 +1,20 @@
 import { useLayoutEffect, useRef, useState } from 'preact/hooks'
+import type { PracticeTower } from './game/field-trials'
 
-type Screen = 'menu' | 'field-trials' | 'campaign' | 'long' | 'battle' | 'orders' | 'enemies' | 'towers'
+type Screen = 'menu' | 'field-trials' | 'campaign' | 'long' | 'battle' | 'orders' | 'enemies' | 'towers' | 'guide-trial'
 type Overlay = 'restart' | 'restore' | 'new' | 'report'
-type Route = { screen: Screen; overlay: Overlay | null }
+type Route = { screen: Screen; overlay: Overlay | null; trial?: PracticeTower }
 
 const root: Route = { screen: 'menu', overlay: null }
 
 function depth({ screen, overlay }: Route) {
-  const level = screen === 'menu' ? 0 : screen === 'orders' ? 2 : screen === 'enemies' || screen === 'towers' ? 3 : 1
+  const level = screen === 'menu' ? 0 : screen === 'orders' ? 2 : screen === 'enemies' || screen === 'towers' ? 3 : screen === 'guide-trial' ? 4 : 1
   return level + Number(overlay !== null)
 }
 
 function parent({ screen, overlay }: Route): Route {
   if (overlay) return { screen, overlay: null }
+  if (screen === 'guide-trial') return { screen: 'towers', overlay: null }
   if (screen === 'enemies' || screen === 'towers') return { screen: 'orders', overlay: null }
   if (screen === 'orders') return { screen: 'battle', overlay: null }
   return root
@@ -63,11 +65,11 @@ export function useGameNavigation() {
     return () => window.removeEventListener('popstate', onPop)
   }, [])
 
-  function navigate(screen: Screen, overlay: Overlay | null = null) {
+  function navigate(screen: Screen, overlay: Overlay | null = null, trial?: PracticeTower) {
     if (pending.current) return
-    const next = { screen, overlay }
+    const next = { screen, overlay, trial }
     const from = current.current
-    if (from.screen === screen && from.overlay === overlay) return
+    if (from.screen === screen && from.overlay === overlay && from.trial === trial) return
     const difference = depth(next) - depth(from)
     if (difference < 0) {
       pending.current = next
