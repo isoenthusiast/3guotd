@@ -219,7 +219,7 @@ function App() {
   const previousAudio = useRef<Round | null>(null)
   const [round, setRound] = useState(createRound)
   const [clears, setClears] = useState(loadClears)
-  const [openingGuide, setOpeningGuide] = useState<'active' | 'dismissed' | null>(null)
+  const [openingGuide, setOpeningGuide] = useState<'active' | 'start' | 'dismissed' | null>(null)
   const [selected, setSelected] = useState<number | null>(null)
   const [speed, setSpeed] = useState<PlaySpeed>(1)
   const recovery = useRecovery(round, speed, hasRun)
@@ -253,8 +253,8 @@ function App() {
   const spendingOpen = canSpend(round)
   const canRefund = setup && round.towers.length > 0
   const showActions = activeSite !== null && spendingOpen && (!tower || !!upgradeable && (!upgradeable.reach || !upgradeable.power))
-  const guiding = openingGuide === 'active' && initialSetup && mission?.id === 'village-watch:1'
-  const guideHasArcher = guiding && round.towers.some(defense => defense.kind === 'archer')
+  const guiding = (openingGuide === 'active' || openingGuide === 'start') && initialSetup && mission?.id === 'village-watch:1'
+  const guideHasArcher = guiding && openingGuide === 'start' && round.towers.some(defense => defense.kind === 'archer')
   const firstPlacement = openingGuide !== 'dismissed' && (setup || running) && round.waveNumber === 1 && !preparingLevel && round.towers.length === 0
   const suggested = useMemo(() => {
     if (!firstPlacement && (!guiding || guideHasArcher)) return null
@@ -276,7 +276,8 @@ function App() {
     volley: roadCoverage(roundRoutes(round), activeSite, 'volley'),
     crossbow: roadCoverage(roundRoutes(round), activeSite, 'crossbow'),
   }, [activeSite, tower, mission, round.rulesVersion])
-  const firstBuy = firstPlacement && coverage?.archer.reachesRoad
+  const guidePurchase = guiding && !guideHasArcher && suggested !== null && activeSite === suggested
+  const firstBuy = guiding ? guidePurchase : firstPlacement && coverage?.archer.reachesRoad
   const selectedName = activeSite === null ? '' : siteName(activeSite)
   const linkedArcher = activeSite !== null && (tower?.kind === 'beacon' || (!tower && choices.includes('beacon')))
     ? beaconArcher(round.towers, activeSite) : undefined
@@ -296,7 +297,7 @@ function App() {
     return boosted ? branchEffect(branch) : `${towerDetails.archer.fasterShotInterval} s / shot`
   }
   const guideCue = guiding ? guideHasArcher ? 'Tap Start to begin the wave.'
-    : suggested !== null && activeSite === suggested
+    : guidePurchase
       ? `${siteName(suggested)} · Tap Build Archer · ${towerDetails.archer.price} silver`
       : 'Tap the gold + to select the marked site.' : ''
   const openingHint = activeSite === null ? 'Tap the gold + for an Archer site.'
@@ -447,7 +448,7 @@ function App() {
     navigate('campaign')
   }
 
-  function buy(event: (current: Round) => Round) {
+  function buy(event: (current: Round) => Round, completesGuide = false) {
     const updated = event(round)
     if (updated === round) return
     if (sound) {
@@ -455,6 +456,7 @@ function App() {
       playCue('purchase')
     }
     setRound(current => event(current))
+    if (completesGuide) setOpeningGuide('start')
   }
 
   useEffect(() => {
@@ -803,7 +805,7 @@ function App() {
                   aria-description={round.silver < towerDetails[kind].price
                     ? `${towerRole(kind)}. Need ${towerDetails[kind].price - round.silver} more silver`
                     : kind === 'archer' ? 'Adds a shooter that deals damage along its covered road.' : towerRole(kind)}
-                  onClick={() => buy(current => buildTower(current, activeSite, kind))}>
+                  onClick={() => buy(current => buildTower(current, activeSite, kind), kind === 'archer' && guidePurchase)}>
                   <TowerPortrait kind={kind} />
                   <span><strong>Build {isTrialTower(kind) ? trialNames[kind] : towerDetails[kind].name}</strong>
                     <span>{towerDetails[kind].price} silver</span></span>

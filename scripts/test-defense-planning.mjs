@@ -63,7 +63,7 @@ try {
   await activate(cards)
   await activate(page.getByRole('button', { name: /Longer range/ }))
   await activate(page.getByRole('button', { name: /Faster fire/ }))
-  if (!baseline) assert.match(await status.innerText(), /Longer range \+ Faster fire/)
+  if (!baseline) assert.match(await page.locator('.tower-summary').innerText(), /Longer range \+ Faster fire/)
   await activate(button('Start wave'))
   await activate(button('Battle orders'))
   if (!baseline) {
