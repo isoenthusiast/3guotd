@@ -389,6 +389,20 @@
         <dd><span class="checkpoint">Check the existing Fengchu relay claim for delivery before retrying the playtest link.</span></dd>
       </dl>
     </article>
+    <article id="imp-21">
+      <div class="item-heading">
+        <h3><span class="id">IMP-21</span>Sharpen the battlefield on high-density phones</h3>
+        <span class="status">Accepted</span>
+      </div>
+      <dl>
+        <dt>Expected behavior</dt>
+        <dd>Render the board at a backing resolution appropriate to the device while retaining existing board dimensions and touch hitboxes. Choose a scale cap using measured frame pacing on a busy wave.</dd>
+        <dt>How to verify</dt>
+        <dd>At 320 × 480 and 390 × 740, compare labels, sprites, and health pips at device pixel ratios 1, 2, and 3. Verify identical tile selection and board bounds, no scrolling, and acceptable frame pacing on the same busy-wave fixture.</dd>
+        <dt>Acceptance</dt>
+        <dd>SimaYi approved AUD-051 at <code>0942637122e9a65ead519fd5e512cf021bb8a078</code>. Live offline DPR 1–3 checks passed at both phone sizes with stable touch geometry and frame pacing. GF-090 and GF-091 are closed. Sustained performance on physical phones remains unverified.</dd>
+      </dl>
+    </article>
   </main>
 </body>
 </html>
