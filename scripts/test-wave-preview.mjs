@@ -61,7 +61,7 @@ try {
       }
       await page.clock.install()
       await button('Start wave').tap()
-      await page.clock.runFor(Math.ceil(8800 / speed))
+      await page.clock.runFor(Math.ceil((wave === 2 ? 10_000 : 8_800) / speed))
       await button('Pause').tap()
       assert.equal(await forecast.count(), 0)
       await button('Main menu').tap()
