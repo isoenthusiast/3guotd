@@ -836,7 +836,7 @@ function App() {
             {speed}×</button>}
           {running || preparingLevel ? <button class="battle-primary" type="button" onClick={() => setPaused(value => !value)}>
             {paused ? 'Resume' : 'Pause'}</button>
-            : setup ? <button class="battle-primary" type="button" aria-label="Start wave" onClick={() => {
+            : setup ? <button class="battle-primary" type="button" aria-label="Start wave" disabled={guiding && !guideHasArcher} onClick={() => {
               if (guiding) setOpeningGuide('dismissed')
               setRound(startRound)
             }}>Start</button>
