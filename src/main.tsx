@@ -126,6 +126,7 @@ function Battlefield({ round, selected, suggested, onSelect, wireframe = false, 
     const measure = () => {
       const bounds = element.getBoundingClientRect()
       if (!bounds.width || !bounds.height) return
+      // Preserve the previous bitmap where native density would reduce detail.
       const scale = Math.min(window.devicePixelRatio || 1, 3)
       const width = Math.max(columns * tile, Math.round(bounds.width * scale))
       const height = Math.max(rows * tile, Math.round(bounds.height * scale))
@@ -138,10 +139,13 @@ function Battlefield({ round, selected, suggested, onSelect, wireframe = false, 
       measure()
     }
     const observer = new ResizeObserver(measure)
-    observer.observe(element)
+    try { observer.observe(element, { box: 'device-pixel-content-box' }) }
+    catch { observer.observe(element) }
+    window.addEventListener('resize', measure)
     watchResolution()
     return () => {
       observer.disconnect()
+      window.removeEventListener('resize', measure)
       resolution.removeEventListener('change', watchResolution)
     }
   }, [])

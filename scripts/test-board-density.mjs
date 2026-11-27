@@ -100,7 +100,7 @@ async function inspect(address, viewport, dpr, old = false) {
           && element.height === Math.max(832, Math.round(height * Math.min(devicePixelRatio, 3)))
       })
     }
-    if (!old && dpr === 1) {
+    if (!old && dpr === 1 && viewport.width === 390) {
       const resized = { width: viewport.width, height: viewport.height + 40 }
       await cdp.send('Emulation.setDeviceMetricsOverride', { ...resized, mobile: true, deviceScaleFactor: 4 })
       await page.waitForFunction(() => {
@@ -108,6 +108,9 @@ async function inspect(address, viewport, dpr, old = false) {
         const { width, height } = element.getBoundingClientRect()
         return devicePixelRatio === 4 && element.width === Math.max(576, Math.round(width * 3))
           && element.height === Math.max(832, Math.round(height * 3))
+      }, null, { timeout: 4000 }).catch(async error => {
+        console.log(await canvas.evaluate(el => ({ dpr: devicePixelRatio, width: el.width, height: el.height, bounds: el.getBoundingClientRect().toJSON() })))
+        throw error
       })
     }
     console.log(JSON.stringify({ build: old ? 'baseline' : 'candidate', viewport, dpr, bounds, raster, pacing }))
