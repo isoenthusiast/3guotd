@@ -118,25 +118,53 @@ function Battlefield({ round, selected, suggested, onSelect, wireframe = false, 
 }) {
   const artReady = useBattlefieldArt()
   const canvas = useRef<HTMLCanvasElement>(null)
+  const [bitmap, setBitmap] = useState({ width: columns * tile, height: rows * tile })
+  useLayoutEffect(() => {
+    const element = canvas.current
+    if (!element) return
+    let resolution: MediaQueryList
+    const measure = () => {
+      const bounds = element.getBoundingClientRect()
+      if (!bounds.width || !bounds.height) return
+      const scale = Math.min(window.devicePixelRatio || 1, 3)
+      const width = Math.max(columns * tile, Math.round(bounds.width * scale))
+      const height = Math.max(rows * tile, Math.round(bounds.height * scale))
+      setBitmap(previous => previous.width === width && previous.height === height ? previous : { width, height })
+    }
+    const watchResolution = () => {
+      resolution?.removeEventListener('change', watchResolution)
+      resolution = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`)
+      resolution.addEventListener('change', watchResolution)
+      measure()
+    }
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    watchResolution()
+    return () => {
+      observer.disconnect()
+      resolution.removeEventListener('change', watchResolution)
+    }
+  }, [])
   const cells = useRef<(HTMLButtonElement | null)[]>([])
   const reachable = useMemo(() => Array.from({ length: siteCount }, (_, site) =>
     roadCoverage(roundRoutes(round), site, 'archer').reachesRoad), [round.mission])
-  useEffect(() => {
+  useLayoutEffect(() => {
     const ctx = canvas.current?.getContext('2d')
     if (!ctx) return
+    ctx.setTransform(bitmap.width / (columns * tile), 0, 0, bitmap.height / (rows * tile), 0, 0)
     let frame = 0
     const paint = () => {
       if (drawBattlefield(ctx, round, selected, { wireframe, supportEnemy, supportArcher })) frame = requestAnimationFrame(paint)
     }
     paint()
     return () => cancelAnimationFrame(frame)
-  }, [round, selected, artReady, wireframe, supportEnemy, supportArcher])
+  }, [bitmap, round, selected, artReady, wireframe, supportEnemy, supportArcher])
 
   const closingSites = round.mission?.closedSites?.[round.waveNumber] ?? []
   const tabSite = selected ?? suggested ?? reachable.findIndex((_, site) => canBuildAt(round, site))
   return (
     <div class="battlefield">
-      <canvas ref={canvas} width={columns * tile} height={rows * tile} role="img"
+      <canvas ref={canvas} width={bitmap.width} height={bitmap.height} role="img"
         aria-label={round.mission ? `${round.mission.title}, with ${round.mission.gate} at the bottom`
           : 'Shu frontier battlefield, with an enemy road from top to bottom ending at the gate'} />
       <div class="cells" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
