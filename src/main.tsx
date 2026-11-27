@@ -128,7 +128,7 @@ function Battlefield({ round, selected, suggested, onSelect, wireframe = false, 
       if (!bounds.width || !bounds.height) return
       previousRatio = window.devicePixelRatio || 1
       // Preserve the previous bitmap where native density would reduce detail.
-      const scale = Math.min(previousRatio, 3)
+      const scale = Math.min(previousRatio, 3, Math.sqrt(1_100_000 / (bounds.width * bounds.height)))
       const width = Math.max(columns * tile, Math.round(bounds.width * scale))
       const height = Math.max(rows * tile, Math.round(bounds.height * scale))
       setBitmap(previous => previous.width === width && previous.height === height ? previous : { width, height })

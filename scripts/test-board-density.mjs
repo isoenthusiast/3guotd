@@ -46,9 +46,10 @@ async function inspect(address, viewport, dpr, old = false) {
       const element = document.querySelector('.battlefield canvas')
       if (!element || !window.densityLabels.has('Ferry landing')) return false
       const { width, height } = element.getBoundingClientRect()
+      const scale = Math.min(devicePixelRatio, 3, Math.sqrt(1_100_000 / (width * height)))
       return old ? element.width === 576 && element.height === 832
-        : element.width === Math.max(576, Math.round(width * Math.min(devicePixelRatio, 3))) &&
-          element.height === Math.max(832, Math.round(height * Math.min(devicePixelRatio, 3)))
+        : element.width === Math.max(576, Math.round(width * scale)) &&
+          element.height === Math.max(832, Math.round(height * scale))
     }, old)
     const raster = await canvas.evaluate(element => {
       const ctx = element.getContext('2d')
@@ -96,8 +97,9 @@ async function inspect(address, viewport, dpr, old = false) {
       await page.waitForFunction(() => {
         const element = document.querySelector('.battlefield canvas')
         const { width, height } = element.getBoundingClientRect()
-        return element.width === Math.max(576, Math.round(width * Math.min(devicePixelRatio, 3)))
-          && element.height === Math.max(832, Math.round(height * Math.min(devicePixelRatio, 3)))
+        const scale = Math.min(devicePixelRatio, 3, Math.sqrt(1_100_000 / (width * height)))
+        return element.width === Math.max(576, Math.round(width * scale))
+          && element.height === Math.max(832, Math.round(height * scale))
       })
     }
     if (!old && dpr === 1 && viewport.width === 390) {
@@ -106,8 +108,9 @@ async function inspect(address, viewport, dpr, old = false) {
       await page.waitForFunction(() => {
         const element = document.querySelector('.battlefield canvas')
         const { width, height } = element.getBoundingClientRect()
-        return devicePixelRatio === 4 && element.width === Math.max(576, Math.round(width * 3))
-          && element.height === Math.max(832, Math.round(height * 3))
+        const scale = Math.min(3, Math.sqrt(1_100_000 / (width * height)))
+        return devicePixelRatio === 4 && element.width === Math.max(576, Math.round(width * scale))
+          && element.height === Math.max(832, Math.round(height * scale))
       }, null, { timeout: 4000 }).catch(async error => {
         console.log(await canvas.evaluate(el => ({ dpr: devicePixelRatio, width: el.width, height: el.height, bounds: el.getBoundingClientRect().toJSON() })))
         throw error
